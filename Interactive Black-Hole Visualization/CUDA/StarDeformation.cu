@@ -250,6 +250,40 @@ __global__ void distortStarMap(float3* starLight, const float2* thphi, const uns
 	const int starSize, const float* camParam, const float* magnitude, const int treeLevel,
 	const int M, const int N, const int step, float offset, int* search, int searchNr, int2* stCache,
 	int* stnums, float3* trail, int trailnum, float2* grad, const int framenumber, const float2* viewthing, bool redshiftOn, bool lensingOn, const float* area) {
+	
+	distortStarMapWorker(starLight, thphi, bh, stars, tree,
+		starSize, camParam, magnitude, treeLevel,
+		M, N, step, offset, search, searchNr, stCache,
+		stnums, trail, trailnum, grad, framenumber, viewthing, redshiftOn, lensingOn, area);
+}
+
+__global__ void distortStarMapSharedMem(float3* starLight, const float2* thphi, const unsigned char* bh, const float* stars, const int* tree,
+	const int starSize, const float* camParam, const float* magnitude, const int treeLevel,
+	const int M, const int N, const int step, float offset, int* search, int searchNr, int2* stCache,
+	int* stnums, float3* trail, int trailnum, float2* grad, const int framenumber, const float2* viewthing, bool redshiftOn, bool lensingOn, const float* area) {
+
+	int tid = threadIdx.x + blockDim.x * threadIdx.y;
+
+	extern __shared__ float shared_memory[];
+
+	//Copy stars into shared memory in a quick manner using coallesing for quick access
+	for (int star_index_stride = 0; star_index_stride < starSize * 2; star_index_stride+= blockDim.x) {
+		shared_memory[star_index_stride + tid] = stars[star_index_stride + tid];
+	}
+
+	__syncthreads();
+
+
+	distortStarMapWorker(starLight, thphi, bh, shared_memory, tree,
+		starSize, camParam, magnitude, treeLevel,
+		M, N, step, offset, search, searchNr, stCache,
+		stnums, trail, trailnum, grad, framenumber, viewthing, redshiftOn, lensingOn, area);
+}
+
+__device__ void distortStarMapWorker(float3* starLight, const float2* thphi, const unsigned char* bh, const float* stars, const int* tree,
+	const int starSize, const float* camParam, const float* magnitude, const int treeLevel,
+	const int M, const int N, const int step, float offset, int* search, int searchNr, int2* stCache,
+	int* stnums, float3* trail, int trailnum, float2* grad, const int framenumber, const float2* viewthing, bool redshiftOn, bool lensingOn, const float* area) {
 
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;

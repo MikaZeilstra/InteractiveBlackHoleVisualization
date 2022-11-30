@@ -14,6 +14,14 @@
 														std::cout << milliseconds << " ms\t " << txt << std::endl; \
 													  }
 
+#define callKernelWithSharedMemory(txt, kernel, blocks, threads, memory_size, ...);{ cudaEventRecord(start);							\
+														kernel <<<blocks, threads, memory_size>>>(__VA_ARGS__);		\
+														cudaEventRecord(stop);							\
+														cudaEventSynchronize(stop);						\
+														cudaEventElapsedTime(&milliseconds, start, stop); \
+														std::cout << milliseconds << " ms\t " << txt << std::endl; \
+													  }
+
 float2* dev_hashTable = 0;
 int2* dev_offsetTable = 0;
 int2* dev_hashPosTag = 0;
@@ -520,7 +528,7 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 	int numBlocks_starsize = stars.starSize / threadsPerBlock_32 + 1;
 	int numBlocks_bordersize = (bhproc.angleNum * 2) / threadsPerBlock_32 + 1;
 
-	dim3 threadsPerBlock4_4(4, 4);
+	dim3 threadsPerBlock4_4(32, 8);
 	dim3 numBlocks_N_M_4_4((image.N - 1) / threadsPerBlock4_4.x + 1, (image.M - 1) / threadsPerBlock4_4.y + 1);
 	dim3 numBlocks_N1_M1_4_4(image.N / threadsPerBlock4_4.x + 1, image.M / threadsPerBlock4_4.y + 1);
 	dim3 numBlocks_GN_GM_4_4((grids.GN - 1) / threadsPerBlock4_4.x + 1, (grids.GM - 1) / threadsPerBlock4_4.y + 1);
@@ -620,11 +628,22 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 			callKernel("Calculated gradient field for star trails", makeGradField, numBlocks_N1_M1_4_4, threadsPerBlock4_4,
 						dev_interpolatedGrid, image.M, image.N, dev_gradient);
 
-			callKernel("Distorted star map", distortStarMap, numBlocks_N_M_4_4, threadsPerBlock4_4,
-						dev_starLight0, dev_interpolatedGrid, dev_blackHoleMask, dev_starPositions, dev_starTree, stars.starSize, 
-						dev_camera0, dev_starMagnitudes, stars.treeLevel,
-						image.M, image.N, starvis.gaussian, offset, dev_treeSearch, starvis.searchNr, dev_starCache, dev_nrOfImagesPerStar, 
-						dev_starTrails, starvis.trailnum, dev_gradient, q, dev_viewer, redshiftOn, lensingOn, dev_solidAngles0);
+			//Check if we can use shared memory for stars
+			if (stars.starSize * sizeof(float) * 2 < 49152) {
+				callKernelWithSharedMemory("Distorted star map", distortStarMapSharedMem, numBlocks_N_M_4_4, threadsPerBlock4_4, stars.starSize * 2 * sizeof(float),
+					dev_starLight0, dev_interpolatedGrid, dev_blackHoleMask, dev_starPositions, dev_starTree, stars.starSize,
+					dev_camera0, dev_starMagnitudes, stars.treeLevel,
+					image.M, image.N, starvis.gaussian, offset, dev_treeSearch, starvis.searchNr, dev_starCache, dev_nrOfImagesPerStar,
+					dev_starTrails, starvis.trailnum, dev_gradient, q, dev_viewer, redshiftOn, lensingOn, dev_solidAngles0);
+			}
+			else {
+				callKernel("Distorted star map", distortStarMap, numBlocks_N_M_4_4, threadsPerBlock4_4,
+					dev_starLight0, dev_interpolatedGrid, dev_blackHoleMask, dev_starPositions, dev_starTree, stars.starSize,
+					dev_camera0, dev_starMagnitudes, stars.treeLevel,
+					image.M, image.N, starvis.gaussian, offset, dev_treeSearch, starvis.searchNr, dev_starCache, dev_nrOfImagesPerStar,
+					dev_starTrails, starvis.trailnum, dev_gradient, q, dev_viewer, redshiftOn, lensingOn, dev_solidAngles0);
+			}
+			
 
 			callKernel("Summed all star light", sumStarLight, numBlocks_N_M_1_24, threadsPerBlock1_24,
 						dev_starLight0, dev_starTrails, dev_starLight1, starvis.gaussian, image.M, image.N, starvis.diffusionFilter);

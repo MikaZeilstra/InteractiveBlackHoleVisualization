@@ -28,7 +28,7 @@ public:
 
 	StarProcessor(Parameters& param) {
 		std::vector< std::vector<float> > starVec;
-		readStars2("../Stars/"+param.starCatalogue, starVec);
+		readStars2(param.getResourceFolder()+ param.getStarFolder() + param.starCatalogue, starVec);
 		std::vector< std::vector<float> > starThphi;
 		std::vector< std::vector<float> > lowStars;
 		for (int i = 0; i < starVec.size(); i++) {

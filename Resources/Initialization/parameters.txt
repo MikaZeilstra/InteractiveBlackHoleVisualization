@@ -10,12 +10,12 @@ viewAngle = 0.5 //*PI
 offsetX = 0 // *PI
 offsetY = 0 // *PI
 
-nrOfFrames = 50
+nrOfFrames = 1
 
 // Image location.
 celestialSkyImg = "rainbow.png"
 // Star file location.
-starCatalogue = "sterren.txt"
+starCatalogue = "sterren_first5k.txt"
 // Star binary tree depth
 starTreeLevel = 8
 // Stars only with magnitude lower than
@@ -47,7 +47,7 @@ camSpeedFrom = 0.32001
 camSpeedTo = 0.0001
 camSpeedStepsize = 0.02
 
-camRadiusChange = true
+camRadiusChange = false
 camRadiusFrom = 5.
 camRadiusTo = 10.
 camRadiusStepsize = 0.2

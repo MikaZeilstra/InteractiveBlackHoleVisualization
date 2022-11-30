@@ -1,5 +1,7 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
+#include <device_functions.h>
+
 #include "intellisense_cuda_intrinsics.cuh"
 #include "Constants.cuh"
 #include "ColorComputation.cuh"
@@ -18,6 +20,18 @@ __global__ void distortStarMap(float3* starLight, const float2* thphi, const uns
 								const int M, const int N, const int step, float offset, int* search, int searchNr, int2* stCache,
 								int* stnums, float3* trail, int trailnum, float2* grad, const int framenumber, const float2* viewthing, 
 								bool redshiftOn, bool lensingOn, const float* area);
+
+__global__ void distortStarMapSharedMem(float3* starLight, const float2* thphi, const unsigned char* bh, const float* stars, const int* tree,
+	const int starSize, const float* camParam, const float* magnitude, const int treeLevel,
+	const int M, const int N, const int step, float offset, int* search, int searchNr, int2* stCache,
+	int* stnums, float3* trail, int trailnum, float2* grad, const int framenumber, const float2* viewthing,
+	bool redshiftOn, bool lensingOn, const float* area);
+
+__device__ void distortStarMapWorker(float3* starLight, const float2* thphi, const unsigned char* bh, const float* stars, const int* tree,
+	const int starSize, const float* camParam, const float* magnitude, const int treeLevel,
+	const int M, const int N, const int step, float offset, int* search, int searchNr, int2* stCache,
+	int* stnums, float3* trail, int trailnum, float2* grad, const int framenumber, const float2* viewthing,
+	bool redshiftOn, bool lensingOn, const float* area);
 
 __global__ void addDiffraction(float3* starLight, const int M, const int N, const uchar3* diffraction, const int filtersize);
 
