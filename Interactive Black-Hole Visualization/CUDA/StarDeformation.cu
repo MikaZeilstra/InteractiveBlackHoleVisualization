@@ -288,13 +288,7 @@ __device__ void distortStarMapWorker(float3* starLight, const float2* thphi, con
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 
-	// Set starlight array to zero
 	int filterW = step * 2 + 1;
-	for (int u = 0; u <= 2 * step; u++) {
-		for (int v = 0; v <= 2 * step; v++) {
-			starLight[filterW * filterW * ijc + filterW * u + v] = { 0.f, 0.f, 0.f };
-		}
-	}
 
 	// Only compute if pixel is in bounds and not black hole.
 	if (i < N && j < M) {

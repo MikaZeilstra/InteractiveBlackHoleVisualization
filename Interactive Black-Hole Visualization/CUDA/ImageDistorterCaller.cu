@@ -629,6 +629,8 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 						dev_interpolatedGrid, image.M, image.N, dev_gradient);
 
 			//Check if we can use shared memory for stars
+			cudaMemset(dev_starLight0, 0, sizeof(float3)*(starvis.gaussian * 2 + 1) * (starvis.gaussian * 2 + 1) * image.M * image.N);
+
 			if (stars.starSize * sizeof(float) * 2 < 49152) {
 				callKernelWithSharedMemory("Distorted star map", distortStarMapSharedMem, numBlocks_N_M_4_4, threadsPerBlock4_4, stars.starSize * 2 * sizeof(float),
 					dev_starLight0, dev_interpolatedGrid, dev_blackHoleMask, dev_starPositions, dev_starTree, stars.starSize,

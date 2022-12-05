@@ -15,11 +15,11 @@ nrOfFrames = 1
 // Image location.
 celestialSkyImg = "rainbow.png"
 // Star file location.
-starCatalogue = "sterren_first5k.txt"
+starCatalogue = "sterren.txt"
 // Star binary tree depth
 starTreeLevel = 8
 // Stars only with magnitude lower than
-starMagnitudeCut = 1000
+starMagnitudeCut = 5
 // Star diffraction img
 diffractionImg = "0s1.png"
 
