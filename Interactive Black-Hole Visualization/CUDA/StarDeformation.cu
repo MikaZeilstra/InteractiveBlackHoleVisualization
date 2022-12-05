@@ -1,4 +1,7 @@
 #include "StarDeformation.cuh"
+
+#define DIFFRACTION_THRESHOLD  65025.f
+
 __constant__ const int tempToRGB[1173] = { 255, 56, 0, 255, 71, 0, 255, 83, 0, 255, 93, 0, 255, 101, 0, 255, 109, 0, 255, 115, 0, 255, 121, 0,
 												255, 126, 0, 255, 131, 0, 255, 137, 18, 255, 142, 33, 255, 147, 44, 255, 152, 54, 255, 157, 63, 255, 161, 72,
 												255, 165, 79, 255, 169, 87, 255, 173, 94, 255, 177, 101, 255, 180, 107, 255, 184, 114, 255, 187, 120,
@@ -373,9 +376,9 @@ __device__ void distortStarMapWorker(float3* starLight, const float2* thphi, con
 									rgb.x *= 255.f;
 									rgb.y *= 255.f;
 									rgb.z *= 255.f;
-									starLight[filterW * filterW * ijc + filterW * u + v].x += rgb.x * rgb.x;
-									starLight[filterW * filterW * ijc + filterW * u + v].y += rgb.y * rgb.y;
-									starLight[filterW * filterW * ijc + filterW * u + v].z += rgb.z * rgb.z;
+									starLight[M * N * (filterW * u + v) + j * N + i].x += rgb.x * rgb.x;
+									starLight[M * N * (filterW * u + v) + j * N + i].y += rgb.y * rgb.y;
+									starLight[M * N * (filterW * u + v) + j * N + i].z += rgb.z * rgb.z;
 								}
 							}
 						}
@@ -396,9 +399,11 @@ __global__ void sumStarLight(float3* starLight, float3* trail, float3* out, int 
 	float factor = 20.f;// 00.f;
 	for (int u = start; u <= stop; u++) {
 		for (int v = 0; v <= 2 * step; v++) {
-			brightness.x += factor * starLight[filterW * filterW * ((i + u - step) * M + ((j + v - step + M) % M)) + filterW * filterW - (filterW * u + v + 1)].x;
-			brightness.y += factor * starLight[filterW * filterW * ((i + u - step) * M + ((j + v - step + M) % M)) + filterW * filterW - (filterW * u + v + 1)].y;
-			brightness.z += factor * starLight[filterW * filterW * ((i + u - step) * M + ((j + v - step + M) % M)) + filterW * filterW - (filterW * u + v + 1)].z;
+			int x = (i + u - step);
+			int y = ((j + v - step + M) % M);
+			brightness.x += factor * starLight[M * N * (filterW * u + v) + y * N + x].x;
+			brightness.y += factor * starLight[M * N * (filterW * u + v) + y * N + x].y;
+			brightness.z += factor * starLight[M * N * (filterW * u + v) + y * N + x].z;
 		}
 	}
 	float factor2 = 1.f;
@@ -406,7 +411,7 @@ __global__ void sumStarLight(float3* starLight, float3* trail, float3* out, int 
 	brightness.y += factor2 * trail[ijc].y;
 	brightness.z += factor2 * trail[ijc].z;
 	trail[ijc] = { 0.f, 0.f, 0.f };
-	out[ijc] = brightness;
+	out[j * N + i] = brightness;
 }
 
 
@@ -423,14 +428,55 @@ __global__ void clearArrays(int* stnums, int2* stCache, const int frame, const i
 	}
 }
 
-__global__ void addDiffraction(float3* starLight, const int M, const int N, const uchar3* diffraction, const int filtersize) {
+__global__ void addDiffraction(float3* starLight, float3* output, const int M, const int N, const uchar3* diffraction, const int filtersize) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 
+	int threadId = threadIdx.x + threadIdx.y * blockDim.x;
+
+	int filterhalf = filtersize / 2;
+
+	output[ijc] = starLight[j * N + i];
+
+	
+	// Convolve diffraction pattern with image if it reaches the threshold
+	for (int diff_y =  j - filterhalf; diff_y < j + filterhalf; diff_y++) {
+		//Wrap filter horizontally at M and 0 to connect 0 phi to 2 pi phi
+		for (int diff_x = (i - filterhalf  +M) % M; diff_x < (i + filterhalf + M) % M; diff_x=(diff_x+1)%M) {
+			//Check if filter index is in the image
+			__syncwarp();
+			if (diff_y >= 0 && diff_y < N) {
+
+				//If starlight in filter meets threshold add an amount determined by diffraction to current pixel
+				float3 filter_starlight = starLight[diff_y * N + diff_x];
+				float max = fmaxf(fmaxf(filter_starlight.x, filter_starlight.y), filter_starlight.z);
+				if (max > DIFFRACTION_THRESHOLD) {
+					float div = div = 10000 * powf(max, 0.6); //TODO ask significance of these numbers
+					//Get the location in the diffraction filter of our pixel relative to the pixel we are checking for starlight
+					int3 filter_location = { i - diff_x + filterhalf, j - diff_y + filterhalf };
+
+					//Get the diffraction contributed from the filtered pixel
+					float3 diff = {
+						filter_starlight.x / div * (float)(diffraction[filter_location.y * filtersize + filter_location.x].x),
+						filter_starlight.y / div * (float)(diffraction[filter_location.y * filtersize + filter_location.x].y),
+						filter_starlight.z / div * (float)(diffraction[filter_location.y * filtersize + filter_location.x].z),
+
+					};
+
+					//Add diffraction contribution to our pixel
+					output[ijc].x += fmin(DIFFRACTION_THRESHOLD, diff.x * diff.x);
+					output[ijc].y += fmin(DIFFRACTION_THRESHOLD, diff.y * diff.y);
+					output[ijc].z += fmin(DIFFRACTION_THRESHOLD, diff.z * diff.z);
+				}
+			}
+		}
+	}
+	
+	/*
 	// check whether the pixel itself (halfway in the list) has a high value (higher than threshold) If yes, mark it.
 	// In a second pass do the convolution with the pattern over all the pixels that got marked.
 	float max = fmaxf(fmaxf(starLight[ijc].x, starLight[ijc].y), starLight[ijc].z);
-	if (max > 65025.f) {
+	if (max > DIFFRACTION_THRESHOLD) {
 		int filterhalf = filtersize / 2;
 		int startx = 0;
 		int endx = filtersize;
@@ -448,4 +494,7 @@ __global__ void addDiffraction(float3* starLight, const int M, const int N, cons
 			}
 		}
 	}
+	*/
+
+	
 }

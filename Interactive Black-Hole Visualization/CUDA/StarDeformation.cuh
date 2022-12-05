@@ -9,7 +9,7 @@
 
 __global__ void makeGradField(const float2* thphi, const int M, const int N, float2* grad);
 
-__global__ void addDiffraction(float3* starLight, const int M, const int N, const uchar3* diffraction, const int filtersize);
+__global__ void addDiffraction(float3* starLight, float3* output, const int M, const int N, const uchar3* diffraction, const int filtersize);
 
 __global__ void clearArrays(int* stnums, int2* stCache, const int frame, const int trailnum, const int starSize);
 

@@ -533,6 +533,11 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 	dim3 numBlocks_N1_M1_4_4(image.N / threadsPerBlock4_4.x + 1, image.M / threadsPerBlock4_4.y + 1);
 	dim3 numBlocks_GN_GM_4_4((grids.GN - 1) / threadsPerBlock4_4.x + 1, (grids.GM - 1) / threadsPerBlock4_4.y + 1);
 
+	dim3 threadsPerBlock32_4(128, 8);
+	dim3 numBlocks_N_M_32_4((image.N - 1) / threadsPerBlock32_4.x + 1, (image.M - 1) / threadsPerBlock32_4.y + 1);
+	dim3 numBlocks_N1_M1_32_4(image.N / threadsPerBlock32_4.x + 1, image.M / threadsPerBlock32_4.y + 1);
+	dim3 numBlocks_GN_GM_32_4((grids.GN - 1) / threadsPerBlock32_4.x + 1, (grids.GM - 1) / threadsPerBlock32_4.y + 1);
+
 	dim3 threadsPerBlock5_25(5, 25);
 	dim3 numBlocks_GN_GM_5_25((grids.GN - 1) / threadsPerBlock5_25.x + 1, (grids.GM - 1) / threadsPerBlock5_25.y + 1);
 	dim3 numBlocks_N_M_5_25((image.N - 1) / threadsPerBlock5_25.x + 1, (image.M - 1) / threadsPerBlock5_25.y + 1);
@@ -650,12 +655,12 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 			callKernel("Summed all star light", sumStarLight, numBlocks_N_M_1_24, threadsPerBlock1_24,
 						dev_starLight0, dev_starTrails, dev_starLight1, starvis.gaussian, image.M, image.N, starvis.diffusionFilter);
 
-			callKernel("Added diffraction", addDiffraction, numBlocks_N_M_4_4, threadsPerBlock4_4,
-						dev_starLight1, image.M, image.N, dev_diffraction, starvis.diffSize);
+			callKernel("Added diffraction", addDiffraction, numBlocks_GN_GM_32_4, threadsPerBlock32_4,
+						dev_starLight1, dev_starLight0, image.M, image.N, dev_diffraction, starvis.diffSize);
 
 			if (!map) {
 				callKernel("Created pixels from star light", makePix, numBlocks_N_M_5_25, threadsPerBlock5_25,
-							dev_starLight1, dev_outputImage, image.M, image.N);
+						dev_starLight0, dev_outputImage, image.M, image.N);
 			}
 		}
 
@@ -667,7 +672,7 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 
 		if (star && map) {
 			callKernel("Created pixels from star light", makePix, numBlocks_N_M_5_25, threadsPerBlock5_25,
-						dev_starLight1, dev_starImage, image.M, image.N);
+						dev_starLight0, dev_starImage, image.M, image.N);
 
 			callKernel("Added distorted star and celestial sky image", addStarsAndBackground, numBlocks_N_M_5_25, threadsPerBlock5_25,
 						dev_starImage, dev_outputImage, dev_outputImage, image.M);
