@@ -27,14 +27,12 @@ mono_crash.*
 [Ll]ibraries/cereal-1.3.2
 
 # Images
-Resources/
-Grids/
-Stars/
-CelestialBackgrounds/
-# CelestialBackgrounds/Summed
+Resources/Grids/*
+Resources/Stars/*.star
+Resources/CelestialBackgrounds/Summed/*
 
 # Results
-Results/
+Results/*
 
 # DLLs
 *.dll
