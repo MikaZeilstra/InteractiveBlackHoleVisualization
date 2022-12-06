@@ -203,7 +203,7 @@ void CUDA::integrateGrid(const double rV, const double thetaV, const double phiV
 	checkCudaErrors();
 
 
-	int threads_per_block = 512;
+	int threads_per_block = 32;
 
 	int block_size = ceil(pRV.size() / (float)threads_per_block);
 
