@@ -18,17 +18,22 @@
 #include "ShadowComputation.cuh"
 #include "ImageDeformation.cuh"
 
+#include "Integration.cuh"
+
 #include "../C++/CelestialSkyProcessor.h"
 #include "../C++/Grid.h"
 #include "../C++/StarProcessor.h"
 #include "../C++/Camera.h"
 #include "../C++/Viewer.h"
 
+#ifndef CUDA_FUNCTIONS
+#define CUDA_FUNCTIONS
+
 namespace CUDA {
 
 	struct CelestialSky {
 		CelestialSky(CelestialSkyProcessor& celestialsky) {
-			summedCelestialSky = (float4*) &(celestialsky.summedImageVec[0]);
+			summedCelestialSky = (float4*)&(celestialsky.summedImageVec[0]);
 			rows = celestialsky.rows;
 			cols = celestialsky.cols;
 			imsize = { rows, cols };
@@ -130,7 +135,7 @@ namespace CUDA {
 	};
 
 	struct StarVis {
-		StarVis (Stars& stars, Image& img, Parameters& param) {
+		StarVis(Stars& stars, Image& img, Parameters& param) {
 			gaussian = 1;
 			diffSize = img.M / 16;
 			cv::Mat diffImg = cv::imread(param.getStarDiffractionFile());
@@ -164,21 +169,29 @@ namespace CUDA {
 	};
 
 	cudaError_t cleanup();
-	
+
 	//void setDeviceVariables(const Grids& grids, const Image& image, const CelestialSky& celestialSky, const Stars& stars);
 
 	void checkCudaStatus(cudaError_t cudaStatus, const char* message);
 
 	void checkCudaErrors();
 
+	void init();
+
 	void call(std::vector<Grid>& grids, std::vector<Camera>& cameras, StarProcessor& stars, Viewer& view, CelestialSkyProcessor& celestialSky, Parameters& param);
 
 	//unsigned char* getDiffractionImage(const int size);
+	void allocateGridMemory(size_t size, double a);
 
-	void memoryAllocationAndCopy(const Grids& grids, const Image& image, const CelestialSky& celestialSky, 
-								 const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis);
+
+	void memoryAllocationAndCopy(const Grids& grids, const Image& image, const CelestialSky& celestialSky,
+		const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis);
 
 	void runKernels(const Grids& grids, const Image& image, const CelestialSky& celestialSky,
-					const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis, const Parameters& param);
+		const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis, const Parameters& param);
+
+	void integrateGrid(const double rV, const double thetaV, const double phiV, std::vector <double>& pRV,
+		std::vector <double>& bV, std::vector <double>& qV, std::vector <double>& pThetaV, double a);
 }
 
+#endif // !CUDA_FUNCTIONS

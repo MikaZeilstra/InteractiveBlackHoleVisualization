@@ -68,9 +68,18 @@
     <ClInclude Include="CUDA\StarDeformation.cuh">
       <Filter>CUDA\Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="CUDA\Integration.cuh">
+      <Filter>CUDA\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C++\IntegrationDefines.h">
+      <Filter>C++\Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="C++\Source.cpp">
+      <Filter>C++\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C++\Grid.cpp">
       <Filter>C++\Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -112,6 +121,9 @@
       <Filter>CUDA\Source Files</Filter>
     </CudaCompile>
     <CudaCompile Include="CUDA\StarDeformation.cu">
+      <Filter>CUDA\Source Files</Filter>
+    </CudaCompile>
+    <CudaCompile Include="CUDA\Integration.cu">
       <Filter>CUDA\Source Files</Filter>
     </CudaCompile>
   </ItemGroup>

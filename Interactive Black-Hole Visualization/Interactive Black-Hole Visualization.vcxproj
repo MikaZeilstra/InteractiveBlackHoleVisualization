@@ -239,6 +239,7 @@
       <FileType>Document</FileType>
     </CudaCompile>
     <CudaCompile Include="CUDA\ImageDistorterCaller.cuh" />
+    <CudaCompile Include="CUDA\Integration.cu" />
     <CudaCompile Include="CUDA\intellisense_cuda_intrinsics.cuh" />
     <CudaCompile Include="CUDA\ShadowComputation.cu" />
     <CudaCompile Include="CUDA\StarDeformation.cu" />
@@ -251,16 +252,19 @@
     <ClInclude Include="C++\Code.h" />
     <ClInclude Include="C++\Const.h" />
     <ClInclude Include="C++\Grid.h" />
+    <ClInclude Include="C++\IntegrationDefines.h" />
     <ClInclude Include="C++\Metric.h" />
     <ClInclude Include="C++\Parameters.h" />
     <ClInclude Include="C++\PSHOffsetTable.h" />
     <ClInclude Include="C++\StarProcessor.h" />
     <ClInclude Include="C++\Viewer.h" />
     <ClInclude Include="CUDA\ImageDeformation.cuh" />
+    <ClInclude Include="CUDA\Integration.cuh" />
     <ClInclude Include="CUDA\ShadowComputation.cuh" />
     <ClInclude Include="CUDA\StarDeformation.cuh" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="C++\Grid.cpp" />
     <ClCompile Include="C++\Source.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

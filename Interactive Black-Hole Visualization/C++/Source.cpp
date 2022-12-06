@@ -84,11 +84,21 @@ int main()
 	/* ----------------------- VARIABLE SETTINGS -------------------------- */
 
 	Parameters param("parameters.txt");
+	
+	
 
 	/* --------------------- INITIALIZATION BLACK HOLE -------------------- */
 
 	BlackHole black = BlackHole(param.afactor);
 	std::cout << "Initialized Black Hole " << std::endl << std::endl;
+
+	/* ----------------------- SETUP CUDA -------------------------- */
+	CUDA::init();
+
+	int max_grid_size = pow(2, param.gridMaxLevel) + 1;
+
+	CUDA::allocateGridMemory(max_grid_size * max_grid_size,metric::a);
+
 
 	/* ------------------ INITIALIZATION CAMERAS & GRIDS ------------------ */
 
@@ -113,7 +123,7 @@ int main()
 		
 		std::string gridFilename = param.getGridFileName(camRad, camInc, camSpeed);
 
-		if (!Archive<Grid>::load(gridFilename, grids[q])) {
+		//if (!Archive<Grid>::load(gridFilename, grids[q])) {
 
 			std::cout << "Computing new grid file..." << std::endl << std::endl;
 			auto start_time = std::chrono::high_resolution_clock::now();
@@ -127,12 +137,13 @@ int main()
 			grids[q].drawBlocks(param.getGridBlocksFileName(camRad, camInc, camSpeed));
 
 			//grids[q].makeHeatMapOfIntegrationSteps(heatMapFilename);
-		}
+		//}
 		std::cout << "Initialized Grid " << q + 1 << " of " << param.gridNum << std::endl;
 	}
 	std::cout << "Initialized all grids" << std::endl << std::endl;
 	
 	/* -------------------- INITIALIZATION STARS ---------------------- */
+
 
 	StarProcessor starProcessor;
 	std::string starFilename = param.getStarFileName();

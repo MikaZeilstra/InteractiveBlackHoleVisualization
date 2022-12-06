@@ -4,29 +4,7 @@
 #include <string>
 #include "Const.h"
 #include "Code.h"
-
-#define rVar var[0]
-#define thetaVar var[1]
-#define phiVar var[2]
-#define pRVar var[3]
-#define pThetaVar var[4]
-
-#define drdz varOut[0]
-#define dtdz varOut[1]
-#define dpdz varOut[2]
-#define dprdz varOut[3]
-#define dptdz varOut[4]
-
-//#define A *a
-//#define asq *asq
-
-#define SAFETY 0.9
-#define PGROW -0.2
-#define PSHRNK -0.25
-#define ERRCON 1.89e-4
-#define MAXSTP 1000
-#define TINY 1.0e-30
-#define ADAPTIVE 5.0
+#include "IntegrationDefines.h"
 
 namespace metric {
 	static double a = 0.0;
@@ -171,24 +149,36 @@ namespace metric {
 
 	static void wrapToPi(double& thetaW, double& phiW) {
 		thetaW = fmod(thetaW, PI2);
-		while (thetaW < 0) thetaW += PI2;
+		if (thetaW < 0) {
+			thetaW += PI2;
+		}
+
 		if (thetaW > PI) {
 			thetaW -= 2 * (thetaW - PI);
 			phiW += PI;
 		}
 		while (phiW < 0) phiW += PI2;
 		phiW = fmod(phiW, PI2);
+		if (phiW < 0) {
+			phiW += PI2;
+		}
 	}
 
 	static void wrapToPi(float& thetaW, float& phiW) {
 		thetaW = fmod(thetaW, PI2);
-		while (thetaW < 0) thetaW += PI2;
+		if (thetaW < 0) {
+			thetaW += PI2;
+		}
+
 		if (thetaW > PI) {
 			thetaW -= 2 * (thetaW - PI);
 			phiW += PI;
 		}
 		while (phiW < 0) phiW += PI2;
 		phiW = fmod(phiW, PI2);
+		if (phiW < 0) {
+			phiW += PI2;
+		}
 	}
 
 	static void derivs(double* var, double* varOut, double b, double q) {

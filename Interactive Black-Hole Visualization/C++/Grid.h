@@ -16,8 +16,22 @@
 #include "PSHOffsetTable.h"
 #include <chrono>
 #include <numeric>
+
+//#include "../CUDA/ImageDistorterCaller.cuh"
+
 #define PRECCELEST 0.015
 #define ERROR 0.001//1e-6
+#define MIN_GPU_INTEGRATION 1000
+
+
+#ifndef GRID_CLASS
+#define GRID_CLASS
+
+namespace CUDA {
+	void integrateGrid(const double rV, const double thetaV, const double phiV, std::vector <double>& pRV,
+		std::vector <double>& bV, std::vector <double>& qV, std::vector <double>& pThetaV,double a);
+}
+
 
 class Grid
 {
@@ -511,6 +525,20 @@ private:
 		double rS = cam->r;
 		double sp = cam->speed;
 
+		std::vector<double>pRs;
+		std::vector<double>bs;
+		std::vector<double>qs;
+		std::vector<double>pThetas;
+		
+		pRs.reserve(n);
+		bs.reserve(n);
+		qs.reserve(n);
+		pThetas.reserve(n);
+
+
+		std::vector<double>is;
+		is.reserve(n);
+
 		#pragma loop(hint_parallel(8))
 		#pragma loop(ivdep)
 		for (int i = 0; i<n; i++) {
@@ -531,17 +559,34 @@ private:
 			double eF = 1. / (cam->alpha + cam->w * cam->wbar * phiFido);
 
 			double pR = eF * cam->ro * rFido / sqrtf(cam->Delta);
-			double pTheta = eF * cam->ro * thetaFido;
+			double pTheta  = eF * cam->ro * thetaFido;
 			double pPhi = eF * cam->wbar * phiFido;
 
 			double b = pPhi;
-			double q = pTheta*pTheta + cos(thetaS)*cos(thetaS)*(b*b / (sin(thetaS)*sin(thetaS)) - metric::asq);
+			double q = pTheta * pTheta + cos(thetaS) * cos(thetaS) * (b * b / (sin(thetaS) * sin(thetaS)) - metric::asq);
 
 			theta[i] = -1;
 			phi[i] = -1;
 			step[i] = 0;
 			if (metric::checkCelest(pR, rS, thetaS, b, q)) {
-				metric::rkckIntegrate1(rS, thetaS, phiS, pR, b, q, pTheta, theta[i], phi[i], step[i]);
+				is.push_back(i);
+
+				pRs.push_back(pR);
+				bs.push_back(b);
+				qs.push_back(q);
+				pThetas.push_back(pTheta);
+			}
+		}
+		if (is.size() < MIN_GPU_INTEGRATION) {
+			for (int i = 0;i < is.size(); i++) {
+				metric::rkckIntegrate1(rS, thetaS, phiS, pRs[i], bs[i], qs[i], pThetas[i], theta[is[i]], phi[is[i]], step[is[i]]);
+			}
+		}
+		else {
+			CUDA::integrateGrid(rS, thetaS, phiS, pRs, bs, qs, pThetas, metric::a);
+			for (int i = 0; i < is.size(); i++) {
+				theta[is[i]] = bs[i];
+				phi[is[i]] = qs[i];
 			}
 		}
 	}
@@ -700,4 +745,4 @@ public:
 	~Grid() {};
 };
 
-
+#endif // !GRID_CLASS

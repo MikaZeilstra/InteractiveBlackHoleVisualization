@@ -16,6 +16,7 @@ struct Parameters {
 	int starTreeLevel, starMagnitudeCut;
 	double br, bphi, btheta;
 	bool userSpeed;
+	bool useStars;
 	bool camSpeedChange, camInclinationChange, camRadiusChange;
 	cv::Point2d camSpeedFromTo, camInclinationFromTo, camRadiusFromTo;
 	double camRadiusStepsize, camSpeedStepsize, camInclinationStepsize;
@@ -159,6 +160,8 @@ struct Parameters {
 
 			std::string str1 = config.lookup("celestialSkyImg");
 			celestialSkyImg = str1;
+
+			useStars = config.lookup("useStars");
 			std::string str2 = config.lookup("starCatalogue");
 			starCatalogue = str2;
 			starTreeLevel = config.lookup("starTreeLevel");

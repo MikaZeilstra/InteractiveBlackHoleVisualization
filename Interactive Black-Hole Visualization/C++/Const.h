@@ -1,9 +1,16 @@
 #pragma once
-const double PI = 3.141592653589793238;
-const double PI1_2 = PI / 2.;
-const double PI2 = PI*2.;
-const double PI1_4 = PI / 4.;
-const double HALF = 1. / 2.;
+#define PI 3.141592653589793238
+#define PI1_2  PI / 2.
+#define PI2 PI*2.
+#define PI1_4 PI / 4.
+#define HALF 1. / 2.
+
+#define NUMBER_OF_EQUATIONS
+
+
+
+
+
 //const int tempToRGBx[1173] = { 255, 56, 0, 255, 71, 0, 255, 83, 0, 255, 93, 0, 255, 101, 0, 255, 109, 0, 255, 115, 0, 255, 121, 0,
 //255, 126, 0, 255, 131, 0, 255, 137, 18, 255, 142, 33, 255, 147, 44, 255, 152, 54, 255, 157, 63, 255, 161, 72,
 //255, 165, 79, 255, 169, 87, 255, 173, 94, 255, 177, 101, 255, 180, 107, 255, 184, 114, 255, 187, 120,
