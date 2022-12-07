@@ -1,11 +1,19 @@
 #pragma once
 #include "Integration.cuh"
 
+#include <stdio.h>
+
+__device__ __constant__ float ap;
+
+
+
 namespace integrate_device {
-	__device__ static double a = 0.999;
-	__device__ static double asq = 0.998001;
-	//double* a = &starta;
-	//double* asq = &startasq;
+
+	void copy_a(double a) {
+		cudaMemcpyToSymbol(integrate_device::a, &a, sizeof(double));
+		double asq = a * a;
+		cudaMemcpyToSymbol(integrate_device::asq, &asq, sizeof(double));
+	};
 
 	__device__ const double b21 = 0.2,
 		b31 = 3.0 / 40.0, b32 = 9.0 / 40.0, b41 = 0.3, b42 = -0.9, b43 = 1.2,
@@ -16,11 +24,6 @@ namespace integrate_device {
 		dc5 = -277.00 / 14336.0;
 	__device__ const double dc1 = 37.0 / 378.0 - 2825.0 / 27648.0, dc3 = 250.0 / 621.0 - 18575.0 / 48384.0,
 		dc4 = 125.0 / 594.0 - 13525.0 / 55296.0, dc6 = 512.0 / 1771.0 - 0.25;
-
-	__device__ static void setAngVel(double afactor) {
-		a = afactor;
-		asq = afactor * afactor;
-	}
 
 	__device__ static double sq(double x) {
 		return x * x;

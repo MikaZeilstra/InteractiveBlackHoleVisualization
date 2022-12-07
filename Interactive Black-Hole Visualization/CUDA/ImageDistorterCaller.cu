@@ -136,13 +136,13 @@ void CUDA::checkCudaErrors() {
 	cudaError_t cudaStatus = cudaGetLastError();
 	if (cudaStatus != cudaSuccess) {
 		fprintf(stderr, "kernel launch failed: %s\n", cudaGetErrorString(cudaStatus));
-		cleanup();
+		//cleanup();
 		return;
 	}
 	cudaStatus = cudaDeviceSynchronize();
 	if (cudaStatus != cudaSuccess) {
 		fprintf(stderr, "Device synchronize failed: %s\n", cudaGetErrorString(cudaStatus));
-		cleanup();
+		//cleanup();
 		return;
 	}
 }
@@ -151,7 +151,7 @@ void CUDA::checkCudaStatus(cudaError_t cudaStatus, const char* message) {
 	if (cudaStatus != cudaSuccess) {
 		fprintf(stderr, message);
 		printf("\n");
-		cleanup();
+		//cleanup();
 	}
 }
 
@@ -188,7 +188,8 @@ void CUDA::allocateGridMemory(size_t size, double a) {
 	allocate(theta_device, sizeof(double) * size, "Thetas");
 	allocate(phi_device, sizeof(double) * size, "phis");
 
-	//cudaMemcpyToSymbol(&integrate_device::a, &a, sizeof(double));
+	integrate_device::copy_a(a);
+	checkCudaErrors();
 };
 
 void CUDA::integrateGrid(const double rV, const double thetaV, const double phiV, std::vector <double>& pRV,
