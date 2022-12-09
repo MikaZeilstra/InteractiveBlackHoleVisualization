@@ -180,20 +180,18 @@ void CUDA::call(std::vector<Grid>& grids_, std::vector<Camera>& cameras_, StarPr
 	runKernels(grids, image, celestSky, stars, bhproc, starvis, param);
 }
 
-void CUDA::allocateGridMemory(size_t size, double a) {
+void CUDA::allocateGridMemory(size_t size) {
 	allocate(pRvs_device, sizeof(double) * size, "Momentum R");
 	allocate(bs_device, sizeof(double) * size, "b param");
 	allocate(qs_device, sizeof(double) * size, "q param");
 	allocate(pThetas_device, sizeof(double) * size, "Momentum theta");
 	allocate(theta_device, sizeof(double) * size, "Thetas");
 	allocate(phi_device, sizeof(double) * size, "phis");
-
-	integrate_device::copy_a(a);
 	checkCudaErrors();
 };
 
 void CUDA::integrateGrid(const double rV, const double thetaV, const double phiV, std::vector <double>& pRV,
-	std::vector <double>& bV, std::vector <double>& qV, std::vector <double>& pThetaV, double a){
+	std::vector <double>& bV, std::vector <double>& qV, std::vector <double>& pThetaV){
 
 
 
@@ -208,7 +206,7 @@ void CUDA::integrateGrid(const double rV, const double thetaV, const double phiV
 
 	int block_size = ceil(pRV.size() / (float)threads_per_block);
 
-	callKernel("integrate GPU", integrate_device::integrate_kernel, block_size, threads_per_block,
+	callKernel("integrate GPU", metric::integrate_kernel, block_size, threads_per_block,
 		rV, thetaV, phiV, pRvs_device, bs_device, qs_device, pThetas_device, pRV.size());
 
 	copyDeviceToHost(bV.data(), bs_device, bV.size() * sizeof(double), "found theta");

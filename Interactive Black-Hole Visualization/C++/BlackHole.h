@@ -1,5 +1,6 @@
 #pragma once
-#include "Metric.h"
+#include "../CUDA/Metric.cuh"
+#include "../CUDA/integration.cuh"
 
 class BlackHole
 {
@@ -12,6 +13,7 @@ public:
 	void setA(double afactor) {
 		a = afactor;
 		metric::setAngVel(afactor);
+		//integration::setA(a);
 	}
 
 	double getAngVel(double mass) {

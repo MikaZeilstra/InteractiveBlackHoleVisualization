@@ -3,8 +3,9 @@
 #include <stdint.h> 
 #include <vector>
 #include "Const.h"
-#include "Metric.h"
+#include "../CUDA/Metric.cuh"
 #include "Parameters.h"
+#include "../CUDA/integration.cuh"
 
 class Viewer
 {

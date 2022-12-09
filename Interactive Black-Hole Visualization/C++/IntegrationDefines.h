@@ -1,3 +1,4 @@
+#pragma once
 #define rVar var[0]
 #define thetaVar var[1]
 #define phiVar var[2]
@@ -26,3 +27,29 @@
 #define MIN_ACCURACY 1e-5
 //#define MIN_STEP_SIZE 0.00001
 #define INTEGRATION_MAX  -10000000
+
+
+#define BUTCHER_TABLEAU b21 = 0.2, \
+b31 = 3.0 / 40.0, b32 = 9.0 / 40.0,\
+b41 = 0.3, b42 = -0.9, b43 = 1.2,\
+b51 = -11.0 / 54.0, b52 = 2.5, b53 = -70.0 / 27.0, b54 = 35.0 / 27.0, \
+b61 = 1631.0 / 55296.0, b62 = 175.0 / 512.0, b63 = 575.0 / 13824.0, b64 = 44275.0 / 110592.0, b65 = 253.0 / 4096.0,\
+c1 = 37.0 / 378.0, c3 = 250.0 / 621.0, c4 = 125.0 / 594.0, c6 = 512.0 / 1771.0
+#define BUTCHER_ERROR dc1 = 37.0 / 378.0 - 2825.0 / 27648.0, dc3 = 250.0 / 621.0 - 18575.0 / 48384.0,\
+dc4 = 125.0 / 594.0 - 13525.0 / 55296.0, dc5 = -277.00 / 14336.0, dc6 = 512.0 / 1771.0 - 0.25
+
+#ifndef __CUDA_ARCH__
+#define BH_A metric::a<T>
+#define BH_ASQ metric::asq<T>
+#else
+#define BH_A metric::a_dev<T>
+#define BH_ASQ metric::asq_dev<T>
+#endif // !__CUDA_ARCH__
+
+#ifndef __CUDA_ARCH__
+#define BH_AT metric::a<double>
+#define BH_ASQT metric::asq<double>
+#else
+#define BH_AT metric::a_dev<double>
+#define BH_ASQT metric::asq_dev<double>
+#endif // !__CUDA_ARCH__

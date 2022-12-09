@@ -3,10 +3,11 @@
 #include <fstream>
 #include <sstream>
 #include <string>
-#include "Metric.h"
+#include "../CUDA/Metric.cuh"
 #include "Const.h"
 #include <vector>
 #include <chrono>
+#include "../CUDA/integration.cuh"
 #include "Parameters.h"
 
 class StarProcessor {

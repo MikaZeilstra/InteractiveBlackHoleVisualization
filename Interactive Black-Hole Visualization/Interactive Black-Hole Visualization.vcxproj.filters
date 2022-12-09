@@ -41,9 +41,6 @@
     <ClInclude Include="C++\Grid.h">
       <Filter>C++\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="C++\Metric.h">
-      <Filter>C++\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="C++\Parameters.h">
       <Filter>C++\Header Files</Filter>
     </ClInclude>
@@ -73,6 +70,9 @@
     </ClInclude>
     <ClInclude Include="C++\IntegrationDefines.h">
       <Filter>C++\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CUDA\Metric.cuh">
+      <Filter>CUDA\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -124,6 +124,9 @@
       <Filter>CUDA\Source Files</Filter>
     </CudaCompile>
     <CudaCompile Include="CUDA\Integration.cu">
+      <Filter>CUDA\Source Files</Filter>
+    </CudaCompile>
+    <CudaCompile Include="CUDA\Metric.cu">
       <Filter>CUDA\Source Files</Filter>
     </CudaCompile>
   </ItemGroup>

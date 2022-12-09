@@ -1,5 +1,5 @@
 #pragma once
-#include "Metric.h"
+#include "../CUDA/Metric.cuh"
 
 
 class Camera
@@ -52,11 +52,11 @@ public:
 	};
 
 	void initforms() {
-		alpha = metric::_alpha(this->r, this->theta);
-		w = metric::_w(this->r, this->theta);
-		wbar = metric::_wbar(this->r, this->theta);
-		Delta = metric::_Delta(this->r);
-		ro = metric::_ro(this->r, this->theta);
+		alpha = metric::_alpha(this->r, this->theta,metric::sq(this->r),metric::sq(sin(theta)), metric::sq(cos(theta)));
+		w = metric::_w(this->r, this->theta, metric::sq(this->r), metric::sq(sin(theta)));
+		wbar = metric::_wbar(this->r, this->theta, metric::sq(this->r), metric::sq(sin(theta)), metric::sq(cos(theta)));
+		Delta = metric::_Delta(this->r, metric::sq(this->r));
+		ro = metric::_ro(this->r, this->theta, metric::sq(this->r), metric::sq(cos(theta)));
 
 	};
 

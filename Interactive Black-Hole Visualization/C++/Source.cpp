@@ -97,7 +97,7 @@ int main()
 
 	int max_grid_size = pow(2, param.gridMaxLevel) + 1;
 
-	CUDA::allocateGridMemory(max_grid_size * max_grid_size,metric::a);
+	CUDA::allocateGridMemory(max_grid_size * max_grid_size);
 
 
 	/* ------------------ INITIALIZATION CAMERAS & GRIDS ------------------ */

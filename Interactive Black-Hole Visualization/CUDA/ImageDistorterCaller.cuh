@@ -181,7 +181,7 @@ namespace CUDA {
 	void call(std::vector<Grid>& grids, std::vector<Camera>& cameras, StarProcessor& stars, Viewer& view, CelestialSkyProcessor& celestialSky, Parameters& param);
 
 	//unsigned char* getDiffractionImage(const int size);
-	void allocateGridMemory(size_t size, double a);
+	void allocateGridMemory(size_t size);
 
 
 	void memoryAllocationAndCopy(const Grids& grids, const Image& image, const CelestialSky& celestialSky,
@@ -191,7 +191,7 @@ namespace CUDA {
 		const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis, const Parameters& param);
 
 	void integrateGrid(const double rV, const double thetaV, const double phiV, std::vector <double>& pRV,
-		std::vector <double>& bV, std::vector <double>& qV, std::vector <double>& pThetaV, double a);
+		std::vector <double>& bV, std::vector <double>& qV, std::vector <double>& pThetaV);
 }
 
 #endif // !CUDA_FUNCTIONS

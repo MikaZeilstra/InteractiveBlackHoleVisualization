@@ -8,7 +8,6 @@
 #include <cereal/types/unordered_map.hpp>
 #include <vector>
 #include <fstream>
-#include "Metric.h"
 #include "Camera.h"
 #include "BlackHole.h"
 #include "Const.h"
@@ -17,7 +16,8 @@
 #include <chrono>
 #include <numeric>
 
-//#include "../CUDA/ImageDistorterCaller.cuh"
+#include "../CUDA/Integration.cuh"
+#include "../CUDA/Metric.cuh"
 
 #define PRECCELEST 0.015
 #define ERROR 0.001//1e-6
@@ -29,7 +29,7 @@
 
 namespace CUDA {
 	void integrateGrid(const double rV, const double thetaV, const double phiV, std::vector <double>& pRV,
-		std::vector <double>& bV, std::vector <double>& qV, std::vector <double>& pThetaV,double a);
+		std::vector <double>& bV, std::vector <double>& qV, std::vector <double>& pThetaV);
 }
 
 
@@ -38,6 +38,37 @@ class Grid
 private:
 	#pragma region private
 	/** ------------------------------ VARIABLES ------------------------------ **/
+	/// <summary>
+	/// Checks if a polygon has a high chance of crossing the 2pi border.
+	/// </summary>
+	/// <param name="poss">The coordinates of the polygon corners.</param>
+	/// <param name="factor">The factor to check whether a point is close to the border.</param>
+	/// <returns>Boolean indicating if the polygon is a likely 2pi cross candidate.</returns>
+	static bool check2PIcross(const std::vector<cv::Point2d>& spl, float factor) {
+		for (int i = 0; i < spl.size(); i++) {
+			if (spl[i]_phi > PI2 * (1. - 1. / factor))
+				return true;
+		}
+		return false;
+	};
+
+	/// <summary>
+	/// Assumes the polygon crosses 2pi and adds 2pi to every corner value of a polygon
+	/// that is close (within 2pi/factor) to 0.
+	/// </summary>
+	/// <param name="poss">The coordinates of the polygon corners.</param>
+	/// <param name="factor">The factor to check whether a point is close to the border.</param>
+	static bool correct2PIcross(std::vector<cv::Point2d>& spl, float factor) {
+		bool check = false;
+		for (int i = 0; i < spl.size(); i++) {
+			if (spl[i]_phi < PI2 * (1. / factor)) {
+				spl[i]_phi += PI2;
+				check = true;
+			}
+		}
+		return check;
+	};
+
 
 	// Cereal settings for serialization
 	friend class cereal::access;
@@ -170,13 +201,13 @@ private:
 				if (CamToCel[ijprev] != cv::Point2d(-1, -1) && CamToCel[ijnext] != cv::Point2d(-1, -1)) {
 					succes = true;
 					if (half) check[3].x = PI - check[3].x;
-					if (metric::check2PIcross(check, 5.)) metric::correct2PIcross(check, 5.);
+					if (check2PIcross(check, 5.)) correct2PIcross(check, 5.);
 					CamToCel[i_j] = hermite(0.5, check[0], check[1], check[2], check[3], 0., 0.);
 				}
 			}
 			if (!succes) {
 				std::vector<cv::Point2d> check = { CamToCel[ij], CamToCel[ij2] };
-				if (metric::check2PIcross(check, 5.)) metric::correct2PIcross(check, 5.);
+				if (check2PIcross(check, 5.)) correct2PIcross(check, 5.);
 				CamToCel[i_j] = 1. / 2.*(check[1] + check[0]);
 			}
 			if (level + 1 == MAXLEVEL) return;
@@ -563,7 +594,7 @@ private:
 			double pPhi = eF * cam->wbar * phiFido;
 
 			double b = pPhi;
-			double q = pTheta * pTheta + cos(thetaS) * cos(thetaS) * (b * b / (sin(thetaS) * sin(thetaS)) - metric::asq);
+			double q = pTheta * pTheta + cos(thetaS) * cos(thetaS) * (b * b / (sin(thetaS) * sin(thetaS)) - metric::asq<double>);
 
 			theta[i] = -1;
 			phi[i] = -1;
@@ -579,11 +610,13 @@ private:
 		}
 		if (is.size() < MIN_GPU_INTEGRATION) {
 			for (int i = 0;i < is.size(); i++) {
-				metric::rkckIntegrate1(rS, thetaS, phiS, pRs[i], bs[i], qs[i], pThetas[i], theta[is[i]], phi[is[i]], step[is[i]]);
+				metric::rkckIntegrate1(rS, thetaS, phiS, &pRs[i], &bs[i], &qs[i], &pThetas[i]);
+				theta[is[i]] = bs[i];
+				phi[is[i]] = qs[i];
 			}
 		}
 		else {
-			CUDA::integrateGrid(rS, thetaS, phiS, pRs, bs, qs, pThetas, metric::a);
+			CUDA::integrateGrid(rS, thetaS, phiS, pRs, bs, qs, pThetas);
 			for (int i = 0; i < is.size(); i++) {
 				theta[is[i]] = bs[i];
 				phi[is[i]] = qs[i];
