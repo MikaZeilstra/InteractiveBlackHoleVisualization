@@ -190,7 +190,9 @@ namespace CUDA {
 	void runKernels(const Grids& grids, const Image& image, const CelestialSky& celestialSky,
 		const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis, const Parameters& param);
 
-	void integrateGrid(const double rV, const double thetaV, const double phiV, std::vector <double>& pRV,
+	template <class T> void integrateGrid(const T rV, const T thetaV, const T phiV, std::vector <T>& pRV,
+		std::vector <T>& bV, std::vector <T>& qV, std::vector <T>& pThetaV);
+	template void integrateGrid<double>(const double rV, const double thetaV, const double phiV, std::vector <double>& pRV,
 		std::vector <double>& bV, std::vector <double>& qV, std::vector <double>& pThetaV);
 }
 

@@ -190,8 +190,8 @@ void CUDA::allocateGridMemory(size_t size) {
 	checkCudaErrors();
 };
 
-void CUDA::integrateGrid(const double rV, const double thetaV, const double phiV, std::vector <double>& pRV,
-	std::vector <double>& bV, std::vector <double>& qV, std::vector <double>& pThetaV){
+template <class T> void CUDA::integrateGrid(const T rV, const T thetaV, const T phiV, std::vector <T>& pRV,
+	std::vector <T>& bV, std::vector <T>& qV, std::vector <T>& pThetaV){
 
 
 
@@ -206,7 +206,7 @@ void CUDA::integrateGrid(const double rV, const double thetaV, const double phiV
 
 	int block_size = ceil(pRV.size() / (float)threads_per_block);
 
-	callKernel("integrate GPU", metric::integrate_kernel, block_size, threads_per_block,
+	callKernel("integrate GPU", metric::integrate_kernel<double>, block_size, threads_per_block,
 		rV, thetaV, phiV, pRvs_device, bs_device, qs_device, pThetas_device, pRV.size());
 
 	copyDeviceToHost(bV.data(), bs_device, bV.size() * sizeof(double), "found theta");

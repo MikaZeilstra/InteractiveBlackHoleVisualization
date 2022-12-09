@@ -7,7 +7,8 @@
 #include "../C++/Const.h"
 #include "../C++/Code.h"
 #include "../C++/IntegrationDefines.h"
-//#include "integration.cuh"
+
+#include <stdio.h>
 
 
 namespace metric {
@@ -18,6 +19,25 @@ namespace metric {
 		cudaMemcpyToSymbol(metric::a_dev<T>, &a<T>, sizeof(T));
 		cudaMemcpyToSymbol(metric::asq_dev<T>, &asq<T>, sizeof(T));
 	}
+
+	//Declare specialized pow functions for double and float
+	
+	template<class T > __device__ __host__ __forceinline__ __forceinline T integrate_pow(T base, T exponent){};
+	template <> __device__ __host__ __forceinline__ __forceinline float integrate_pow(float base, float exponent) {
+		return powf(base, exponent);
+	}
+	template <> __device__ __host__ __forceinline__ __forceinline double integrate_pow(double base, double exponent) {
+		return pow(base, exponent);
+	}
+
+	template<class T > __device__ __host__ __forceinline__ __forceinline T integrate_modf(T base, T exponent) {};
+	template <> __device__ __host__ __forceinline__ __forceinline float integrate_modf(float base, float exponent) {
+		return fmodf(base, exponent);
+	}
+	template <> __device__ __host__ __forceinline__ __forceinline double integrate_modf(double base, double exponent) {
+		return fmod(base, exponent);
+	}
+	
 
 	template <class T>
 	__device__ __host__ __forceinline__ T sq(T x) {
@@ -71,7 +91,7 @@ namespace metric {
 
 	template <class T> __host__ T calcSpeed(T r, T theta) {
 		T rsq = sq(r);
-		T omega = 1. / (BH_A + pow(r, 1.5));
+		T omega = 1. / (BH_A + integrate_pow(r, 1.5));
 		T sp = _wbar(r, theta, rsq, sq(sin(theta)), sq(cos(theta))) / _alpha(r, theta, rsq, sq(sin(theta)), sq(cos(theta))) * (omega - _w(r, theta, rsq, sq(sin(theta))));
 		return sp;
 	}
@@ -185,24 +205,25 @@ namespace metric {
 
 
 	template <class T>  __device__ __host__ void wrapToPi(T& thetaW, T& phiW) {
-		thetaW = fmod(thetaW, PI2);
+		constexpr T pi2 = PI2;
+		thetaW = integrate_modf(thetaW, pi2);
 		if (thetaW < 0) {
-			thetaW += PI2;
+			thetaW += pi2;
 		}
 
 		if (thetaW > PI) {
 			thetaW -= 2 * (thetaW - PI);
 			phiW += PI;
 		}
-		phiW = fmod(phiW, PI2);
+		phiW = integrate_modf(phiW, pi2);
 		if (phiW < 0) {
-			phiW += PI2;
+			phiW += pi2;
 		}
 	}
 
-	__device__ __host__ static void rkck(volatile double* var, volatile double* dvdz, const double h,
-		volatile double* varOut, volatile double* varErr, const double b, const double q, volatile double* aks,
-		volatile double* varTmpInt) {
+	template <class T> __device__ __host__ static void rkck(volatile T* var, volatile T* dvdz, const T h,
+		volatile T* varOut, volatile T* varErr, const T b, const T q, volatile T* aks,
+		volatile T* varTmpInt) {
 		int i;
 		for (i = 0; i < NUMBER_OF_EQUATIONS; i++)
 			varTmpInt[i] = var[i] + b21 * h * dvdz[i];
@@ -225,22 +246,22 @@ namespace metric {
 			varErr[i] = h * (dc1 * dvdz[i] + dc3 * aks[i + 5] + dc4 * aks[i + 10] + dc5 * aks[i + 15] + dc6 * aks[i + 20]);
 	}
 
-	__device__ __host__ static void rkqs(volatile double* var, volatile  double* dvdz, double& z, double& h,
-		volatile double* varScal, const double b, const double q,
-		volatile double* varErr, volatile double* varTemp, volatile double* aks, volatile double* varTmpInt) {
+	template <class T> __device__ __host__ static void rkqs(volatile T* var, volatile  T* dvdz, T& z, T& h,
+		volatile T* varScal, const T b, const T q,
+		volatile T* varErr, volatile T* varTemp, volatile T* aks, volatile T* varTmpInt) {
 
 		rkck(var, dvdz, h, varTemp, varErr, b, q, aks, varTmpInt);
-		double errmax = 0.0;
+		T errmax = 0.0;
 		for (int i = 0; i < NUMBER_OF_EQUATIONS; i++) errmax = fmax(errmax, fabs(varErr[i] / varScal[i]));
 		errmax /= MIN_ACCURACY;
 		if (errmax <= 1.0) {
 			z += h;
 			for (int i = 0; i < NUMBER_OF_EQUATIONS; i++) var[i] = varTemp[i];
-			if (errmax > ERRCON) h = SAFETY * h * pow(errmax, PGROW);
+			if (errmax > ERRCON) h = SAFETY * h * integrate_pow(errmax, PGROW);
 			else h = ADAPTIVE * h;
 		}
 		else {
-			h = fmin(SAFETY * h * pow(errmax, PSHRNK), 0.1 * h);
+			h = fmin(SAFETY * h * integrate_pow(errmax, PSHRNK), 0.1 * h);
 		}
 
 		//TODO: Why min step size 7x slower?
@@ -250,17 +271,17 @@ namespace metric {
 		return (0 < val) - (val < 0);
 	}
 
-	__device__ __host__ static void odeint1(volatile double* varStart, const double b, const double q) {
-		volatile double varScal[5];
-		volatile double var[5];
-		volatile double dvdz[5];
-		volatile double varErr[5];
-		volatile double varTemp[5];
-		volatile double aks[25];
-		volatile double varTmpInt[5];
+	template <class T> __device__ __host__ static void odeint1(volatile T* varStart, const T b, const T q) {
+		volatile T varScal[5];
+		volatile T var[5];
+		volatile T dvdz[5];
+		volatile T varErr[5];
+		volatile T varTemp[5];
+		volatile T aks[25];
+		volatile T varTmpInt[5];
 
-		double z = 0.0;
-		double h = INITIAL_STEP_SIZE * sgn(INTEGRATION_MAX);
+		T z = 0.0;
+		T h = INITIAL_STEP_SIZE * sgn(INTEGRATION_MAX);
 
 		for (int i = 0; i < NUMBER_OF_EQUATIONS; i++) var[i] = varStart[i];
 
@@ -279,10 +300,10 @@ namespace metric {
 
 
 
-	__device__ __host__ void rkckIntegrate1(const double rV, const double thetaV, const double phiV, double* pRV,
-		double* bV, double* qV, double* pThetaV) {
+	template <class T> __device__ __host__ void rkckIntegrate1(const T rV, const T thetaV, const T phiV, T* pRV,
+		T* bV, T* qV, T* pThetaV) {
 
-		volatile double varStart[] = { rV, thetaV, phiV, *pRV, *pThetaV };
+		volatile T varStart[] = { rV, thetaV, phiV, *pRV, *pThetaV };
 
 		odeint1(varStart, *bV, *qV);
 
@@ -292,8 +313,8 @@ namespace metric {
 
 	}
 
-	__global__ void integrate_kernel(const double rV, const double thetaV, const double phiV, double* pRV,
-		double* bV, double* qV, double* pThetaV, int size) {
+	template <class T> __global__ void integrate_kernel(const T rV, const T thetaV, const T phiV, T* pRV,
+		T* bV, T* qV, T* pThetaV, int size) {
 		int index = blockDim.x * blockIdx.x + threadIdx.x;
 		if (index < size) {
 			rkckIntegrate1(rV, thetaV, phiV, &pRV[index], &bV[index], &qV[index], &pThetaV[index]);

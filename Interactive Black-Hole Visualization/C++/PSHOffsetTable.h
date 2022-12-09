@@ -1,3 +1,4 @@
+#pragma once
 #include <vector>
 #include <cereal/types/vector.hpp>
 #include <cereal/types/memory.hpp>

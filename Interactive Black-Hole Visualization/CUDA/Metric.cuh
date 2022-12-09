@@ -39,10 +39,14 @@ namespace metric {
 
 	template <class T> __device__ __host__ void derivs(volatile T* var, volatile T* varOut, T b, T q);
 
-	__global__ void integrate_kernel(const double rV, const double thetaV, const double phiV, double* pRV,
+	template <class T> __global__ void integrate_kernel(const T rV, const T thetaV, const T phiV, T* pRV,
+		T* bV, T* qV, T* pThetaV, int size);
+	template __global__ void integrate_kernel<double>(const double rV, const double thetaV, const double phiV, double* pRV,
 		double* bV, double* qV, double* pThetaV, int size);
 
-	__device__ __host__ void rkckIntegrate1(const double rV, const double thetaV, const double phiV, double* pRV,
+	template <class T> __device__ __host__ void rkckIntegrate1(const T rV, const T thetaV, const T phiV, T* pRV,
+		T* bV, T* qV, T* pThetaV);
+	template __device__ __host__ void rkckIntegrate1<double>(const double rV, const double thetaV, const double phiV, double* pRV,
 		double* bV, double* qV, double* pThetaV);
 
 
