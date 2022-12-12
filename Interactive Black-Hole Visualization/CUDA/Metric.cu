@@ -20,25 +20,6 @@ namespace metric {
 		cudaMemcpyToSymbol(metric::asq_dev<T>, &asq<T>, sizeof(T));
 	}
 
-	//Declare specialized pow functions for double and float
-	
-	template<class T > __device__ __host__ __forceinline__ __forceinline T integrate_pow(T base, T exponent){};
-	template <> __device__ __host__ __forceinline__ __forceinline float integrate_pow(float base, float exponent) {
-		return powf(base, exponent);
-	}
-	template <> __device__ __host__ __forceinline__ __forceinline double integrate_pow(double base, double exponent) {
-		return pow(base, exponent);
-	}
-
-	template<class T > __device__ __host__ __forceinline__ __forceinline T integrate_modf(T base, T exponent) {};
-	template <> __device__ __host__ __forceinline__ __forceinline float integrate_modf(float base, float exponent) {
-		return fmodf(base, exponent);
-	}
-	template <> __device__ __host__ __forceinline__ __forceinline double integrate_modf(double base, double exponent) {
-		return fmod(base, exponent);
-	}
-	
-
 	template <class T>
 	__device__ __host__ __forceinline__ T sq(T x) {
 		return x * x;
@@ -91,7 +72,7 @@ namespace metric {
 
 	template <class T> __host__ T calcSpeed(T r, T theta) {
 		T rsq = sq(r);
-		T omega = 1. / (BH_A + integrate_pow(r, 1.5));
+		T omega = 1. / (BH_A + pow(r, 1.5));
 		T sp = _wbar(r, theta, rsq, sq(sin(theta)), sq(cos(theta))) / _alpha(r, theta, rsq, sq(sin(theta)), sq(cos(theta))) * (omega - _w(r, theta, rsq, sq(sin(theta))));
 		return sp;
 	}
@@ -205,19 +186,18 @@ namespace metric {
 
 
 	template <class T>  __device__ __host__ void wrapToPi(T& thetaW, T& phiW) {
-		constexpr T pi2 = PI2;
-		thetaW = integrate_modf(thetaW, pi2);
+		thetaW = fmodf(thetaW, PI2);
 		if (thetaW < 0) {
-			thetaW += pi2;
+			thetaW += PI2;
 		}
 
 		if (thetaW > PI) {
 			thetaW -= 2 * (thetaW - PI);
 			phiW += PI;
 		}
-		phiW = integrate_modf(phiW, pi2);
+		phiW = fmodf(phiW, PI2);
 		if (phiW < 0) {
-			phiW += pi2;
+			phiW += PI2;
 		}
 	}
 
@@ -257,11 +237,11 @@ namespace metric {
 		if (errmax <= 1.0) {
 			z += h;
 			for (int i = 0; i < NUMBER_OF_EQUATIONS; i++) var[i] = varTemp[i];
-			if (errmax > ERRCON) h = SAFETY * h * integrate_pow(errmax, PGROW);
+			if (errmax > ERRCON) h = SAFETY * h * pow(errmax, PGROW);
 			else h = ADAPTIVE * h;
 		}
 		else {
-			h = fmin(SAFETY * h * integrate_pow(errmax, PSHRNK), 0.1 * h);
+			h = fmin(SAFETY * h * pow(errmax, PSHRNK), 0.1 * h);
 		}
 
 		//TODO: Why min step size 7x slower?

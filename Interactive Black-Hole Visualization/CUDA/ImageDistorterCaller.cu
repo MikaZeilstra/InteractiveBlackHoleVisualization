@@ -195,10 +195,10 @@ template <class T> void CUDA::integrateGrid(const T rV, const T thetaV, const T 
 
 
 
-	copyHostToDevice(pRvs_device, pRV.data(), pRV.size() * sizeof(double), "pRs");
-	copyHostToDevice(bs_device, bV.data(), bV.size() * sizeof(double), "bs");
-	copyHostToDevice(qs_device, qV.data(), qV.size() * sizeof(double), "qs");
-	copyHostToDevice(pThetas_device, pThetaV.data(), pThetaV.size() * sizeof(double), "pThetaVs");
+	copyHostToDevice(pRvs_device, pRV.data(), pRV.size() * sizeof(T), "pRs");
+	copyHostToDevice(bs_device, bV.data(), bV.size() * sizeof(T), "bs");
+	copyHostToDevice(qs_device, qV.data(), qV.size() * sizeof(T), "qs");
+	copyHostToDevice(pThetas_device, pThetaV.data(), pThetaV.size() * sizeof(T), "pThetaVs");
 	checkCudaErrors();
 
 
@@ -206,11 +206,12 @@ template <class T> void CUDA::integrateGrid(const T rV, const T thetaV, const T 
 
 	int block_size = ceil(pRV.size() / (float)threads_per_block);
 
-	callKernel("integrate GPU", metric::integrate_kernel<double>, block_size, threads_per_block,
-		rV, thetaV, phiV, pRvs_device, bs_device, qs_device, pThetas_device, pRV.size());
+	//We can reinterpret_cast since T is either double or float and we reserve space for the larger double type
+	callKernel("integrate GPU", metric::integrate_kernel<T>, block_size, threads_per_block,
+		rV, thetaV, phiV, reinterpret_cast<T*>(pRvs_device), reinterpret_cast<T*>(bs_device), reinterpret_cast<T*>(qs_device), reinterpret_cast<T*>(pThetas_device), pRV.size());
 
-	copyDeviceToHost(bV.data(), bs_device, bV.size() * sizeof(double), "found theta");
-	copyDeviceToHost(qV.data(), qs_device, qV.size() * sizeof(double), "found phi");
+	copyDeviceToHost(bV.data(), bs_device, bV.size() * sizeof(T), "found theta");
+	copyDeviceToHost(qV.data(), qs_device, qV.size() * sizeof(T), "found phi");
 
 	checkCudaErrors();
 

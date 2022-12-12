@@ -405,7 +405,7 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 
 	double max = std::max(diag, diag2);
 
-	if (level < 6 && max>1E-10) return true;
+	if (level < 6 && max>1e-10) return true;
 	if (max > PRECCELEST) return true;
 
 	// If no refinement necessary, save level at position.
@@ -504,6 +504,7 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 #pragma loop(hint_parallel(8))
 #pragma loop(ivdep)
 	for (int i = 0; i < n; i++) {
+		
 
 		double xCam = sin(theta[i]) * cos(phi[i]);
 		double yCam = sin(theta[i]) * sin(phi[i]);
@@ -540,6 +541,7 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 		}
 	}
 	if (is.size() < MIN_GPU_INTEGRATION) {
+	#pragma loop(hint_parallel(8))
 		for (int i = 0; i < is.size(); i++) {
 			metric::rkckIntegrate1<double>(rS, thetaS, phiS, &pRs[i], &bs[i], &qs[i], &pThetas[i]);
 			theta[is[i]] = bs[i];
@@ -547,7 +549,8 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 		}
 	}
 	else {
-		CUDA::integrateGrid(rS, thetaS, phiS, pRs, bs, qs, pThetas);
+		CUDA::integrateGrid<double>(rS, thetaS, phiS, pRs, bs, qs, pThetas);
+#pragma loop(hint_parallel(8))
 		for (int i = 0; i < is.size(); i++) {
 			theta[is[i]] = bs[i];
 			phi[is[i]] = qs[i];
@@ -578,13 +581,28 @@ Grid::Grid(const int maxLevelPrec, const int startLevel, const bool angle, const
 	M = (2 - equafactor) * 2 * (N - 1);
 	STARTM = (2 - equafactor) * 2 * (STARTN - 1);
 	steps = std::vector<int>(M * N);
+	auto start = std::chrono::high_resolution_clock::now();
 	raytrace();
+	auto end = std::chrono::high_resolution_clock::now();
+	std::cout << "integrated in " <<
+		std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms!" <<
+		std::endl << std::endl;
 	//printGridCam(5);
 
 	for (auto block : blockLevels) {
 		fixTvertices(block);
 	}
+
+	start = std::chrono::high_resolution_clock::now();
+	std::cout << "fixed vertices in " <<
+		std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms!" <<
+		std::endl << std::endl;
 	if (startLevel != maxLevelPrec) saveAsGpuHash();
+
+	end = std::chrono::high_resolution_clock::now();
+	std::cout << "hashed in " <<
+		std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms!" <<
+		std::endl << std::endl;
 };
 
 void Grid::saveAsGpuHash() {

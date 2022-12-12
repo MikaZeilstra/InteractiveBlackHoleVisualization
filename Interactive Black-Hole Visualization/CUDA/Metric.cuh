@@ -43,11 +43,15 @@ namespace metric {
 		T* bV, T* qV, T* pThetaV, int size);
 	template __global__ void integrate_kernel<double>(const double rV, const double thetaV, const double phiV, double* pRV,
 		double* bV, double* qV, double* pThetaV, int size);
+	template __global__ void integrate_kernel<float>(const float rV, const float thetaV, const float phiV, float* pRV,
+		float* bV, float* qV, float* pThetaV, int size);
 
 	template <class T> __device__ __host__ void rkckIntegrate1(const T rV, const T thetaV, const T phiV, T* pRV,
 		T* bV, T* qV, T* pThetaV);
 	template __device__ __host__ void rkckIntegrate1<double>(const double rV, const double thetaV, const double phiV, double* pRV,
 		double* bV, double* qV, double* pThetaV);
+	template __device__ __host__ void rkckIntegrate1<float>(const float rV, const float thetaV, const float phiV, float* pRV,
+		float* bV, float* qV, float* pThetaV);
 
 
 	template <class T>  __device__ __host__ void wrapToPi(T& thetaW, T& phiW);
