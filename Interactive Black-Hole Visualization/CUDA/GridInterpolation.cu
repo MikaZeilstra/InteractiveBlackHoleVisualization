@@ -1,6 +1,6 @@
 #pragma once
 #include "GridInterpolation.cuh"
-
+#include "vector_operations.cuh"
 
 
 __global__ void camUpdate(const float alpha, const int g, const float* camParam, float* cam) {
@@ -9,7 +9,7 @@ __global__ void camUpdate(const float alpha, const int g, const float* camParam,
 }
 
 
-__global__ void pixInterpolation(const float2* viewthing, const int M, const int N, const int Gr, float2* thphi, const float2* grid,
+__global__ void pixInterpolation(const float2* viewthing, const int M, const int N, const int Gr, float3* thphi, const float3* grid,
 	const int GM, const int GN, const float hor, const float ver, int* gapsave, int gridlvl,
 	const float2* bhBorder, const int angleNum, const float alpha) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
@@ -18,7 +18,7 @@ __global__ void pixInterpolation(const float2* viewthing, const int M, const int
 		float theta = viewthing[i * M1 + j].x + ver;
 		float phi = fmodf(viewthing[i * M1 + j].y + hor + PI2c, PI2c);
 		if (Gr > 1) {
-			float2 A, B;
+			float3 A, B;
 			float2 center = { .5f * bhBorder[0].x + .5f * bhBorder[0].y, .5f * bhBorder[1].x + .5f * bhBorder[1].y };
 			float stretchRad = max(bhBorder[0].y - bhBorder[0].x, bhBorder[1].x - bhBorder[1].y) * 0.75f;
 			float centerdist = (theta - center.x) * (theta - center.x) + (phi - center.y) * (phi - center.y);
@@ -31,7 +31,7 @@ __global__ void pixInterpolation(const float2* viewthing, const int M, const int
 									   (1.f - alpha) * bhBorder[2 * angleSlot + 2].y + alpha * bhBorder[2 * angleSlot + 3].y };
 
 				if (centerdist <= (bhBorderNew.x - center.x) * (bhBorderNew.x - center.x) + (bhBorderNew.y - center.y) * (bhBorderNew.y - center.y)) {
-					thphi[i * M1 + j] = { -1, -1 };
+					thphi[i * M1 + j] = { -1, -1,0 };
 					return;
 				}
 
@@ -53,13 +53,12 @@ __global__ void pixInterpolation(const float2* viewthing, const int M, const int
 				B = interpolatePix(theta, phi, M, N, 1, gridlvl, grid, GM, GN, gapsave, i, j);
 
 			}
-			if (A.x == -1 || B.x == -1) thphi[i * M1 + j] = { -1, -1 };
+			if (A.x == -1 || B.x == -1) thphi[i * M1 + j] = { -1, -1,0 };
 			else {
 
 				if (A.y < .2f * PI2c && B.y > .8f * PI2c) A.y += PI2c;
 				if (B.y < .2f * PI2c && A.y > .8f * PI2c) B.y += PI2c;
-
-				thphi[i * M1 + j] = { (1.f - alpha) * A.x + alpha * B.x, fmodf((1.f - alpha) * A.y + alpha * B.y, PI2c) };
+				thphi[i * M1 + j] = { (1.f - alpha) * A.x + alpha * B.x, fmodf((1.f - alpha) * A.y + alpha * B.y, PI2c),  (1.f - alpha) * A.z + alpha * B.z };
 			}
 		}
 		else {
@@ -68,8 +67,8 @@ __global__ void pixInterpolation(const float2* viewthing, const int M, const int
 	}
 }
 
-__device__ float2 interpolatePix(const float theta, const float phi, const int M, const int N, const int g, const int gridlvl,
-	const float2* grid, const int GM, const int GN, int* gapsave, const int i, const int j) {
+__device__ float3 interpolatePix(const float theta, const float phi, const int M, const int N, const int g, const int gridlvl,
+	const float3* grid, const int GM, const int GN, int* gapsave, const int i, const int j) {
 	int half = (phi < PIc) ? 0 : 1;
 	int a = 0;
 	int b = half * GM / 2;
@@ -84,10 +83,10 @@ __device__ float2 interpolatePix(const float theta, const float phi, const int M
 	float factor = PI2c / (1.f * GM);
 	float cornersCam[4] = { factor * a, factor * b, factor * k, factor * l };
 	l = l % GM;
-	float2 nul = { -1, -1 };
-	float2 cornersCel[12] = { grid[g * GN * GM + a * GM + b], grid[g * GN * GM + a * GM + l], grid[g * GN * GM + k * GM + b], grid[g * GN * GM + k * GM + l],
+	float3 nul = { -1, -1,-1 };
+	float3 cornersCel[12] = { grid[g * GN * GM + a * GM + b], grid[g * GN * GM + a * GM + l], grid[g * GN * GM + k * GM + b], grid[g * GN * GM + k * GM + l],
 									nul, nul, nul, nul, nul, nul, nul, nul };
-	float2 thphiInter = interpolateSpline(a, b, gap, GM, GN, theta, phi, g, cornersCel, cornersCam, grid);
+	float3 thphiInter = interpolateSpline(a, b, gap, GM, GN, theta, phi, g, cornersCel, cornersCam, grid);
 
 	if (!(thphiInter.x == -1 && thphiInter.y == -1)) wrapToPi(thphiInter.x, thphiInter.y);
 	return thphiInter;
@@ -192,43 +191,16 @@ __device__ void interpolate(float t0, float t1, float t2, float t3, float p0, fl
 	starp = starInPixX;
 }
 
-__device__ float2 intersection(const float ax, const float ay, const float bx, const float by, const float cx, const float cy, const float dx, const float dy) {
-	// Line AB represented as a1x + b1y = c1 
-	double a1 = by - ay;
-	double b1 = ax - bx;
-	double c1 = a1 * (ax)+b1 * (ay);
+__device__ float3 interpolateLinear(int i, int j, float percDown, float percRight, float3* cornersCel) {
+	float3 corners[4] = { cornersCel[0], cornersCel[1], cornersCel[2], cornersCel[3]};
 
-	// Line CD represented as a2x + b2y = c2 
-	double a2 = dy - cy;
-	double b2 = cx - dx;
-	double c2 = a2 * (cx)+b2 * (cy);
 
-	double determinant = a1 * b2 - a2 * b1;
-	if (determinant == 0) {
-		return{ -1, -1 };
-	}
-	float x = (b2 * c1 - b1 * c2) / determinant;
-	float y = (a1 * c2 - a2 * c1) / determinant;
-	return{ x, y };
+	piCheck(corners, 0.2);	
+
+	return (1-percRight) * ((1 - percDown) * corners[0] + percDown * corners[2]) + percRight * ((1 - percDown) * corners[1] + percDown * corners[3]);
 }
 
-__device__ float2 interpolateLinear(int i, int j, float percDown, float percRight, float2* cornersCel) {
-	float phi[4] = { cornersCel[0].y, cornersCel[1].y, cornersCel[2].y, cornersCel[3].y };
-	float theta[4] = { cornersCel[0].x, cornersCel[1].x, cornersCel[2].x, cornersCel[3].x };
-
-	piCheck(phi, 0.2f);
-	float leftT = theta[0] + percDown * (theta[2] - theta[0]);
-	float leftP = phi[0] + percDown * (phi[2] - phi[0]);
-	float rightT = theta[1] + percDown * (theta[3] - theta[1]);
-	float rightP = phi[1] + percDown * (phi[3] - phi[1]);
-	float upT = theta[0] + percRight * (theta[1] - theta[0]);
-	float upP = phi[0] + percRight * (phi[1] - phi[0]);
-	float downT = theta[2] + percRight * (theta[3] - theta[2]);
-	float downP = phi[2] + percRight * (phi[3] - phi[2]);
-	return intersection(upT, upP, downT, downP, leftT, leftP, rightT, rightP);
-}
-
-__device__ float2 hermite(float aValue, float2 const& aX0, float2 const& aX1, float2 const& aX2, float2 const& aX3,
+__device__ float3 hermite(float aValue, float3 & aX0, float3 & aX1, float3 & aX2, float3 & aX3,
 	float aTension, float aBias) {
 	/* Source:
 	* http://paulbourke.net/miscellaneous/interpolation/
@@ -241,28 +213,25 @@ __device__ float2 hermite(float aValue, float2 const& aX0, float2 const& aX1, fl
 	float const aa = (1.f + aBias) * (1.f - aTension) / 2.f;
 	float const bb = (1.f - aBias) * (1.f - aTension) / 2.f;
 
-	float const m0T = aa * (aX1.x - aX0.x) + bb * (aX2.x - aX1.x);
-	float const m0P = aa * (aX1.y - aX0.y) + bb * (aX2.y - aX1.y);
-
-	float const m1T = aa * (aX2.x - aX1.x) + bb * (aX3.x - aX2.x);
-	float const m1P = aa * (aX2.y - aX1.y) + bb * (aX3.y - aX2.y);
+	float3 m0 = aa * (aX1 - aX0) + bb * (aX2 - aX1);
+	float3 m1 = aa * (aX2 - aX1) + bb * (aX3 - aX2);
 
 	float const u0 = 2.f * v3 - 3.f * v2 + 1.f;
 	float const u1 = v3 - 2.f * v2 + v;
 	float const u2 = v3 - v2;
 	float const u3 = -2.f * v3 + 3.f * v2;
 
-	return{ u0 * aX1.x + u1 * m0T + u2 * m1T + u3 * aX2.x, u0 * aX1.y + u1 * m0P + u2 * m1P + u3 * aX2.y };
+	return u0 * aX1 + u1 * m0 + u2 * m1 + u3 * aX2;
 }
 
-__device__ float2 findPoint(const int i, const int j, const int GM, const int GN, const int g,
-	const int offver, const int offhor, const int gap, const float2* grid, int count) {
-	float2 gridpt = grid[GM * GN * g + i * GM + j];
+__device__ float3 findPoint(const int i, const int j, const int GM, const int GN, const int g,
+	const int offver, const int offhor, const int gap, const float3* grid, int count) {
+	float3 gridpt = grid[GM * GN * g + i * GM + j];
 	if (gridpt.x == -2 && gridpt.y == -2) {
 		//return{ -1, -1 };
 		int j2 = (j + offhor * gap + GM) % GM;
 		int i2 = i + offver * gap;
-		float2 ij2 = grid[GM * GN * g + i2 * GM + j2];
+		float3 ij2 = grid[GM * GN * g + i2 * GM + j2];
 		if (ij2.x == -1 && ij2.y == -1) return{ -1, -1 };
 
 		else if (ij2.x != -2 && ij2.y != -2) {
@@ -271,7 +240,7 @@ __device__ float2 findPoint(const int i, const int j, const int GM, const int GN
 			int j0 = (j - offhor * gap + GM) % GM;
 			int i0 = (i - offver * gap);
 
-			float2 ij0 = grid[GM * GN * g + i0 * GM + j0];
+			float3 ij0 = grid[GM * GN * g + i0 * GM + j0];
 			if (ij0.x < 0) return{ -1, -1 };
 
 			int jprev = (j - 3 * offhor * gap + GM) % GM;
@@ -292,17 +261,17 @@ __device__ float2 findPoint(const int i, const int j, const int GM, const int GN
 					jnext = (j0 + GM / 2) % GM;
 				}
 			}
-			float2 ijprev = grid[GM * GN * g + iprev * GM + jprev];
-			float2 ijnext = grid[GM * GN * g + inext * GM + jnext];
+			float3 ijprev = grid[GM * GN * g + iprev * GM + jprev];
+			float3 ijnext = grid[GM * GN * g + inext * GM + jnext];
 
 			if (ijprev.x > -2 && ijnext.x > -2) {
-				float2 pt[4] = { ijprev, ij0, ij2, ijnext };
+				float3 pt[4] = { ijprev, ij0, ij2, ijnext };
 				if (pt[0].x != -1 && pt[3].x != -1) {
 					piCheckTot(pt, 0.2f, 4);
 					return hermite(0.5f, pt[0], pt[1], pt[2], pt[3], 0.f, 0.f);
 				}
 			}
-			float2 pt[2] = { ij2, ij0 };
+			float3 pt[2] = { ij2, ij0 };
 			piCheckTot(pt, 0.2f, 2);
 			return{ .5f * (pt[0].x + pt[1].x), .5f * (pt[0].y + pt[1].y) };
 		}
@@ -313,7 +282,7 @@ __device__ float2 findPoint(const int i, const int j, const int GM, const int GN
 			int j1 = (j - gap + GM) % GM;
 			if (i - gap < 0) return{ -1, -1 };
 
-			float2 cornersCel2[12];
+			float3 cornersCel2[12];
 
 			cornersCel2[0] = grid[GM * GN * g + (i + gap) * GM + j0];
 			cornersCel2[1] = grid[GM * GN * g + (i - gap) * GM + j0];
@@ -329,8 +298,8 @@ __device__ float2 findPoint(const int i, const int j, const int GM, const int GN
 	return gridpt;
 }
 
-__device__ float2 interpolateHermite(const int i, const int j, const int gap, const int GM, const int GN, const float percDown, const float percRight,
-	const int g, float2* cornersCel, const float2* grid, int count) {
+__device__ float3 interpolateHermite(const int i, const int j, const int gap, const int GM, const int GN, const float percDown, const float percRight,
+	const int g, float3* cornersCel, const float3* grid, int count) {
 
 	int k = i + gap;
 	int l = (j + gap) % GM;
@@ -368,18 +337,18 @@ __device__ float2 interpolateHermite(const int i, const int j, const int gap, co
 	}
 	piCheckTot(cornersCel, 0.2f, 12);
 
-	float2 interpolateUp = hermite(percRight, cornersCel[4], cornersCel[0], cornersCel[1], cornersCel[5], 0.f, 0.f);
-	float2 interpolateDown = hermite(percRight, cornersCel[6], cornersCel[2], cornersCel[3], cornersCel[7], 0.f, 0.f);
-	float2 interpolateUpUp = { cornersCel[8].x + (cornersCel[9].x - cornersCel[8].x) * percRight,
+	float3 interpolateUp = hermite(percRight, cornersCel[4], cornersCel[0], cornersCel[1], cornersCel[5], 0.f, 0.f);
+	float3 interpolateDown = hermite(percRight, cornersCel[6], cornersCel[2], cornersCel[3], cornersCel[7], 0.f, 0.f);
+	float3 interpolateUpUp = { cornersCel[8].x + (cornersCel[9].x - cornersCel[8].x) * percRight,
 		cornersCel[8].y + (cornersCel[9].y - cornersCel[8].y) * percRight };
-	float2 interpolateDownDown = { cornersCel[10].x + (cornersCel[11].x - cornersCel[10].x) * percRight,
+	float3 interpolateDownDown = { cornersCel[10].x + (cornersCel[11].x - cornersCel[10].x) * percRight,
 		cornersCel[10].y + (cornersCel[11].y - cornersCel[10].y) * percRight };
 	//HERMITE FINITE
 	return hermite(percDown, interpolateUpUp, interpolateUp, interpolateDown, interpolateDownDown, 0.f, 0.f);
 }
 
-__device__ float2 interpolateSpline(const int i, const int j, const int gap, const int GM, const int GN, const float thetaCam, const float phiCam, const int g,
-	float2* cornersCel, float* cornersCam, const float2* grid) {
+__device__ float3 interpolateSpline(const int i, const int j, const int gap, const int GM, const int GN, const float thetaCam, const float phiCam, const int g,
+	float3* cornersCel, float* cornersCam, const float3* grid) {
 
 	float thetaUp = cornersCam[0];
 	float thetaDown = cornersCam[2];

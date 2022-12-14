@@ -101,10 +101,10 @@ namespace CUDA {
 			}
 			gridStart = cameras[0].r;
 			gridStep = (cameras[G - 1].r - gridStart) / (1.f * G - 1.f);
-			hashTableSize = hashTable.size() / 2;
+			hashTableSize = hashTable.size() / 3;
 			offsetTableSize = offsetTable.size() / 2;
 			offsetTables = (int2*)&(offsetTable[0]);
-			hashTables = (float2*)&(hashTable[0]);
+			hashTables = (float3*)&(hashTable[0]);
 			hashPosTags = (int2*)&(hashPosTag[0]);
 			tableSizes = (int2*)&(tableSize[0]);
 			camParam = &(camParams[0]);
@@ -118,7 +118,7 @@ namespace CUDA {
 		std::vector<int> offsetTable, hashPosTag;
 		std::vector<int> tableSize;
 		int2* offsetTables;
-		float2* hashTables;
+		float3* hashTables;
 		int2* hashPosTags;
 		int2* tableSizes;
 		int GM;

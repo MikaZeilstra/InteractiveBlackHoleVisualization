@@ -269,6 +269,7 @@
     <ClInclude Include="CUDA\Metric.cuh" />
     <ClInclude Include="CUDA\ShadowComputation.cuh" />
     <ClInclude Include="CUDA\StarDeformation.cuh" />
+    <ClInclude Include="CUDA\vector_operations.cuh" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="C++\Grid.cpp" />

@@ -5,7 +5,7 @@
 #include "ColorComputation.cuh"
 #include "GridInterpolation.cuh"
 
-__global__ void makeGradField(const float2* thphi, const int M, const int N, float2* grad);
+__global__ void makeGradField(const float3* thphi, const int M, const int N, float2* grad);
 
 __global__ void addDiffraction(float3* starLight, const int M, const int N, const uchar3* diffraction, const int filtersize);
 
@@ -13,7 +13,7 @@ __global__ void clearArrays(int* stnums, int2* stCache, const int frame, const i
 
 __global__ void sumStarLight(float3* starLight, float3* trail, float3* out, int step, int M, int N, int filterW);
 
-__global__ void distortStarMap(float3* starLight, const float2* thphi, const unsigned char* bh, const float* stars, const int* tree,
+__global__ void distortStarMap(float3* starLight, const float3* thphi, const unsigned char* bh, const float* stars, const int* tree,
 								const int starSize, const float* camParam, const float* magnitude, const int treeLevel,
 								const int M, const int N, const int step, float offset, int* search, int searchNr, int2* stCache,
 								int* stnums, float3* trail, int trailnum, float2* grad, const int framenumber, const float2* viewthing, 

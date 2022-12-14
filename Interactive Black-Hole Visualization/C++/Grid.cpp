@@ -609,12 +609,12 @@ void Grid::saveAsGpuHash() {
 	if (print) std::cout << "Computing Perfect Hash.." << std::endl;
 
 	std::vector<cv::Point2i> elements;
-	std::vector<cv::Point2f> data;
+	std::vector<cv::Point3f> data;
 	for (std::pair<uint64_t, cv::Point2d> entry : CamToCel) {
 		uint32_t el1 = entry.first >> 32;
 		uint32_t el2 = entry.first;
 		elements.push_back({ (int)el1, (int)el2 });
-		data.push_back({ (float)entry.second.x, (float)entry.second.y });
+		data.push_back({ (float)entry.second.x, (float)entry.second.y,0 });
 	}
 	hasher = PSHOffsetTable(elements, data);
 

@@ -74,6 +74,9 @@
     <ClInclude Include="CUDA\Metric.cuh">
       <Filter>CUDA\Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="CUDA\vector_operations.cuh">
+      <Filter>CUDA\Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="C++\Source.cpp">

@@ -15,7 +15,7 @@ nrOfFrames = 1
 // Image location.
 celestialSkyImg = "rainbow.png"
 // Should stars be added?
-useStars = false
+useStars = true
 // Star file location.
 starCatalogue = "sterren.txt"
 // Star binary tree depth

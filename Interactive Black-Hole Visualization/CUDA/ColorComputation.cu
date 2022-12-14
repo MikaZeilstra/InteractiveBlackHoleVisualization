@@ -1,6 +1,6 @@
 #include "ColorComputation.cuh"
 
-__global__ void findArea(const float2* thphi, const int M, const int N, float* area) {
+__global__ void findArea(const float3* thphi, const int M, const int N, float* area) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 	if (i < N && j < M) {

@@ -37,13 +37,13 @@ cudaEvent_t start, stop;
 
 float milliseconds = 0.f;
 
-float2* dev_hashTable = 0;
+float3* dev_hashTable = 0;
 int2* dev_offsetTable = 0;
 int2* dev_hashPosTag = 0;
 int2* dev_tableSize = 0;
 
-float2* dev_grid = 0;
-static float2* dev_interpolatedGrid = 0;
+float3* dev_grid = 0;
+static float3* dev_interpolatedGrid = 0;
 int* dev_gridGap = 0;
 static float* dev_cameras = 0;
 float* dev_camera0 = 0;
@@ -241,13 +241,13 @@ void CUDA::memoryAllocationAndCopy(const Grids& grids, const Image& image, const
 	cudaDeviceGetLimit(&size_stack, cudaLimitStackSize);
 	//printf("Heap size found to be %d; Stack size found to be %d\n", (int)size_heap, (int)size_stack);
 
-	allocate(dev_hashTable, grids.hashTableSize * sizeof(float2), "hashTable");
+	allocate(dev_hashTable, grids.hashTableSize * sizeof(float3), "hashTable");
 	allocate(dev_offsetTable, grids.offsetTableSize * sizeof(int2), "offsetTable");
 	allocate(dev_tableSize, grids.G * sizeof(int2), "tableSize");
 	allocate(dev_hashPosTag, grids.hashTableSize * sizeof(int2), "hashPosTag");
 
-	allocate(dev_grid, gridnum * gridsize * sizeof(float2), "grid");
-	allocate(dev_interpolatedGrid, rastSize * sizeof(float2), "interpolatedGrid");
+	allocate(dev_grid, gridnum * gridsize * sizeof(float3), "grid");
+	allocate(dev_interpolatedGrid, rastSize * sizeof(float3), "interpolatedGrid");
 	allocate(dev_gridGap, rastSize * sizeof(int), "gridGap");
 
 	allocate(dev_cameras, 7 * grids.G * sizeof(float), "cameras");
@@ -282,7 +282,7 @@ void CUDA::memoryAllocationAndCopy(const Grids& grids, const Image& image, const
 
 	std::cout << "Copying variables into CUDA memory..." << std::endl;
 
-	copyHostToDevice(dev_hashTable, grids.hashTables, grids.hashTableSize * sizeof(float2), "hashTable");
+	copyHostToDevice(dev_hashTable, grids.hashTables, grids.hashTableSize * sizeof(float3), "hashTable");
 	copyHostToDevice(dev_offsetTable, grids.offsetTables, grids.offsetTableSize * sizeof(int2), "offsetTable");
 	copyHostToDevice(dev_hashPosTag, grids.hashPosTags, grids.hashTableSize * sizeof(int2), "hashPosTags");
 	copyHostToDevice(dev_tableSize, grids.tableSizes, grids.G * sizeof(int2), "tableSizes");

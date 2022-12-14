@@ -28,7 +28,7 @@ class OffsetBucket {
 public:
 	bool create = false;
 	std::vector<cv::Point2i> contents;
-	std::vector<cv::Point2f> data;
+	std::vector<cv::Point3f> data;
 	cv::Point2i index; //index in offset table
 	OffsetBucket() {};
 
@@ -47,7 +47,7 @@ private:
 	}
 
 	std::vector<cv::Point2i> elements;
-	std::vector<cv::Point2f> datapoints;
+	std::vector<cv::Point3f> datapoints;
 	std::vector<OffsetBucket> offsetBuckets;
 	std::vector<bool> hashFilled;
 
@@ -107,8 +107,9 @@ private:
 			cv::Point2i _hash = hashFunc(ele, offset);
 			if (hashFilled[_hash.x * hashTableWidth + _hash.y]) std::cout << "ALREADY FILLED" << std::endl;
 			hashFilled[_hash.x * hashTableWidth + _hash.y] = true;
-			hashTable[(_hash.x * hashTableWidth + _hash.y) * 2] = bucket.data[i].x;
-			hashTable[(_hash.x * hashTableWidth + _hash.y) * 2 + 1] = bucket.data[i].y;
+			hashTable[(_hash.x * hashTableWidth + _hash.y) * 3] = bucket.data[i].x;
+			hashTable[(_hash.x * hashTableWidth + _hash.y) * 3 + 1] = bucket.data[i].y;
+			hashTable[(_hash.x * hashTableWidth + _hash.y) * 3 + 2] = bucket.data[i].z;
 
 			hashPosTag[(_hash.x * hashTableWidth + _hash.y) * 2] = ele.x;
 			hashPosTag[(_hash.x * hashTableWidth + _hash.y) * 2 + 1] = ele.y;
@@ -344,8 +345,9 @@ public:
 
 	
 
-	PSHOffsetTable(std::vector<cv::Point2i>& _elements, std::vector<cv::Point2f>& _datapoints) {
+	PSHOffsetTable(std::vector<cv::Point2i>& _elements, std::vector<cv::Point3f>& _datapoints) {
 		srand(time(NULL));
+   		//srand(1);
 
 		int size = _elements.size();
 		n = size;
@@ -353,7 +355,7 @@ public:
 		offsetTableWidth = calcOffsetTableWidth(size);
 
 		hashFilled = std::vector<bool>(hashTableWidth*hashTableWidth);
-		hashTable = std::vector<float>(hashTableWidth*hashTableWidth*2);
+		hashTable = std::vector<float>(hashTableWidth*hashTableWidth*3);
 		hashPosTag = std::vector<int>(hashTableWidth*hashTableWidth*2);
 		
 		offsetBuckets = std::vector<OffsetBucket>(offsetTableWidth*offsetTableWidth);

@@ -4,7 +4,7 @@
 #include "Constants.cuh"
 #include "GridLookup.cuh"
 
-__global__ void findArea(const float2* thphi, const int M, const int N, float* area);
+__global__ void findArea(const float3* thphi, const int M, const int N, float* area);
 __global__ void smoothAreaH(float* areaSmooth, float* area, const unsigned char* bh, const int* gap, const int M, const int N);
 __global__ void smoothAreaV(float* areaSmooth, float* area, const unsigned char* bh, const int* gap, const int M, const int N);
 
