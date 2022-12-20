@@ -23,113 +23,107 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="C++\BlackHole.h">
+    <ClInclude Include="C++\Header files\Archive.h">
       <Filter>C++\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="C++\Camera.h">
+    <ClInclude Include="C++\Header files\BlackHole.h">
       <Filter>C++\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="C++\CelestialSkyProcessor.h">
+    <ClInclude Include="C++\Header files\Camera.h">
       <Filter>C++\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="C++\Code.h">
+    <ClInclude Include="C++\Header files\CelestialSkyProcessor.h">
       <Filter>C++\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="C++\Const.h">
+    <ClInclude Include="C++\Header files\Code.h">
       <Filter>C++\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="C++\Grid.h">
+    <ClInclude Include="C++\Header files\Const.h">
       <Filter>C++\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="C++\Parameters.h">
+    <ClInclude Include="C++\Header files\Grid.h">
       <Filter>C++\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="C++\PSHOffsetTable.h">
+    <ClInclude Include="C++\Header files\IntegrationDefines.h">
       <Filter>C++\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="C++\StarProcessor.h">
+    <ClInclude Include="C++\Header files\Parameters.h">
       <Filter>C++\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="C++\Viewer.h">
+    <ClInclude Include="C++\Header files\PSHOffsetTable.h">
       <Filter>C++\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="C++\Archive.h">
+    <ClInclude Include="C++\Header files\StarProcessor.h">
       <Filter>C++\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CUDA\ShadowComputation.cuh">
+    <ClInclude Include="C++\Header files\Viewer.h">
+      <Filter>C++\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CUDA\Header files\ColorComputation.cuh">
       <Filter>CUDA\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CUDA\ImageDeformation.cuh">
+    <ClInclude Include="CUDA\Header files\Constants.cuh">
       <Filter>CUDA\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CUDA\StarDeformation.cuh">
+    <ClInclude Include="CUDA\Header files\GridInterpolation.cuh">
       <Filter>CUDA\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CUDA\Integration.cuh">
+    <ClInclude Include="CUDA\Header files\GridLookup.cuh">
       <Filter>CUDA\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="C++\IntegrationDefines.h">
-      <Filter>C++\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="CUDA\Metric.cuh">
+    <ClInclude Include="CUDA\Header files\ImageDeformation.cuh">
       <Filter>CUDA\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CUDA\vector_operations.cuh">
+    <ClInclude Include="CUDA\Header files\ImageDistorterCaller.cuh">
+      <Filter>CUDA\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CUDA\Header files\intellisense_cuda_intrinsics.cuh">
+      <Filter>CUDA\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CUDA\Header files\Metric.cuh">
+      <Filter>CUDA\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CUDA\Header files\ShadowComputation.cuh">
+      <Filter>CUDA\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CUDA\Header files\StarDeformation.cuh">
+      <Filter>CUDA\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CUDA\Header files\vector_operations.cuh">
       <Filter>CUDA\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="C++\Source.cpp">
+    <ClCompile Include="C++\Source files\Grid.cpp">
       <Filter>C++\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C++\Grid.cpp">
+    <ClCompile Include="C++\Source files\Source.cpp">
       <Filter>C++\Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="CUDA\ColorComputation.cuh">
-      <Filter>CUDA\Header Files</Filter>
-    </CudaCompile>
-    <CudaCompile Include="CUDA\Constants.cuh">
-      <Filter>CUDA\Header Files</Filter>
-    </CudaCompile>
-    <CudaCompile Include="CUDA\ColorComputation.cu">
+    <CudaCompile Include="CUDA\Source files\ColorComputation.cu">
       <Filter>CUDA\Source Files</Filter>
     </CudaCompile>
-    <CudaCompile Include="CUDA\GridInterpolation.cuh">
-      <Filter>CUDA\Header Files</Filter>
-    </CudaCompile>
-    <CudaCompile Include="CUDA\GridLookup.cuh">
-      <Filter>CUDA\Header Files</Filter>
-    </CudaCompile>
-    <CudaCompile Include="CUDA\ImageDistorterCaller.cuh">
-      <Filter>CUDA\Header Files</Filter>
-    </CudaCompile>
-    <CudaCompile Include="CUDA\intellisense_cuda_intrinsics.cuh">
-      <Filter>CUDA\Header Files</Filter>
-    </CudaCompile>
-    <CudaCompile Include="CUDA\GridInterpolation.cu">
+    <CudaCompile Include="CUDA\Source files\GridInterpolation.cu">
       <Filter>CUDA\Source Files</Filter>
     </CudaCompile>
-    <CudaCompile Include="CUDA\GridLookup.cu">
+    <CudaCompile Include="CUDA\Source files\GridLookup.cu">
       <Filter>CUDA\Source Files</Filter>
     </CudaCompile>
-    <CudaCompile Include="CUDA\ImageDistorterCaller.cu">
+    <CudaCompile Include="CUDA\Source files\ImageDeformation.cu">
       <Filter>CUDA\Source Files</Filter>
     </CudaCompile>
-    <CudaCompile Include="CUDA\ImageDeformation.cu">
+    <CudaCompile Include="CUDA\Source files\ImageDistorterCaller.cu">
       <Filter>CUDA\Source Files</Filter>
     </CudaCompile>
-    <CudaCompile Include="CUDA\ShadowComputation.cu">
+    <CudaCompile Include="CUDA\Source files\Metric.cu">
       <Filter>CUDA\Source Files</Filter>
     </CudaCompile>
-    <CudaCompile Include="CUDA\StarDeformation.cu">
+    <CudaCompile Include="CUDA\Source files\ShadowComputation.cu">
       <Filter>CUDA\Source Files</Filter>
     </CudaCompile>
-    <CudaCompile Include="CUDA\Integration.cu">
-      <Filter>CUDA\Source Files</Filter>
-    </CudaCompile>
-    <CudaCompile Include="CUDA\Metric.cu">
+    <CudaCompile Include="CUDA\Source files\StarDeformation.cu">
       <Filter>CUDA\Source Files</Filter>
     </CudaCompile>
   </ItemGroup>

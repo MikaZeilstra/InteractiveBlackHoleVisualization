@@ -227,53 +227,43 @@
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <CudaCompile Include="CUDA\ColorComputation.cu">
-      <FileType>Document</FileType>
-    </CudaCompile>
-    <CudaCompile Include="CUDA\ColorComputation.cuh" />
-    <CudaCompile Include="CUDA\Constants.cuh" />
-    <CudaCompile Include="CUDA\GridInterpolation.cu">
-      <FileType>Document</FileType>
-    </CudaCompile>
-    <CudaCompile Include="CUDA\GridInterpolation.cuh" />
-    <CudaCompile Include="CUDA\GridLookup.cu">
-      <FileType>Document</FileType>
-    </CudaCompile>
-    <CudaCompile Include="CUDA\GridLookup.cuh" />
-    <CudaCompile Include="CUDA\ImageDeformation.cu" />
-    <CudaCompile Include="CUDA\ImageDistorterCaller.cu">
-      <FileType>Document</FileType>
-    </CudaCompile>
-    <CudaCompile Include="CUDA\ImageDistorterCaller.cuh" />
-    <CudaCompile Include="CUDA\Integration.cu" />
-    <CudaCompile Include="CUDA\intellisense_cuda_intrinsics.cuh" />
-    <CudaCompile Include="CUDA\Metric.cu" />
-    <CudaCompile Include="CUDA\ShadowComputation.cu" />
-    <CudaCompile Include="CUDA\StarDeformation.cu" />
+    <ClInclude Include="C++\Header files\Archive.h" />
+    <ClInclude Include="C++\Header files\BlackHole.h" />
+    <ClInclude Include="C++\Header files\Camera.h" />
+    <ClInclude Include="C++\Header files\CelestialSkyProcessor.h" />
+    <ClInclude Include="C++\Header files\Code.h" />
+    <ClInclude Include="C++\Header files\Const.h" />
+    <ClInclude Include="C++\Header files\Grid.h" />
+    <ClInclude Include="C++\Header files\IntegrationDefines.h" />
+    <ClInclude Include="C++\Header files\Parameters.h" />
+    <ClInclude Include="C++\Header files\PSHOffsetTable.h" />
+    <ClInclude Include="C++\Header files\StarProcessor.h" />
+    <ClInclude Include="C++\Header files\Viewer.h" />
+    <ClInclude Include="CUDA\Header files\ColorComputation.cuh" />
+    <ClInclude Include="CUDA\Header files\Constants.cuh" />
+    <ClInclude Include="CUDA\Header files\GridInterpolation.cuh" />
+    <ClInclude Include="CUDA\Header files\GridLookup.cuh" />
+    <ClInclude Include="CUDA\Header files\ImageDeformation.cuh" />
+    <ClInclude Include="CUDA\Header files\ImageDistorterCaller.cuh" />
+    <ClInclude Include="CUDA\Header files\intellisense_cuda_intrinsics.cuh" />
+    <ClInclude Include="CUDA\Header files\Metric.cuh" />
+    <ClInclude Include="CUDA\Header files\ShadowComputation.cuh" />
+    <ClInclude Include="CUDA\Header files\StarDeformation.cuh" />
+    <ClInclude Include="CUDA\Header files\vector_operations.cuh" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="C++\Archive.h" />
-    <ClInclude Include="C++\BlackHole.h" />
-    <ClInclude Include="C++\Camera.h" />
-    <ClInclude Include="C++\CelestialSkyProcessor.h" />
-    <ClInclude Include="C++\Code.h" />
-    <ClInclude Include="C++\Const.h" />
-    <ClInclude Include="C++\Grid.h" />
-    <ClInclude Include="C++\IntegrationDefines.h" />
-    <ClInclude Include="C++\Parameters.h" />
-    <ClInclude Include="C++\PSHOffsetTable.h" />
-    <ClInclude Include="C++\StarProcessor.h" />
-    <ClInclude Include="C++\Viewer.h" />
-    <ClInclude Include="CUDA\ImageDeformation.cuh" />
-    <ClInclude Include="CUDA\Integration.cuh" />
-    <ClInclude Include="CUDA\Metric.cuh" />
-    <ClInclude Include="CUDA\ShadowComputation.cuh" />
-    <ClInclude Include="CUDA\StarDeformation.cuh" />
-    <ClInclude Include="CUDA\vector_operations.cuh" />
+    <ClCompile Include="C++\Source files\Grid.cpp" />
+    <ClCompile Include="C++\Source files\Source.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="C++\Grid.cpp" />
-    <ClCompile Include="C++\Source.cpp" />
+    <CudaCompile Include="CUDA\Source files\ColorComputation.cu" />
+    <CudaCompile Include="CUDA\Source files\GridInterpolation.cu" />
+    <CudaCompile Include="CUDA\Source files\GridLookup.cu" />
+    <CudaCompile Include="CUDA\Source files\ImageDeformation.cu" />
+    <CudaCompile Include="CUDA\Source files\ImageDistorterCaller.cu" />
+    <CudaCompile Include="CUDA\Source files\Metric.cu" />
+    <CudaCompile Include="CUDA\Source files\ShadowComputation.cu" />
+    <CudaCompile Include="CUDA\Source files\StarDeformation.cu" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

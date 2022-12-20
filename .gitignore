@@ -32,7 +32,7 @@ Resources/Stars/*.star
 Resources/CelestialBackgrounds/Summed/*
 
 # Results
-Results/*
+Results/*.png
 
 # DLLs
 *.dll

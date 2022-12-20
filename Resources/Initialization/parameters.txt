@@ -12,10 +12,13 @@ offsetY = 0 // *PI
 
 nrOfFrames = 1
 
+//Effect settings
+useRedshift = false
+useLensing = false
+useStars = false
+
 // Image location.
 celestialSkyImg = "rainbow.png"
-// Should stars be added?
-useStars = true
 // Star file location.
 starCatalogue = "sterren.txt"
 // Star binary tree depth
@@ -33,7 +36,7 @@ gridMaxLevel = 10
 afactor = 0.999;
 
 // Camera location, speed, direction
-camRadius = 8.
+camRadius = 3.
 camInclination = 0.5 //*PI
 // If a custom user speed is used.
 userSpeed = false
