@@ -192,8 +192,6 @@ namespace CUDA {
 		std::vector <T>& bV, std::vector <T>& qV, std::vector <T>& pThetaV);
 	template void integrateGrid<double>(const double rV, const double thetaV, const double phiV, std::vector <double>& pRV,
 		std::vector <double>& bV, std::vector <double>& qV, std::vector <double>& pThetaV);
-	template void integrateGrid<float>(const float rV, const float thetaV, const float phiV, std::vector <float>& pRV,
-		std::vector <float>& bV, std::vector <float>& qV, std::vector <float>& pThetaV);
 }
 
 #endif // !CUDA_FUNCTIONS

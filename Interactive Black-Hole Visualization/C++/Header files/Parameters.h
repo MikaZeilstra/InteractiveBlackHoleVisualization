@@ -5,7 +5,7 @@
 #include "Const.h"
 
 struct Parameters {
-
+	
 	bool sphereView, angleView;
 	int windowWidth, windowHeight = 1920;
 	double viewAngle;
@@ -17,6 +17,7 @@ struct Parameters {
 	double br, bphi, btheta;
 	bool userSpeed;
 	bool useStars, useRedshift, useLensing;
+	bool savePaths;
 	bool camSpeedChange, camInclinationChange, camRadiusChange;
 	cv::Point2d camSpeedFromTo, camInclinationFromTo, camRadiusFromTo;
 	double camRadiusStepsize, camSpeedStepsize, camInclinationStepsize;
@@ -72,6 +73,10 @@ struct Parameters {
 	std::string getDiffractionFolder() const {
 		return getResourceFolder() + "Diffraction/";
 	}
+
+	std::string getGeodesicsResultFolder() const {
+		return "Geodesics/";
+	}
  
 	std::string getStarDiffractionFile() const {
 		return getDiffractionFolder() + diffractionImg;
@@ -88,7 +93,7 @@ struct Parameters {
 		return ss.str();
 	}
 
-	std::string getResultFileName(float alpha, int q, const char folder[] = "", const char name_extra[] = "") const {
+	std::string getResultFileName(float alpha, int q, const char folder[] = "", const char name_extra[] = "", const char ext[] = "png") const {
 		float camRad = camRadiusFromTo.x;
 		float camInc = camInclinationFromTo.x;
 		float camSpeed = camSpeedFromTo.x;
@@ -97,7 +102,7 @@ struct Parameters {
 		if (camSpeedChange) camSpeed = camSpeedFromTo.x + alpha * (camSpeedFromTo.y - camSpeedFromTo.x);
 
 		std::stringstream ss;
-		ss << getResultsFolder() << folder << getGridDescription(camRad, camInc, camSpeed) << "_" << q << name_extra << ".png";
+		ss << getResultsFolder() << folder << getGridDescription(camRad, camInc, camSpeed) << "_" << q << name_extra << "." << ext;
 		return ss.str();
 	}
 
@@ -108,6 +113,11 @@ struct Parameters {
 	std::string getGridResultFileName(float alpha, int q, const char name_extra[] = "") const {
 		return getResultFileName(alpha, q, getGridResultFolder().c_str(), name_extra);
 	}
+
+	std::string getGeodesicsResultFileName(float alpha, int q, const char name_extra[] = "") const {
+		return getResultFileName(alpha, q, getGeodesicsResultFolder().c_str(), name_extra,"geo");
+	}
+	
 
 	std::string getGridFileName(float camRad, float camInc, float camSpeed) const {
 		std::stringstream ss;
@@ -179,7 +189,8 @@ struct Parameters {
 
 			useRedshift = config.lookup("useRedshift");
 			useLensing = config.lookup("useLensing");
-
+			savePaths = config.lookup("saveGeodesics");
+			
 			useStars = config.lookup("useStars");
 			std::string str2 = config.lookup("starCatalogue");
 			starCatalogue = str2;

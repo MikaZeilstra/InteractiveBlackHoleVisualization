@@ -41,22 +41,26 @@ namespace metric {
 
 	template <class T> __global__ void integrate_kernel(const T rV, const T thetaV, const T phiV, T* pRV,
 		T* bV, T* qV, T* pThetaV, int size);
+
 	template __global__ void integrate_kernel<double>(const double rV, const double thetaV, const double phiV, double* pRV,
 		double* bV, double* qV, double* pThetaV, int size);
 	template __global__ void integrate_kernel<float>(const float rV, const float thetaV, const float phiV, float* pRV,
 		float* bV, float* qV, float* pThetaV, int size);
 
 	template <class T> __device__ __host__ void rkckIntegrate1(const T rV, const T thetaV, const T phiV, T* pRV,
-		T* bV, T* qV, T* pThetaV);
+		T* bV, T* qV, T* pThetaV, bool savePath, float3* pathSave);
 	template __device__ __host__ void rkckIntegrate1<double>(const double rV, const double thetaV, const double phiV, double* pRV,
-		double* bV, double* qV, double* pThetaV);
+		double* bV, double* qV, double* pThetaV, bool savePath, float3* pathSave);
 	template __device__ __host__ void rkckIntegrate1<float>(const float rV, const float thetaV, const float phiV, float* pRV,
-		float* bV, float* qV, float* pThetaV);
+		float* bV, float* qV, float* pThetaV, bool savePath, float3* pathSave);
 
 
-	template <class T>  __device__ __host__ void wrapToPi(T& thetaW, T& phiW);
-	template  __device__ __host__ void wrapToPi<double>(double &thetaW, double& phiW);
-	template  __device__ __host__ void wrapToPi<float>(float& thetaW, float& phiW);
+	template <class T>  __device__ __host__ bool wrapToPi(T& thetaW, T& phiW);
+
+	//Variables
+	template  __device__ __host__ bool wrapToPi<double>(double &thetaW, double& phiW);
+	template  __device__ __host__ bool wrapToPi<float>(float& thetaW, float& phiW);
+
 }
 
 

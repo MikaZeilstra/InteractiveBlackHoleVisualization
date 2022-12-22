@@ -127,7 +127,7 @@ int main()
 
 			std::cout << "Computing new grid file..." << std::endl << std::endl;
 			auto start_time = std::chrono::high_resolution_clock::now();
-			grids[q] = Grid(param.gridMaxLevel, param.gridStartLevel, param.angleView, &cam, &black);
+			grids[q] = Grid(param.gridMaxLevel, param.gridStartLevel, param.angleView, &cam, &black, param);
 			reportDuration(start_time, "Computed", "grid file");
 
 			std::cout << "Writing to file..." << std::endl << std::endl;

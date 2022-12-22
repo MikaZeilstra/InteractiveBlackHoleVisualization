@@ -12,6 +12,7 @@
 #include "BlackHole.h"
 #include "Const.h"
 #include "Code.h"
+#include "Parameters.h"
 #include "PSHOffsetTable.h"
 #include <chrono>
 #include <numeric>
@@ -229,6 +230,13 @@ public:
 
 	std::vector<int> steps;
 
+	/// <summary>
+	/// Stores paths the light takes
+	/// </summary>
+	std::vector<float> geodesics;
+
+	Parameters* param;
+
 	PSHOffsetTable hasher;
 
 	//PSHOffsetTable hasher;
@@ -253,7 +261,7 @@ public:
 	/// <param name="angle">If the camera is not on the symmetry axis.</param>
 	/// <param name="camera">The camera.</param>
 	/// <param name="bh">The black hole.</param>
-	Grid(const int maxLevelPrec, const int startLevel, const bool angle, const Camera* camera, const BlackHole* bh);
+	Grid(const int maxLevelPrec, const int startLevel, const bool angle, const Camera* camera, const BlackHole* bh, Parameters& param);
 
 	void saveAsGpuHash();
 
@@ -262,6 +270,8 @@ public:
 
 
 	void makeHeatMapOfIntegrationSteps(std::string filename);
+
+	void saveGeodesics(Parameters& param);
 
 	/// <summary>
 	/// Finalizes an instance of the <see cref="Grid"/> class.

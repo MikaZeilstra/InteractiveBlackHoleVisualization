@@ -1,5 +1,6 @@
 #pragma once
 #include "../Header files/ImageDistorterCaller.cuh"
+#include "../../C++/Header files/IntegrationDefines.h"
 
 #define copyHostToDevice(dev_pointer, host_pointer, size, txt) { std::string errtxt = ("Host to Device copy Error " + std::string(txt)); \
 																 checkCudaStatus(cudaMemcpy(dev_pointer, host_pointer, size, cudaMemcpyHostToDevice), errtxt.c_str()); }
@@ -213,7 +214,6 @@ template <class T> void CUDA::integrateGrid(const T rV, const T thetaV, const T 
 	copyDeviceToHost(bV.data(), bs_device, bV.size() * sizeof(T), "found theta");
 	copyDeviceToHost(qV.data(), qs_device, qV.size() * sizeof(T), "found phi");
 	copyDeviceToHost(pThetaV.data(), pThetas_device, pThetaV.size() * sizeof(T), "found r");
-
 	checkCudaErrors();
 
 }
@@ -486,7 +486,7 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 					grid[i].z = 0;
 				}
 				else {
-					grid[i].z = grid[i].z / (grids.gridStart + q * grids.gridStep);
+					grid[i].z = grid[i].z / (grids.gridStart + q * (param.camRadiusChange ? grids.gridStep : 0));
 				}
 			}
 			
@@ -508,7 +508,7 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 				interpolated_grid[i].z = 0;
 			}
 			else {
-				interpolated_grid[i].z = interpolated_grid[i].z / (grids.gridStart + q * grids.gridStep);
+				interpolated_grid[i].z = interpolated_grid[i].z / (grids.gridStart + q * (param.camRadiusChange ? grids.gridStep : 0));
 			}
 		}
 

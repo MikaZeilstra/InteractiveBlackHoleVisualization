@@ -17,6 +17,9 @@ useRedshift = false
 useLensing = false
 useStars = false
 
+//Option to save the geodesics used to generate the image
+saveGeodesics = false
+
 // Image location.
 celestialSkyImg = "rainbow.png"
 // Star file location.

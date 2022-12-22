@@ -24,7 +24,7 @@ __device__ bool piCheckTot(float3* tp, float factor, int size);
 // Set values for projected pixel corners & update phi values in case of 2pi crossing.
 __device__ void retrievePixelCorners(const float3* thphi, float* t, float* p, int& ind, const int M, bool& picheck, float offset);
 
-//__device__ void wrapToPi(float& thetaW, float& phiW);
+// __device__ void wrapToPi(float& thetaW, float& phiW);
 
 __device__ int2 hash1(int2 key, int ow);
 

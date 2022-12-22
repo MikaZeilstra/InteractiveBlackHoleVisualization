@@ -13,6 +13,7 @@
 #include "../Header files/Const.h"
 #include "../Header files/Code.h"
 #include "../Header files/PSHOffsetTable.h"
+#include "../Header files/IntegrationDefines.h"
 #include <chrono>
 #include <numeric>
 
@@ -487,11 +488,18 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 	std::vector<double>bs;
 	std::vector<double>qs;
 	std::vector<double>pThetas;
+	
+	std::vector<float>paths;
+
+	if (param->savePaths) {
+		paths.reserve(n * 3 * (MAXSTP / STEP_SAVE_INTERVAL));
+	}
 
 	pRs.reserve(n);
 	bs.reserve(n);
 	qs.reserve(n);
 	pThetas.reserve(n);
+	
 
 #pragma loop(hint_parallel(8))
 #pragma loop(ivdep)
@@ -528,11 +536,17 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 	if (n < MIN_GPU_INTEGRATION) {
 	#pragma loop(hint_parallel(8))
 		for (int i = 0; i < n; i++) {
-			metric::rkckIntegrate1<double>(rS, thetaS, phiS, &pRs[i], &bs[i], &qs[i], &pThetas[i]);
+			metric::rkckIntegrate1<double>(rS, thetaS, phiS, &pRs[i], &bs[i], &qs[i], &pThetas[i],param->savePaths, reinterpret_cast<float3*>( & (paths.data()[i * 3 * (MAXSTP / STEP_SAVE_INTERVAL)])));
 			theta[i] = bs[i];
 			phi[i] = qs[i];
 			r[i] = pThetas[i];
+
+			
 		}
+		if (param->savePaths) {
+			geodesics.insert(geodesics.end(), paths.begin(), paths.end());
+		}
+		
 	}
 	else {
 		CUDA::integrateGrid<double>(rS, thetaS, phiS, pRs, bs, qs, pThetas);
@@ -543,6 +557,9 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 			r[i] = pThetas[i];
 		}
 	}
+
+	
+
 }
 
 #pragma endregion private
@@ -556,13 +573,14 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 /// <param name="angle">If the camera is not on the symmetry axis.</param>
 /// <param name="camera">The camera.</param>
 /// <param name="bh">The black hole.</param>
-Grid::Grid(const int maxLevelPrec, const int startLevel, const bool angle, const Camera* camera, const BlackHole* bh) {
+Grid::Grid(const int maxLevelPrec, const int startLevel, const bool angle, const Camera* camera, const BlackHole* bh, Parameters& _param) {
 	MAXLEVEL = maxLevelPrec;
 	STARTLVL = startLevel;
 	cam = camera;
 	black = bh;
 	equafactor = angle ? 1 : 0;
-	 
+	param = &_param;
+
 	N = (uint32_t)round(pow(2, MAXLEVEL) / (2 - equafactor) + 1);
 	STARTN = (uint32_t)round(pow(2, startLevel) / (2 - equafactor) + 1);
 	M = (2 - equafactor) * 2 * (N - 1);
@@ -592,7 +610,17 @@ Grid::Grid(const int maxLevelPrec, const int startLevel, const bool angle, const
 	std::cout << "hashed in " <<
 		std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms!" <<
 		std::endl << std::endl;
+	if (param->savePaths) {
+		saveGeodesics(_param);
+	}
+	
 };
+
+void Grid::saveGeodesics(Parameters& param) {
+	cv::FileStorage fs(param.getGeodesicsResultFileName(metric::a<double>,0), cv::FileStorage::WRITE);
+	fs << "paths" << geodesics;
+	fs.release();
+}
 
 void Grid::saveAsGpuHash() {
 	if (print) std::cout << "Computing Perfect Hash.." << std::endl;

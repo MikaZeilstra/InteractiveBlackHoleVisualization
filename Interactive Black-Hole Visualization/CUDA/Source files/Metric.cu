@@ -12,6 +12,15 @@
 
 
 namespace metric {
+#ifndef __CUDA_ARCH__
+	const double BUTCHER_TABLEAU;
+	const double BUTCHER_ERROR;
+#else
+	__device__ __constant__ const double BUTCHER_TABLEAU;
+	__device__ __constant__ const double BUTCHER_ERROR;
+#endif // !__CUDA_ARCH__
+
+
 	template <class T> __host__ void setAngVel(T afactor) {
 		metric::a<T> = afactor;
 		metric::asq<T> = afactor * afactor;
@@ -176,16 +185,10 @@ namespace metric {
 			rosqsq + (asqcossin * (btheta * delta + R)) / sqrosqdel;
 	}
 
-#ifndef __CUDA_ARCH__
-	const double BUTCHER_TABLEAU;
-	const double BUTCHER_ERROR;
-#else
-	__device__ __constant__ const double BUTCHER_TABLEAU;
-	__device__ __constant__ const double BUTCHER_ERROR;
-#endif // !__CUDA_ARCH__
+	//Wraps the theta and phi coordinates back to their respective domains [0,PI] and [0,2PI) respectively returns wheter phi has been reduced back from larger than Pi.
+	template <class T>  __device__ __host__ bool wrapToPi(T& thetaW, T& phiW) {
+		bool ret = false;
 
-
-	template <class T>  __device__ __host__ void wrapToPi(T& thetaW, T& phiW) {
 		thetaW = fmodf(thetaW, PI2);
 		if (thetaW < 0) {
 			thetaW += PI2;
@@ -194,11 +197,14 @@ namespace metric {
 		if (thetaW > PI) {
 			thetaW -= 2 * (thetaW - PI);
 			phiW += PI;
+			ret = true;
 		}
 		phiW = fmodf(phiW, PI2);
 		if (phiW < 0) {
 			phiW += PI2;
 		}
+
+		return ret;
 	}
 
 	template <class T> __device__ __host__ static void rkck(volatile T* var, volatile T* dvdz, const T h,
@@ -249,7 +255,7 @@ namespace metric {
 		return (0 < val) - (val < 0);
 	}
 
-	template <class T> __device__ __host__ static void odeint1(volatile T* varStart, const T b, const T q) {
+	template <class T> __device__ __host__ static void odeint1(volatile T* varStart, const T b, const T q, bool shouldSavePath, float3* pathSave) {
 		volatile T varScal[5];
 		volatile T var[5];
 		volatile T dvdz[5];
@@ -265,20 +271,31 @@ namespace metric {
 
 		for (int i = 0; i < NUMBER_OF_EQUATIONS; i++) var[i] = varStart[i];
 
-		int theta_crossings = 0;
-
-		bool last_theta = thetaVar > 0;
+		bool last_theta = thetaVar > PI1_2;
 
 		for (int nstp = 0; nstp < MAXSTP; nstp++) {
+
+			//Save the path every ten steps for visualization if required;
+			#ifndef __CUDA_ARCH__
+				if (shouldSavePath && nstp % STEP_SAVE_INTERVAL == 0) {
+					pathSave[nstp/ STEP_SAVE_INTERVAL] = {(float) thetaVar,(float)phiVar,(float)rVar };
+				}
+			#endif // __CUDA_ARCH__		
+
 			metric::derivs(var, dvdz, b, q);
 			for (int i = 0; i < NUMBER_OF_EQUATIONS; i++)
 				varScal[i] = fabs(var[i]) + fabs(dvdz[i] * h) + TINY;
 
 			rkqs(var, dvdz, z, h, varScal, b, q, varErr, varTemp, aks, varTmpInt);
 
-			if (thetaVar > 0 != last_theta) {
-				theta_crossings++;
+			bool changedTheta = wrapToPi(thetaVar, phiVar);
+
+			/*
+			if (thetaVar > PI1_2 != last_theta && !changedTheta) {
+				for (int i = 0; i < NUMBER_OF_EQUATIONS; i++) varStart[i] = var[i];
+				return;
 			}
+			*/
 
 			last_theta = thetaVar > 0;
 
@@ -301,11 +318,11 @@ namespace metric {
 
 
 	template <class T> __device__ __host__ void rkckIntegrate1(const T rV, const T thetaV, const T phiV, T* pRV,
-		T* bV, T* qV, T* pThetaV) {
+		T* bV, T* qV, T* pThetaV, bool shouldSavePath, float3* pathSave) {
 
 		volatile T varStart[] = { rV, thetaV, phiV, *pRV, *pThetaV };
 
-		odeint1(varStart, *bV, *qV);
+		odeint1(varStart, *bV, *qV, shouldSavePath, pathSave);
 
 		*bV = varStart[theta_index];
 		*qV = varStart[phi_index];
@@ -318,7 +335,7 @@ namespace metric {
 			*pThetaV = 0;
 		}
 		else {
-			wrapToPi(*bV, *qV);
+			//wrapToPi(*bV, *qV);
 		}
 	}
 
@@ -326,7 +343,7 @@ namespace metric {
 		T* bV, T* qV, T* pThetaV, int size) {
 		int index = blockDim.x * blockIdx.x + threadIdx.x;
 		if (index < size) {
-			rkckIntegrate1(rV, thetaV, phiV, &pRV[index], &bV[index], &qV[index], &pThetaV[index]);
+			rkckIntegrate1(rV, thetaV, phiV, &pRV[index], &bV[index], &qV[index], &pThetaV[index],false,nullptr);
 		}
 	};
 }
