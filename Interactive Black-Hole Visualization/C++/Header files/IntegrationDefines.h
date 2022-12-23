@@ -33,7 +33,7 @@
 #define INITIAL_STEP_SIZE 1e-2
 #define NUMBER_OF_EQUATIONS 5
 #define MIN_ACCURACY 1e-5
-#define MIN_STEP_SIZE -1e-5
+#define MIN_STEP_SIZE -1e-7
 #define INTEGRATION_MAX  -1e7
 
 #define STEP_SAVE_INTERVAL 2

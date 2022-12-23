@@ -39,8 +39,8 @@ gridMaxLevel = 10
 afactor = 0.999;
 
 // Camera location, speed, direction
-camRadius = 3.
-camInclination = 0.5 //*PI
+camRadius = 4.
+camInclination = 0.4 //*PI
 // If a custom user speed is used.
 userSpeed = false
 camSpeed = 0.32001

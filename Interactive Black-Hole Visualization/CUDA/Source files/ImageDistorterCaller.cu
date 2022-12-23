@@ -477,7 +477,7 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 		for (int i = 0; i < grid.size(); i++) {
 			if (grid[i].x != -2.0 && grid[i].x != -1) {
 				grid[i].x = (grid[i].x / PI);
-				grid[i].y = (grid[i].y / PI2);
+				grid[i].y = (grid[i].y / PI2)*0;
 
 				grid[i].x = grid[i].x - floor(grid[i].x);
 				grid[i].y = grid[i].y - floor(grid[i].y);
@@ -486,7 +486,7 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 					grid[i].z = 0;
 				}
 				else {
-					grid[i].z = grid[i].z / (grids.gridStart + q * (param.camRadiusChange ? grids.gridStep : 0));
+					grid[i].z = grid[i].z / (grids.gridStart + q * (param.camRadiusChange ? grids.gridStep : 0))*0;
 				}
 			}
 			

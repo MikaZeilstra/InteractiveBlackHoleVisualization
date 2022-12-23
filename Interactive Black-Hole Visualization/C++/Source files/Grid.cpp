@@ -357,9 +357,17 @@ void Grid::integrateCameraCoordinates(std::vector<uint64_t>& ijvec) {
 	std::vector<int> step(s);
 	for (int q = 0; q < s; q++) {
 		uint64_t ij = ijvec[q];
+		int i = i_32;
+		int j = j_32;
+		j = j % M;
+		
+
 		theta[q] = (double)i_32 / (N - 1) * PI / (2 - equafactor);
 		phi[q] = (double)j_32 / M * PI2;
+		
 	}
+
+	
 
 	auto start_time = std::chrono::high_resolution_clock::now();
 	integration_wrapper(theta, phi,r, s, step);
@@ -392,15 +400,31 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 	double ph4 = CamToCel[k_l]_phi;
 
 	//Check if the points are well alligned
+	cv::Point3d topLeft = CamToCel[i_j];
+	cv::Point3d topRight = CamToCel[k_j];
+	cv::Point3d bottomLeft = CamToCel[i_l];
+	cv::Point3d bottomRight = CamToCel[k_l];
 
-	double diag = (th1 - th4) * (th1 - th4) + (ph1 - ph4) * (ph1 - ph4);
-	diag = std::min(diag, (th1 - th4) * (th1 - th4) + (ph1 - (ph4 + PI2)) * (ph1 - (ph4 + PI2)));
+	//double diag = (th1 - th4) * (th1 - th4) + (ph1 - ph4) * (ph1 - ph4);
+	//diag = std::min(diag, (th1 - th4) * (th1 - th4) + (ph1 - (ph4 + PI2)) * (ph1 - (ph4 + PI2)));
 	
-	double diag2 = (th2 - th3) * (th2 - th3) + (ph2 - ph3) * (ph2 - ph3);
-	diag2 = std::min(diag2, (th2 - th3) * (th2 - th3) + (ph2 - (ph3 + PI2)) * (ph2 - (ph3 + PI2)));
+
+	double diag = (topLeft - bottomRight).ddot(topLeft - bottomRight);
+	bottomRight.y += PI2;
+	diag = std::min(diag, (topLeft - bottomRight).ddot(topLeft - bottomRight));
+	
+	//double diag2 = (th2 - th3) * (th2 - th3) + (ph2 - ph3) * (ph2 - ph3);
+	//diag2 = std::min(diag2, (th2 - th3) * (th2 - th3) + (ph2 - (ph3 + PI2)) * (ph2 - (ph3 + PI2)));
+	//double max = std::max(diag, diag2);
+
+	double diag2 = (topRight - bottomLeft).ddot(topRight - bottomLeft);
+	bottomRight.y += PI2;
+	diag2 = std::min(diag, (topRight - bottomLeft).ddot(topRight - bottomLeft));
 	double max = std::max(diag, diag2);
 
-	if (level < 6 && max > 1e-10) return true;
+	if (CamToCel[i_j].z != CamToCel[k_j].z || CamToCel[k_j].z != CamToCel[i_l].z || CamToCel[i_l].z != CamToCel[k_l].z) return true;
+
+	if (level < 6) return true;
 
 	if (max > PRECCELEST) return true;
 
@@ -447,7 +471,8 @@ void Grid::adaptiveBlockIntegration(int level) {
 			uint32_t k = i + gap / 2;
 			uint32_t l = j + gap / 2;
 			j = j % M;
-		
+			
+			
 
 			if (refineCheck(i, j, gap, level)) {
 				fillVector(toIntIJ, k, j);
@@ -492,7 +517,7 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 	std::vector<float>paths;
 
 	if (param->savePaths) {
-		paths.reserve(n * 3 * (MAXSTP / STEP_SAVE_INTERVAL));
+		paths = std::vector<float>(n * 3 * (MAXSTP / STEP_SAVE_INTERVAL));
 	}
 
 	pRs.reserve(n);
@@ -536,6 +561,10 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 	if (n < MIN_GPU_INTEGRATION) {
 	#pragma loop(hint_parallel(8))
 		for (int i = 0; i < n; i++) {
+			if (phi[i] == 3.3624858870453256 && theta[i] == 1.4051264017032472) {
+				printf("");
+			}
+
 			metric::rkckIntegrate1<double>(rS, thetaS, phiS, &pRs[i], &bs[i], &qs[i], &pThetas[i],param->savePaths, reinterpret_cast<float3*>( & (paths.data()[i * 3 * (MAXSTP / STEP_SAVE_INTERVAL)])));
 			theta[i] = bs[i];
 			phi[i] = qs[i];

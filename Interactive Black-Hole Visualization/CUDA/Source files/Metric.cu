@@ -263,6 +263,7 @@ namespace metric {
 		volatile T varTemp[5];
 		volatile T aks[25];
 		volatile T varTmpInt[5];
+		volatile T prevVar[5];
 
 		T z = 0.0;
 		T h = INITIAL_STEP_SIZE * sgn(INTEGRATION_MAX);
@@ -288,28 +289,31 @@ namespace metric {
 
 			rkqs(var, dvdz, z, h, varScal, b, q, varErr, varTemp, aks, varTmpInt);
 
-			bool changedTheta = wrapToPi(thetaVar, phiVar);
-
-			/*
-			if (thetaVar > PI1_2 != last_theta && !changedTheta) {
-				for (int i = 0; i < NUMBER_OF_EQUATIONS; i++) varStart[i] = var[i];
-				return;
-			}
-			*/
-
-			last_theta = thetaVar > 0;
-
-
 			//If the step size magnitude becomes too small we are most likely very close to the black hole and we will assume we will hit it.
-			if (h > MIN_STEP_SIZE) {
+			if (h > MIN_STEP_SIZE || rVar <= 1) {
 				break;
 			}
 
 			if (z <= INTEGRATION_MAX) {
-				rVar = INFINITY;
-				for (int i = 0; i < NUMBER_OF_EQUATIONS; i++) varStart[i] = var[i];
+				varStart[r_index] = INFINITY;
 				return;
 			}
+
+			
+			if (thetaVar > PI1_2 != last_theta) {
+				float factor = (thetaVar - PI1_2) / (thetaVar - varStart[theta_index]);
+				double r = (1 - factor) * rVar + factor * varStart[r_index];
+				if (r > 0 && r < 3) {
+					for (int i = 0; i < NUMBER_OF_EQUATIONS; i++) {
+						varStart[i] = (1 - factor) * var[i] + factor * varStart[i];
+					}
+					return;
+				}							
+			}
+			
+
+			last_theta = thetaVar > PI1_2;
+			for (int i = 0; i < NUMBER_OF_EQUATIONS; i++) varStart[i] = var[i];
 		}
 
 		varStart[theta_index] = nanf("");
@@ -335,7 +339,7 @@ namespace metric {
 			*pThetaV = 0;
 		}
 		else {
-			//wrapToPi(*bV, *qV);
+			wrapToPi(*bV, *qV);
 		}
 	}
 

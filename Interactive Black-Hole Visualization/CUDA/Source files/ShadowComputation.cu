@@ -1,4 +1,4 @@
-#include "ShadowComputation.cuh"
+#include "../Header files/ShadowComputation.cuh"
 
 __device__ __forceinline__ float atomicMinFloat(float* addr, float value) {
 	float old;

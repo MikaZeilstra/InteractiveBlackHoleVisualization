@@ -15,7 +15,7 @@
 #include "GeodesicVisualizer.h"
 #include "camera.h"
 
-#define GEODESICS_FILE "../Results/Geodesics/Grid_1_to_10_Spin_0.999_Rad_3_Inc_0.5pi_0.geo"
+#define GEODESICS_FILE "../Results/Geodesics/Grid_1_to_10_Spin_0.999_Rad_3_Inc_0.6pi_0.geo"
 
 std::vector<float> geodesics;
 

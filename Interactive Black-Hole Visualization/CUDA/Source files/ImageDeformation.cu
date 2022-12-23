@@ -7,13 +7,12 @@ __global__ void distortEnvironmentMap(const float3* thphi, uchar4* out, const un
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 	float4 color = { 0.f, 0.f, 0.f, 0.f };
-
+	int ind = i * M1 + j;
 	// Only compute if pixel is not black hole and i j is in image
 	if (i < N && j < M) {
-		if (bh[ijc] == 0) {
+		if (bh[ijc] == 0 && thphi[ind].z > 10e8) {
 
 			volatile float t[4], p[4];
-			int ind = i * M1 + j;
 			bool picheck = false;
 			retrievePixelCorners(thphi, const_cast<float*>(t), const_cast<float*>(p), ind, M, picheck, offset);
 
@@ -122,6 +121,8 @@ __global__ void distortEnvironmentMap(const float3* thphi, uchar4* out, const un
 					color.z *= 255.f;
 				}
 			}
+		} else if (bh[ijc] == 0 && thphi[ind].z != INFINITY){
+			color = { 0,255,255 };
 		}
 		//CHANGED
 		out[ijc] = { (unsigned char)min(255, (int) color.x),   
