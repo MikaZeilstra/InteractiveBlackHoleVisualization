@@ -4,7 +4,7 @@
 #include <sstream>
 #include <string>
 #include "../../CUDA/Header files/Metric.cuh"
-#include "Const.h"
+#include "../../CUDA/Header files/Constants.cuh"
 #include <vector>
 #include <chrono>
 #include "Parameters.h"

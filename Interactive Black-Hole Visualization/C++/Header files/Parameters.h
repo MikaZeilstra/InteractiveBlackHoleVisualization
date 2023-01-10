@@ -2,7 +2,7 @@
 #include "opencv2/imgcodecs/imgcodecs.hpp"
 #include <iostream>
 #include <libconfig.h++>
-#include "Const.h"
+#include "../../CUDA/Header files/Constants.cuh"
 
 struct Parameters {
 	

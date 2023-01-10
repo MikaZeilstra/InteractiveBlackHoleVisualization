@@ -1,6 +1,5 @@
 #pragma once
 #include "intellisense_cuda_intrinsics.cuh"
-#include "Constants.cuh"
 
 __global__ void makeGrid(const int g, const int GM, const int GN, const int GN1, float3* grid, const float3* hashTable,
 	const int2* hashPosTag, const int2* offsetTable, const int2* tableSize, const char count, const int sym);

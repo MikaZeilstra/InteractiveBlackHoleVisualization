@@ -10,7 +10,6 @@
 #include <fstream>
 #include "../Header files/Camera.h"
 #include "../Header files/BlackHole.h"
-#include "../Header files/Const.h"
 #include "../Header files/Code.h"
 #include "../Header files/PSHOffsetTable.h"
 #include "../Header files/IntegrationDefines.h"
@@ -19,6 +18,7 @@
 
 #include "../../CUDA/Header files/Metric.cuh"
 #include "../../CUDA/Header files/ImageDistorterCaller.cuh"
+#include "../../CUDA/Header files/Constants.cuh"
 
 #define PRECCELEST 0.015
 #define ERROR 0.001//1e-6
@@ -76,7 +76,7 @@ void Grid::fixTvertices(std::pair<uint64_t, int> block) {
 	int level = block.second;
 	if (level == MAXLEVEL) return;
 	uint64_t ij = block.first;
-	if (CamToCel[ij]_phi < 0) return;
+	if (isnan(CamToCel[ij]_phi)) return;
 
 	int gap = pow(2, MAXLEVEL - level);
 	uint32_t i = i_32;
@@ -84,12 +84,21 @@ void Grid::fixTvertices(std::pair<uint64_t, int> block) {
 	uint32_t k = i + gap;
 	uint32_t l = (j + gap) % M;
 
-	checkAdjacentBlock(ij, k_j, level, 1, gap);
-	checkAdjacentBlock(ij, i_l, level, 0, gap);
-	checkAdjacentBlock(i_l, k_l, level, 1, gap);
-	checkAdjacentBlock(k_j, k_l, level, 0, gap);
+	//If the change in radius is small enough between the vertices they are one the same surface fix the possible T vertices
+	if (abs(CamToCel[ij].z - CamToCel[k_j].z) > R_CHANGE_THRESHOLD) {
+		checkAdjacentBlock(ij, k_j, level, 1, gap);
+	}
+	if (abs(CamToCel[ij].z - CamToCel[i_l].z) > R_CHANGE_THRESHOLD) {
+		checkAdjacentBlock(ij, i_l, level, 0, gap);
+	}
+	if (abs(CamToCel[i_l].z - CamToCel[k_l].z) > R_CHANGE_THRESHOLD) {
+		checkAdjacentBlock(i_l, k_l, level, 1, gap);
+	}
+	if (abs(CamToCel[k_j].z - CamToCel[k_l].z) > R_CHANGE_THRESHOLD) {
+		checkAdjacentBlock(k_j, k_l, level, 0, gap);
+	}
 }
-
+	
 /// <summary>
 /// Recursively checks the edge of a block for adjacent smaller blocks causing t-vertices.
 /// Adjusts the value of smaller block vertices positioned on the edge to be halfway
@@ -130,7 +139,9 @@ void Grid::checkAdjacentBlock(uint64_t ij, uint64_t ij2, int level, int udlr, in
 		bool succes = false;
 		if (find(ijprev) && find(ijnext)) {
 			std::vector<cv::Point3d> check = { CamToCel[ijprev], CamToCel[ij], CamToCel[ij2], CamToCel[ijnext] };
-			if (CamToCel[ijprev].x != -1 && CamToCel[ijnext].x != -1) {
+			if (CamToCel[ijprev].x != -1 && CamToCel[ijnext].x != -1
+				&& abs(CamToCel[ijprev].z- CamToCel[ij].z) < R_CHANGE_THRESHOLD
+				&& abs(CamToCel[ijnext].z - CamToCel[ij2].z) < R_CHANGE_THRESHOLD) {
 				succes = true;
 				if (half) check[3].x = PI - check[3].x;
 				if (check2PIcross(check, 5.)) correct2PIcross(check, 5.);
@@ -373,8 +384,8 @@ void Grid::integrateCameraCoordinates(std::vector<uint64_t>& ijvec) {
 	integration_wrapper(theta, phi,r, s, step);
 	fillGridCam(ijvec, s, theta, phi, r, step);
 	auto end_time = std::chrono::high_resolution_clock::now();
-	int count = 0;
-	for (int q = 0; q < s; q++) if (step[q] != 0) count++;
+	//int count = 0;
+	//for (int q = 0; q < s; q++) if (step[q] != 0) count++;
 	//std::cout << "CPU: " << count << "rays in " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() << "ms!" << std::endl << std::endl;
 }
 
@@ -405,28 +416,25 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 	cv::Point3d bottomLeft = CamToCel[i_l];
 	cv::Point3d bottomRight = CamToCel[k_l];
 
-	//double diag = (th1 - th4) * (th1 - th4) + (ph1 - ph4) * (ph1 - ph4);
-	//diag = std::min(diag, (th1 - th4) * (th1 - th4) + (ph1 - (ph4 + PI2)) * (ph1 - (ph4 + PI2)));
 	
-
 	double diag = (topLeft - bottomRight).ddot(topLeft - bottomRight);
 	bottomRight.y += PI2;
 	diag = std::min(diag, (topLeft - bottomRight).ddot(topLeft - bottomRight));
 	
-	//double diag2 = (th2 - th3) * (th2 - th3) + (ph2 - ph3) * (ph2 - ph3);
-	//diag2 = std::min(diag2, (th2 - th3) * (th2 - th3) + (ph2 - (ph3 + PI2)) * (ph2 - (ph3 + PI2)));
-	//double max = std::max(diag, diag2);
 
 	double diag2 = (topRight - bottomLeft).ddot(topRight - bottomLeft);
 	bottomRight.y += PI2;
-	diag2 = std::min(diag, (topRight - bottomLeft).ddot(topRight - bottomLeft));
-	double max = std::max(diag, diag2);
+	diag2 = std::min(diag2, (topRight - bottomLeft).ddot(topRight - bottomLeft));
 
-	if (CamToCel[i_j].z != CamToCel[k_j].z || CamToCel[k_j].z != CamToCel[i_l].z || CamToCel[i_l].z != CamToCel[k_l].z) return true;
-
+	//if (CamToCel[i_j].z != CamToCel[k_j].z || CamToCel[k_j].z != CamToCel[i_l].z || CamToCel[i_l].z != CamToCel[k_l].z) return true;
+	
 	if (level < 6) return true;
 
-	if (max > PRECCELEST) return true;
+	// If the maximum diagonal is not less than required precision split the block
+	// Nan indicates 1 of the vertices was part of the black hole, meaning we want better resolution unless they were all BH.
+	// Nan comparison with nan is always false so we need to have the comparison return false if we want to split
+	bool AllBH = isnan(topLeft.x) && isnan(topRight.x) && isnan(bottomLeft.x) && isnan(bottomRight.x);
+	if (!(diag <= PRECCELEST && diag2 <= PRECCELEST) && !AllBH) return true;
 
 	// If no refinement necessary, save level at position.
 	blockLevels[i_j] = level;
@@ -561,10 +569,6 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 	if (n < MIN_GPU_INTEGRATION) {
 	#pragma loop(hint_parallel(8))
 		for (int i = 0; i < n; i++) {
-			if (phi[i] == 3.3624858870453256 && theta[i] == 1.4051264017032472) {
-				printf("");
-			}
-
 			metric::rkckIntegrate1<double>(rS, thetaS, phiS, &pRs[i], &bs[i], &qs[i], &pThetas[i],param->savePaths, reinterpret_cast<float3*>( & (paths.data()[i * 3 * (MAXSTP / STEP_SAVE_INTERVAL)])));
 			theta[i] = bs[i];
 			phi[i] = qs[i];

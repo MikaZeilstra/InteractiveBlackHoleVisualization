@@ -1,7 +1,7 @@
 #pragma once
 #include "cuda_runtime.h"
-#include <algorithm>
 
+#define R_CHANGE_THRESHOLD 1e-1
 
 #define TILE_W 4
 #define TILE_H 4
@@ -17,8 +17,16 @@
 #define cam_br cam[4]
 #define cam_btheta cam[5]
 #define cam_bphi cam[6]
+
 #define SQRT2PI 2.506628274631f
+
 #define PI2c 6.283185307179586476f
 #define PIc 3.141592653589793238f
 
+#define INFINITY 1e30
+#define PI 3.141592653589793238
+#define PI1_2  (PI / 2.)
+#define PI2 (PI*2.)
+#define PI1_4 (PI / 4.)
+#define HALF (1. / 2.)
  

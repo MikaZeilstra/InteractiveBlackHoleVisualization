@@ -1,5 +1,6 @@
 #include "../Header files/GridLookup.cuh"
 #include "../Header files/metric.cuh"
+#include "../Header files/Constants.cuh"
 
 __global__ void makeGrid(const int g, const int GM, const int GN, const int GN1, float3* grid, const float3* hashTable,
 	const int2* hashPosTag, const int2* offsetTable, const int2* tableSize, const char count, const int sym) {
@@ -132,7 +133,7 @@ __device__ void retrievePixelCorners(const float3* thphi, float* t, float* p, in
 
 #pragma unroll
 	for (int q = 0; q < 4; q++) {
-		if (p[q] < 0 || t[q] < 0) {
+		if (isnan(t[q]) || p[q] < 0 || t[q] < 0) {
 			ind = -1;
 			return;
 		}

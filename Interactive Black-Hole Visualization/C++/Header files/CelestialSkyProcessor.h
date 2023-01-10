@@ -1,6 +1,6 @@
 #pragma once
 #include "opencv2/imgcodecs/imgcodecs.hpp"
-#include "Const.h"
+#include "../../CUDA/Header files/Constants.cuh"
 #include "Parameters.h"
 #include <fstream>
 #include <iomanip>

@@ -3,12 +3,10 @@
 
 #include "../Header files/metric.cuh"
 
-
-#include "../../C++/Header files/Const.h"
+#include "../Header files/Constants.cuh"
 #include "../../C++/Header files/Code.h"
 #include "../../C++/Header files/IntegrationDefines.h"
 
-#include <stdio.h>
 
 
 namespace metric {
@@ -276,7 +274,7 @@ namespace metric {
 
 		for (int nstp = 0; nstp < MAXSTP; nstp++) {
 
-			//Save the path every ten steps for visualization if required;
+			//Save the path every ten steps for visualization if required only is included on the cpu;
 			#ifndef __CUDA_ARCH__
 				if (shouldSavePath && nstp % STEP_SAVE_INTERVAL == 0) {
 					pathSave[nstp/ STEP_SAVE_INTERVAL] = {(float) thetaVar,(float)phiVar,(float)rVar };
@@ -294,6 +292,7 @@ namespace metric {
 				break;
 			}
 
+			//If the traveled distance is large enough we can approximate space-time as flat and use these coordinates as the result
 			if (z <= INTEGRATION_MAX) {
 				varStart[r_index] = INFINITY;
 				return;
@@ -316,7 +315,10 @@ namespace metric {
 			for (int i = 0; i < NUMBER_OF_EQUATIONS; i++) varStart[i] = var[i];
 		}
 
+		//If we take too many steps or reached a too low step count we assume the ray hits the black hole
 		varStart[theta_index] = nanf("");
+		varStart[phi_index] = nanf("");
+		varStart[r_index] = 0;
 	};
 
 
@@ -333,12 +335,7 @@ namespace metric {
 		*pThetaV = varStart[r_index];
 
 
-		if (isnan(varStart[theta_index])) {
-			*bV = -1;
-			*qV = -1;
-			*pThetaV = 0;
-		}
-		else {
+		if (!isnan(varStart[theta_index])) {
 			wrapToPi(*bV, *qV);
 		}
 	}

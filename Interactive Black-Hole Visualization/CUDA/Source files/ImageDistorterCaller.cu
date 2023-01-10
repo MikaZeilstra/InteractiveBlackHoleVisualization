@@ -408,42 +408,56 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 		callKernel("Interpolated grid", pixInterpolation, numBlocks_N1_M1_5_25, threadsPerBlock5_25,
 			dev_viewer, image.M, image.N, grids.G, dev_interpolatedGrid, dev_grid, grids.GM, grids.GN1,
 			hor, ver, dev_gridGap, grids.level, dev_blackHoleBorder0, bhproc.angleNum, alpha);
+		checkCudaErrors();
 
 		callKernel("Constructed black-hole shadow mask", findBlackPixels, numBlocks_N_M_5_25, threadsPerBlock5_25,
 			dev_interpolatedGrid, image.M, image.N, dev_blackHoleMask);
+		checkCudaErrors();
 
 		callKernel("Calculated solid angles", findArea, numBlocks_N_M_5_25, threadsPerBlock5_25,
 			dev_interpolatedGrid, image.M, image.N, dev_solidAngles0);
+		checkCudaErrors();
 
 		callKernel("Smoothed solid angles horizontally", smoothAreaH, numBlocks_N_M_5_25, threadsPerBlock5_25,
 			dev_solidAngles1, dev_solidAngles0, dev_blackHoleMask, dev_gridGap, image.M, image.N);
+		checkCudaErrors();
+
 
 		callKernel("Smoothed solid angles vertically", smoothAreaV, numBlocks_N_M_5_25, threadsPerBlock5_25,
 			dev_solidAngles0, dev_solidAngles1, dev_blackHoleMask, dev_gridGap, image.M, image.N);
+		checkCudaErrors();
+
 
 
 		if (star) {
 			callKernel("Cleared star cache", clearArrays, numBlocks_starsize, threadsPerBlock_32,
 				dev_nrOfImagesPerStar, dev_starCache, q, starvis.trailnum, stars.starSize);
+			checkCudaErrors();
 
 			callKernel("Calculated gradient field for star trails", makeGradField, numBlocks_N1_M1_4_4, threadsPerBlock4_4,
 				dev_interpolatedGrid, image.M, image.N, dev_gradient);
+			checkCudaErrors();
 
 			callKernel("Distorted star map", distortStarMap, numBlocks_N_M_4_4, threadsPerBlock4_4,
 				dev_starLight0, dev_interpolatedGrid, dev_blackHoleMask, dev_starPositions, dev_starTree, stars.starSize,
 				dev_camera0, dev_starMagnitudes, stars.treeLevel,
 				image.M, image.N, starvis.gaussian, offset, dev_treeSearch, starvis.searchNr, dev_starCache, dev_nrOfImagesPerStar,
 				dev_starTrails, starvis.trailnum, dev_gradient, q, dev_viewer, param.useRedshift, param.useLensing, dev_solidAngles0);
+			checkCudaErrors();
 
 			callKernel("Summed all star light", sumStarLight, numBlocks_N_M_1_24, threadsPerBlock1_24,
 				dev_starLight0, dev_starTrails, dev_starLight1, starvis.gaussian, image.M, image.N, starvis.diffusionFilter);
+			checkCudaErrors();
 
 			callKernel("Added diffraction", addDiffraction, numBlocks_N_M_4_4, threadsPerBlock4_4,
 				dev_starLight1, image.M, image.N, dev_diffraction, starvis.diffSize);
+			checkCudaErrors();
 
 			if (!map) {
 				callKernel("Created pixels from star light", makePix, numBlocks_N_M_5_25, threadsPerBlock5_25,
 					dev_starLight1, dev_outputImage, image.M, image.N);
+				checkCudaErrors();
+
 			}
 		}
 
@@ -451,11 +465,14 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 			callKernel("Distorted celestial sky image", distortEnvironmentMap, numBlocks_N_M_4_4, threadsPerBlock4_4,
 				dev_interpolatedGrid, dev_outputImage, dev_blackHoleMask, celestialSky.imsize, image.M, image.N, offset,
 				dev_summedCelestialSky, dev_cameras, dev_solidAngles0, dev_viewer, param.useRedshift, param.useLensing);
+			checkCudaErrors();
+
 		}
 
 		if (star && map) {
 			callKernel("Created pixels from star light", makePix, numBlocks_N_M_5_25, threadsPerBlock5_25,
 				dev_starLight1, dev_starImage, image.M, image.N);
+			checkCudaErrors();
 
 			callKernel("Added distorted star and celestial sky image", addStarsAndBackground, numBlocks_N_M_5_25, threadsPerBlock5_25,
 				dev_starImage, dev_outputImage, dev_outputImage, image.M);
@@ -477,7 +494,7 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 		for (int i = 0; i < grid.size(); i++) {
 			if (grid[i].x != -2.0 && grid[i].x != -1) {
 				grid[i].x = (grid[i].x / PI);
-				grid[i].y = (grid[i].y / PI2)*0;
+				grid[i].y = (grid[i].y / PI2);
 
 				grid[i].x = grid[i].x - floor(grid[i].x);
 				grid[i].y = grid[i].y - floor(grid[i].y);
@@ -486,7 +503,7 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 					grid[i].z = 0;
 				}
 				else {
-					grid[i].z = grid[i].z / (grids.gridStart + q * (param.camRadiusChange ? grids.gridStep : 0))*0;
+					grid[i].z = grid[i].z / (grids.gridStart + q * (param.camRadiusChange ? grids.gridStep : 0));
 				}
 			}
 			

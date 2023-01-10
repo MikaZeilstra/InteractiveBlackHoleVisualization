@@ -1,7 +1,5 @@
 #pragma once
-#include "intellisense_cuda_intrinsics.cuh"
-//#include "Constants.cuh"
-#include "GridLookup.cuh"
+#include <cuda_runtime.h>
 
 __global__ void camUpdate(const float alpha, const int g, const float* camParam, float* cam);
 
@@ -23,6 +21,8 @@ __device__ float3 interpolatePix(const float theta, const float phi, const int M
 /// <returns></returns>
 __device__ void interpolate(float t0, float t1, float t2, float t3, float p0, float p1, float p2, float p3,
 	float& start, float& starp, int sgn, int i, int j);
+
+__device__ float3 interpolateNeirestNeighbour(float percDown, float percRight, float3* cornersCel);
 
 __device__ float3 interpolateLinear(int i, int j, float percDown, float percRight, float3* cornersCel);
 

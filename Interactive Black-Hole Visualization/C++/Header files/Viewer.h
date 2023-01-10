@@ -2,7 +2,7 @@
 #include "opencv2/imgcodecs/imgcodecs.hpp"
 #include <stdint.h> 
 #include <vector>
-#include "Const.h"
+#include "../../CUDA/Header files/Constants.cuh"
 #include "../../CUDA/Header files/Metric.cuh"
 #include "Parameters.h"
 

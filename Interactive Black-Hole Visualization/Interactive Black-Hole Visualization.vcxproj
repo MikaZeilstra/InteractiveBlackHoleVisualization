@@ -232,7 +232,6 @@
     <ClInclude Include="C++\Header files\Camera.h" />
     <ClInclude Include="C++\Header files\CelestialSkyProcessor.h" />
     <ClInclude Include="C++\Header files\Code.h" />
-    <ClInclude Include="C++\Header files\Const.h" />
     <ClInclude Include="C++\Header files\Grid.h" />
     <ClInclude Include="C++\Header files\IntegrationDefines.h" />
     <ClInclude Include="C++\Header files\Parameters.h" />

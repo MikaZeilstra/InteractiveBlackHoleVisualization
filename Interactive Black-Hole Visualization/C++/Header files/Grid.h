@@ -10,7 +10,6 @@
 #include <fstream>
 #include "Camera.h"
 #include "BlackHole.h"
-#include "Const.h"
 #include "Code.h"
 #include "Parameters.h"
 #include "PSHOffsetTable.h"

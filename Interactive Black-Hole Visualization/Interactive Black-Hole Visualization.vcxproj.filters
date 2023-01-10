@@ -38,9 +38,6 @@
     <ClInclude Include="C++\Header files\Code.h">
       <Filter>C++\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="C++\Header files\Const.h">
-      <Filter>C++\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="C++\Header files\Grid.h">
       <Filter>C++\Header Files</Filter>
     </ClInclude>

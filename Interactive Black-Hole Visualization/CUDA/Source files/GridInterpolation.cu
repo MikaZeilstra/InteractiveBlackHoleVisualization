@@ -1,7 +1,10 @@
 #pragma once
 #include "../Header files/GridInterpolation.cuh"
+#include "../Header files/GridLookup.cuh"
 #include "../Header files/vector_operations.cuh"
 #include "../Header files/metric.cuh"
+#include "../../C++/Header files/IntegrationDefines.h"
+#include "../Header files/Constants.cuh"
 
 
 __global__ void camUpdate(const float alpha, const int g, const float* camParam, float* cam) {
@@ -192,6 +195,22 @@ __device__ void interpolate(float t0, float t1, float t2, float t3, float p0, fl
 	starp = starInPixX;
 }
 
+/// <summary>
+/// Interpolates the location using neirest neighbour interpolation
+/// </summary>
+/// <param name="percDown">fraction down from top left to top right line</param>
+/// <param name="percRight">fraction right from top left to bottom left line</param>
+/// <param name="cornersCel">Values at top left, top right, bottom left and bottom right corners respectively</param>
+/// <returns></returns>
+__device__ float3 interpolateNeirestNeighbour(float percDown, float percRight, float3* cornersCel) {
+	float3 corners[4] = { cornersCel[0], cornersCel[1], cornersCel[2], cornersCel[3] };
+	
+
+	piCheck(corners, 0.2);
+	return corners[(int)(2 * roundf(percDown) + roundf(percRight))];
+	return (1 - percRight) * ((1 - percDown) * corners[0] + percDown * corners[2]) + percRight * ((1 - percDown) * corners[1] + percDown * corners[3]);
+}
+
 __device__ float3 interpolateLinear(int i, int j, float percDown, float percRight, float3* cornersCel) {
 	float3 corners[4] = { cornersCel[0], cornersCel[1], cornersCel[2], cornersCel[3]};
 
@@ -332,10 +351,13 @@ __device__ float3 interpolateHermite(const int i, const int j, const int gap, co
 	cornersCel[9] = findPoint(imin1, lx, GM, GN, g, -1, 0, gap, grid, count);		//9 righthigh
 	cornersCel[10] = findPoint(kplus1, jy, GM, GN, g, 1, 0, gap, grid, count);		//10 leftdown
 	cornersCel[11] = findPoint(kplus1, ly, GM, GN, g, 1, 0, gap, grid, count);		//11 rightdown
-
+	
+	//If any of the extra points are in the black hole return a linear interpolation (we know the inner points are correct
+	bool r_finite = cornersCel[4].z < INFINITY;
 	for (int q = 4; q < 12; q++) {
-		if (cornersCel[q].x == -1) return interpolateLinear(i, j, percDown, percRight, cornersCel);
+		if (isnan(cornersCel[q].x) || r_finite != (cornersCel[q].z < INFINITY)) return interpolateLinear(i, j, percDown, percRight, cornersCel);
 	}
+
 	piCheckTot(cornersCel, 0.2f, 12);
 
 	float3 interpolateUp = hermite(percRight, cornersCel[4], cornersCel[0], cornersCel[1], cornersCel[5], 0.f, 0.f);
@@ -367,12 +389,16 @@ __device__ float3 interpolateSpline(const int i, const int j, const int gap, con
 		if (phiRight == phiCam) return cornersCel[3];
 	}
 
-	for (int q = 0; q < 4; q++) {
-		if (cornersCel[q].x == -1 && cornersCel[q].y == -1) return{ -1.f, -1.f };
-	}
-
 	float percDown = (thetaCam - thetaUp) / (thetaDown - thetaUp);
 	float percRight = (phiCam - phiLeft) / (phiRight - phiLeft);
+
+	bool r_finite = cornersCel[0].z < INFINITY;
+	for (int q = 0; q < 4; q++) {
+		if (isnan(cornersCel[q].x)) return{ -1.f,-1.f,-1.f };
+		if (r_finite != (cornersCel[q].z < INFINITY)) return interpolateNeirestNeighbour(percDown, percRight, cornersCel);
+	}
+
+	
 
 	return interpolateHermite(i, j, gap, GM, GN, percDown, percRight, g, cornersCel, grid, 0);
 	//return interpolateLinear(i, j, percDown, percRight, cornersCel);

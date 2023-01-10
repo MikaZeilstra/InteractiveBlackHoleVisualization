@@ -21,7 +21,7 @@ __global__ void findBhCenter(const int GM, const int GN, const float3* grid, flo
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 
 	if (i < GN && j < GM) {
-		if (grid[i * GM + j].x == -1 || grid[GM * GN + i * GM + j].x == -1) {
+		if (isnan(grid[i * GM + j].x) || isnan(grid[GM * GN + i * GM + j].x)) {
 			float gridsize = PIc / (1.f * GN);
 			atomicMinFloat(&(bhBorder[0].x), gridsize * (float)i);
 			atomicMaxFloat(&(bhBorder[0].y), gridsize * (float)i);
@@ -46,7 +46,7 @@ __global__ void findBhBorders(const int GM, const int GN, const float3* grid, co
 		float3 gridB = { -2, -2 };
 		float3 gridA = { -2, -2 };
 
-		while (!(gridA.x > 0 && gridB.x == -1)) {
+		while (!(gridA.x > 0 && isnan(gridB.x))) {
 			gridB = gridA;
 			pt.x += thetaChange;
 			pt.y += phiChange;
