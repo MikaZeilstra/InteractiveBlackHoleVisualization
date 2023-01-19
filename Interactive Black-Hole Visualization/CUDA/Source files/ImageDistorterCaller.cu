@@ -1,6 +1,7 @@
 #pragma once
 #include "../Header files/ImageDistorterCaller.cuh"
 #include "../../C++/Header files/IntegrationDefines.h"
+#include "./../Header files/AccretionDiskColorComputation.cuh"
 
 #define copyHostToDevice(dev_pointer, host_pointer, size, txt) { std::string errtxt = ("Host to Device copy Error " + std::string(txt)); \
 																 checkCudaStatus(cudaMemcpy(dev_pointer, host_pointer, size, cudaMemcpyHostToDevice), errtxt.c_str()); }
@@ -44,6 +45,7 @@ int2* dev_hashPosTag = 0;
 int2* dev_tableSize = 0;
 
 float3* dev_grid = 0;
+float3* dev_grid_2 = 0;
 static float3* dev_interpolatedGrid = 0;
 int* dev_gridGap = 0;
 static float* dev_cameras = 0;
@@ -81,6 +83,8 @@ double* pThetas_device;
 double* theta_device;
 double* phi_device;
 
+double* temperatureLUT_device;
+
 cudaError_t CUDA::cleanup() {
 	cudaFree(dev_hashTable);
 	cudaFree(dev_offsetTable);
@@ -88,6 +92,7 @@ cudaError_t CUDA::cleanup() {
 	cudaFree(dev_tableSize);
 
 	cudaFree(dev_grid);
+
 	cudaFree(dev_interpolatedGrid);
 	cudaFree(dev_gridGap);
 
@@ -125,6 +130,8 @@ cudaError_t CUDA::cleanup() {
 	cudaFree(pThetas_device);
 	cudaFree(theta_device);
 	cudaFree(phi_device);
+
+	cudaFree(temperatureLUT_device);
 
 	cudaStreamDestroy(stream);
 
@@ -177,7 +184,7 @@ void CUDA::call(std::vector<Grid>& grids_, std::vector<Camera>& cameras_, StarPr
 	StarVis starvis(stars, image, param);
 	BlackHoleProc bhproc(1000);
 
-	memoryAllocationAndCopy(grids, image, celestSky, stars, bhproc, starvis);
+	memoryAllocationAndCopy(grids, image, celestSky, stars, bhproc, starvis,param);
 	runKernels(grids, image, celestSky, stars, bhproc, starvis, param);
 }
 
@@ -219,7 +226,7 @@ template <class T> void CUDA::integrateGrid(const T rV, const T thetaV, const T 
 }
 
 void CUDA::memoryAllocationAndCopy(const Grids& grids, const Image& image, const CelestialSky& celestialSky,
-	const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis) {
+	const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis, const Parameters& param) {
 
 	std::cout << "Allocating CUDA memory..." << std::endl;
 
@@ -242,12 +249,14 @@ void CUDA::memoryAllocationAndCopy(const Grids& grids, const Image& image, const
 	cudaDeviceGetLimit(&size_stack, cudaLimitStackSize);
 	//printf("Heap size found to be %d; Stack size found to be %d\n", (int)size_heap, (int)size_stack);
 
-	allocate(dev_hashTable, grids.hashTableSize * sizeof(float3), "hashTable");
-	allocate(dev_offsetTable, grids.offsetTableSize * sizeof(int2), "offsetTable");
-	allocate(dev_tableSize, grids.G * sizeof(int2), "tableSize");
-	allocate(dev_hashPosTag, grids.hashTableSize * sizeof(int2), "hashPosTag");
+	//allocate(dev_hashTable, grids.hashTableSize * sizeof(float3), "hashTable");
+	//allocate(dev_offsetTable, grids.offsetTableSize * sizeof(int2), "offsetTable");
+	//allocate(dev_tableSize, grids.G * sizeof(int2), "tableSize");
+	//allocate(dev_hashPosTag, grids.hashTableSize * sizeof(int2), "hashPosTag");
 
 	allocate(dev_grid, gridnum * gridsize * sizeof(float3), "grid");
+	dev_grid_2 = &dev_grid[gridsize];
+
 	allocate(dev_interpolatedGrid, rastSize * sizeof(float3), "interpolatedGrid");
 	allocate(dev_gridGap, rastSize * sizeof(int), "gridGap");
 
@@ -267,7 +276,6 @@ void CUDA::memoryAllocationAndCopy(const Grids& grids, const Image& image, const
 
 	allocate(dev_outputImage, imageSize * sizeof(uchar4), "outputImage");
 	allocate(dev_starImage, imageSize * sizeof(uchar4), "starImage");
-
 	allocate(dev_starLight0, imageSize * starvis.diffusionFilter * starvis.diffusionFilter * sizeof(float3), "starLight0");
 	allocate(dev_starLight1, imageSize * sizeof(float3), "starLight1");
 
@@ -281,12 +289,10 @@ void CUDA::memoryAllocationAndCopy(const Grids& grids, const Image& image, const
 	allocate(dev_treeSearch, starvis.searchNr * imageSize * sizeof(int), "treeSearch");
 	allocate(dev_gradient, rastSize * sizeof(float2), "gradient");
 
-	std::cout << "Copying variables into CUDA memory..." << std::endl;
+	allocate(temperatureLUT_device, param.accretionTemperatureLUTSize * sizeof(double),"temperature table");
 
-	copyHostToDevice(dev_hashTable, grids.hashTables, grids.hashTableSize * sizeof(float3), "hashTable");
-	copyHostToDevice(dev_offsetTable, grids.offsetTables, grids.offsetTableSize * sizeof(int2), "offsetTable");
-	copyHostToDevice(dev_hashPosTag, grids.hashPosTags, grids.hashTableSize * sizeof(int2), "hashPosTags");
-	copyHostToDevice(dev_tableSize, grids.tableSizes, grids.G * sizeof(int2), "tableSizes");
+
+	std::cout << "Copying variables into CUDA memory..." << std::endl;
 
 	copyHostToDevice(dev_cameras, grids.camParam, 7 * grids.G * sizeof(float), "cameras");
 	copyHostToDevice(dev_viewer, image.viewer, rastSize * sizeof(float2), "viewer");
@@ -326,6 +332,7 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 	int threadsPerBlock_32 = 32;
 	int numBlocks_starsize = stars.starSize / threadsPerBlock_32 + 1;
 	int numBlocks_bordersize = (bhproc.angleNum * 2) / threadsPerBlock_32 + 1;
+	int numBlocks_tempLUT = param.accretionTemperatureLUTSize / threadsPerBlock_32 + 1;
 
 	dim3 threadsPerBlock4_4(4, 4);
 	dim3 numBlocks_N_M_4_4((image.N - 1) / threadsPerBlock4_4.x + 1, (image.M - 1) / threadsPerBlock4_4.y + 1);
@@ -344,10 +351,7 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 	std::cout << "Running Kernels" << std::endl << std::endl;
 
 	if (grids.G == 1) {
-		callKernel("Expanded grid", makeGrid, numBlocks_GN_GM_5_25, threadsPerBlock5_25,
-			0, grids.GM, grids.GN, grids.GN1, dev_grid,
-			dev_hashTable, dev_hashPosTag, dev_offsetTable, dev_tableSize, 0, grids.sym);
-		dev_camera0 = dev_cameras;
+		copyHostToDevice(dev_grid, grids.grid_vectors[0].data(), grids.grid_vectors[0].size() * sizeof(float3), "grid");
 		checkCudaErrors();
 	}
 
@@ -356,24 +360,21 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 	int grid_nr = -1;
 	int startframe = 0;
 
+	
 	for (int q = 0 + startframe; q < param.nrOfFrames + startframe; q++) {
 		float speed = 1.f / cameraUsed[0];
 		float offset = PI2 * q / (.25f * speed * image.M);
 
+		//TODO Fix grid_vector for more grids
 		if (grids.G > 1) {
 			grid_value = fmodf(grid_value, (float)grids.G - 1.f);
 			std::cout << "Computing grid: " << grid_value << std::endl;
 			alpha = fmodf(grid_value, 1.f);
 			if (grid_nr != (int)grid_value) {
 				grid_nr = (int)grid_value;
-
-				callKernel("Made grid A", makeGrid, numBlocks_GN_GM_5_25, threadsPerBlock5_25,
-					grid_nr, grids.GM, grids.GN, grids.GN1, dev_grid, dev_hashTable, dev_hashPosTag,
-					dev_offsetTable, dev_tableSize, 0, grids.sym);
+				copyHostToDevice(dev_grid, grids.grid_vectors[grid_nr].data(), grids.grid_vectors[grid_nr].size() * sizeof(float3), "grid");
 				checkCudaErrors();
-				callKernel("Made grid B", makeGrid, numBlocks_GN_GM_5_25, threadsPerBlock5_25,
-					grid_nr + 1, grids.GM, grids.GN, grids.GN1, dev_grid, dev_hashTable, dev_hashPosTag,
-					dev_offsetTable, dev_tableSize, 1, grids.sym);
+				copyHostToDevice(dev_grid, grids.grid_vectors[grid_nr+1].data(), grids.grid_vectors[grid_nr+1].size() * sizeof(float3), "grid");
 				checkCudaErrors();
 				callKernel("Find black-hole shadow center", findBhCenter, numBlocks_GN_GM_5_25, threadsPerBlock5_25,
 					grids.GM, grids.GN1, dev_grid, dev_blackHoleBorder0);
@@ -403,7 +404,6 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 
 			grid_value += .5f;
 		}
-
 		cudaEventRecord(start);
 		callKernel("Interpolated grid", pixInterpolation, numBlocks_N1_M1_5_25, threadsPerBlock5_25,
 			dev_viewer, image.M, image.N, grids.G, dev_interpolatedGrid, dev_grid, grids.GM, grids.GN1,
@@ -478,6 +478,16 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 				dev_starImage, dev_outputImage, dev_outputImage, image.M);
 		}
 		std::cout << std::endl;
+
+		if (param.useAccretionDisk) {
+			callKernel("Calculate temperature LUT", createTemperatureTable, numBlocks_tempLUT, threadsPerBlock_32,
+				param.accretionTemperatureLUTSize, temperatureLUT_device, (param.accretionDiskMaxRadius - 3) / param.accretionTemperatureLUTSize, param.blackholeMass, param.blackholeAccretion);
+			checkCudaErrors();
+
+			callKernel("Add accretion Disk", addAccretionDisk, numBlocks_N_M_4_4, threadsPerBlock4_4,
+				dev_interpolatedGrid, dev_outputImage, temperatureLUT_device,(param.accretionDiskMaxRadius/param.accretionTemperatureLUTSize), param.accretionTemperatureLUTSize, dev_blackHoleMask, image.M, image.N);
+			checkCudaErrors();
+		}
 
 		checkCudaErrors();
 

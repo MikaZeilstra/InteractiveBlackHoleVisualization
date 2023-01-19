@@ -90,6 +90,7 @@ int main()
 	/* --------------------- INITIALIZATION BLACK HOLE -------------------- */
 
 	BlackHole black = BlackHole(param.afactor);
+	metric::setMetricParameters(param.afactor,param.accretionDiskMaxRadius,param.useAccretionDisk);
 	std::cout << "Initialized Black Hole " << std::endl << std::endl;
 
 	/* ----------------------- SETUP CUDA -------------------------- */
@@ -131,7 +132,7 @@ int main()
 			reportDuration(start_time, "Computed", "grid file");
 
 			std::cout << "Writing to file..." << std::endl << std::endl;
-			Archive<Grid>::serialize(gridFilename, grids[q]);
+			//Archive<Grid>::serialize(gridFilename, grids[q]);
 
 			gridLevelCount(grids[q], param.gridMaxLevel);
 			grids[q].drawBlocks(param.getGridBlocksFileName(camRad, camInc, camSpeed));

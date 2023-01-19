@@ -10,7 +10,7 @@ __global__ void distortEnvironmentMap(const float3* thphi, uchar4* out, const un
 	int ind = i * M1 + j;
 	// Only compute if pixel is not black hole and i j is in image
 	if (i < N && j < M) {
-		if (bh[ijc] == 0 && thphi[ind].z > 10e8) {
+		if (bh[ijc] == 0 && thphi[ind].z > INFINITY_CHECK) {
 
 			volatile float t[4], p[4];
 			bool picheck = false;
@@ -115,14 +115,13 @@ __global__ void distortEnvironmentMap(const float3* thphi, uchar4* out, const un
 					findLensingRedshift(t, p, M, ind, camParam, viewthing, frac, redshft, solidangle[ijc]);
 					if (lensingOn) P *= frac;
 					if (redshiftOn) P = powf(P, redshft);
+					//Redshift does not change Hue channel?
 					HSPtoRGB(H, S, min(1.f, P), color.z, color.y, color.x);
 					color.x *= 255.f;
 					color.y *= 255.f;
 					color.z *= 255.f;
 				}
 			}
-		} else if (bh[ijc] == 0 && thphi[ind].z != INFINITY){
-			color = { 0,255,255 };
 		}
 		//CHANGED
 		out[ijc] = { (unsigned char)min(255, (int) color.x),   

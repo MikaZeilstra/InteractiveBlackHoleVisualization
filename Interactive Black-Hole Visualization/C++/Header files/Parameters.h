@@ -16,13 +16,16 @@ struct Parameters {
 	int starTreeLevel, starMagnitudeCut;
 	double br, bphi, btheta;
 	bool userSpeed;
-	bool useStars, useRedshift, useLensing;
+	bool useStars, useRedshift, useLensing,useAccretionDisk;
 	bool savePaths;
 	bool camSpeedChange, camInclinationChange, camRadiusChange;
 	cv::Point2d camSpeedFromTo, camInclinationFromTo, camRadiusFromTo;
 	double camRadiusStepsize, camSpeedStepsize, camInclinationStepsize;
 	double afactor;
-	int gridStartLevel, gridMaxLevel;
+	double accretionDiskMaxRadius;
+	double blackholeMass, blackholeAccretion;
+	int accretionTemperatureLUTSize;
+	int gridStartLevel, gridMaxLevel, gridMinLevel;
 	int gridNum = 1;
 
 	std::string getResourceFolder() const {
@@ -177,6 +180,9 @@ struct Parameters {
 			sphereView = config.lookup("sphereView");
 			windowWidth = config.lookup("windowWidth");
 			windowHeight = config.lookup("windowHeight");
+
+
+
 			viewAngle = config.lookup("viewAngle");
 			viewAngle *= PI;
 			viewOffset.x = config.lookup("offsetX");
@@ -212,7 +218,16 @@ struct Parameters {
 			afactor = config.lookup("afactor");
 
 			gridStartLevel = config.lookup("gridStartLevel");
+			gridMinLevel = config.lookup("gridMinLevel");
 			gridMaxLevel = config.lookup("gridMaxLevel");
+
+			useAccretionDisk = config.lookup("useAccretionDisk");
+			if (useAccretionDisk) {
+				accretionDiskMaxRadius = config.lookup("accretionDiskRadius");
+				accretionTemperatureLUTSize = config.lookup("temperatureLUTSize");
+				blackholeMass = config.lookup("blackholeMass");
+				blackholeAccretion = config.lookup("blackholeAccretionRate");
+			}
 
 			camSpeedChange = config.lookup("camSpeedChange");
 			if (camSpeedChange) {

@@ -86,11 +86,7 @@ namespace CUDA {
 			GM = grids[0].M;
 			GN = grids[0].N;
 			for (int g = 0; g < G; g++) {
-				hashTable.insert(hashTable.end(), grids[g].hasher.hashTable.begin(), grids[g].hasher.hashTable.end());
-				offsetTable.insert(offsetTable.end(), grids[g].hasher.offsetTable.begin(), grids[g].hasher.offsetTable.end());
-				hashPosTag.insert(hashPosTag.end(), grids[g].hasher.hashPosTag.begin(), grids[g].hasher.hashPosTag.end());
-				tableSize.push_back(grids[g].hasher.hashTableWidth);
-				tableSize.push_back(grids[g].hasher.offsetTableWidth);
+				grid_vectors.push_back(grids[g].grid_vector);
 			}
 			camParams.resize(7 * G);
 			for (int g = 0; g < G; g++) {
@@ -99,32 +95,19 @@ namespace CUDA {
 			}
 			gridStart = cameras[0].r;
 			gridStep = (cameras[G - 1].r - gridStart) / (1.f * G - 1.f);
-			hashTableSize = hashTable.size() / 3;
-			offsetTableSize = offsetTable.size() / 2;
-			offsetTables = (int2*)&(offsetTable[0]);
-			hashTables = (float3*)&(hashTable[0]);
-			hashPosTags = (int2*)&(hashPosTag[0]);
-			tableSizes = (int2*)&(tableSize[0]);
 			camParam = &(camParams[0]);
 			level = grids[0].MAXLEVEL;
 			sym = float(GM) / float(GN) > 3 ? 1 : 0;
 			GN1 = (sym == 1) ? 2 * GN - 1 : GN;
+			
 
 		}
 		std::vector<float> camParams;
-		std::vector<float> hashTable;
-		std::vector<int> offsetTable, hashPosTag;
-		std::vector<int> tableSize;
-		int2* offsetTables;
-		float3* hashTables;
-		int2* hashPosTags;
-		int2* tableSizes;
+		std::vector<std::vector<float3>>grid_vectors;
 		int GM;
 		int GN;
 		int GN1;
 		int level;
-		int offsetTableSize;
-		int hashTableSize;
 		int G;
 		float gridStep;
 		float gridStart;
@@ -183,7 +166,7 @@ namespace CUDA {
 
 
 	void memoryAllocationAndCopy(const Grids& grids, const Image& image, const CelestialSky& celestialSky,
-		const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis);
+		const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis, const Parameters& param);
 
 	void runKernels(const Grids& grids, const Image& image, const CelestialSky& celestialSky,
 		const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis, const Parameters& param);

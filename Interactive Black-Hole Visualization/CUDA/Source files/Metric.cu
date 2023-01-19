@@ -18,13 +18,22 @@ namespace metric {
 	__device__ __constant__ const double BUTCHER_ERROR;
 #endif // !__CUDA_ARCH__
 
-
-	template <class T> __host__ void setAngVel(T afactor) {
+	/// <summary>
+	/// Sets parameters of the metric required for integration
+	/// </summary>
+	/// <param name="afactor"></param> The factor of angular momentum over mass
+	/// <param name="accretionRadius"></param> The maximum radius of the accretion disk 
+	/// <returns></returns>
+	template <class T> __host__ void setMetricParameters(T afactor, T accretionRadius, bool useDisk) {
 		metric::a<T> = afactor;
 		metric::asq<T> = afactor * afactor;
+		metric::accretionDiskRadius<T> = accretionRadius;
+		metric::useAccretionDisk = useDisk;
 
 		cudaMemcpyToSymbol(metric::a_dev<T>, &a<T>, sizeof(T));
 		cudaMemcpyToSymbol(metric::asq_dev<T>, &asq<T>, sizeof(T));
+		cudaMemcpyToSymbol(metric::accretionDiskRadius_dev<T>, &accretionDiskRadius<T>, sizeof(T));
+		cudaMemcpyToSymbol(metric::useAccretionDisk_dev, &useAccretionDisk, sizeof(bool));
 	}
 
 	template <class T>
@@ -288,7 +297,7 @@ namespace metric {
 			rkqs(var, dvdz, z, h, varScal, b, q, varErr, varTemp, aks, varTmpInt);
 
 			//If the step size magnitude becomes too small we are most likely very close to the black hole and we will assume we will hit it.
-			if (h > MIN_STEP_SIZE || rVar <= 1) {
+			if (h > MIN_STEP_SIZE || rVar <= 0) {
 				break;
 			}
 
@@ -299,10 +308,10 @@ namespace metric {
 			}
 
 			
-			if (thetaVar > PI1_2 != last_theta) {
+			if (BH_USE_ACCRETION_DISK && (thetaVar > PI1_2 != last_theta)) {
 				float factor = (thetaVar - PI1_2) / (thetaVar - varStart[theta_index]);
 				double r = (1 - factor) * rVar + factor * varStart[r_index];
-				if (r > 0 && r < 3) {
+				if (r > 0 && r < BH_MAX_ACCRETION_RADIUS) {
 					for (int i = 0; i < NUMBER_OF_EQUATIONS; i++) {
 						varStart[i] = (1 - factor) * var[i] + factor * varStart[i];
 					}

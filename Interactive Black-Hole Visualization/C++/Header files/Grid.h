@@ -2,17 +2,17 @@
 
 #include "opencv2/imgcodecs/imgcodecs.hpp"
 #include "opencv2/opencv.hpp"
-#include <cereal/archives/binary.hpp>
-#include <cereal/types/vector.hpp>
-#include <cereal/types/memory.hpp>
-#include <cereal/types/unordered_map.hpp>
+//#include <cereal/archives/binary.hpp>
+//#include <cereal/types/vector.hpp>
+//#include <cereal/types/memory.hpp>
+//#include <cereal/types/unordered_map.hpp>
 #include <vector>
 #include <fstream>
+#include <unordered_set>
 #include "Camera.h"
 #include "BlackHole.h"
 #include "Code.h"
 #include "Parameters.h"
-#include "PSHOffsetTable.h"
 #include <chrono>
 #include <numeric>
 
@@ -47,14 +47,16 @@ private:
 	/// <param name="factor">The factor to check whether a point is close to the border.</param>
 	static bool correct2PIcross(std::vector<cv::Point3d>& spl, float factor);
 
-
+	///TODO FIX SERIALISATION
 	// Cereal settings for serialization
+	/*
 	friend class cereal::access;
 	template < class Archive >
 	void serialize(Archive & ar)
 	{
-		ar(MAXLEVEL, N, M, hasher);
+		ar(MAXLEVEL, N, M, grid_vector);
 	}
+	*/
 	// Camera & Blackhole
 	const Camera* cam;
 	const BlackHole* black;
@@ -234,11 +236,10 @@ public:
 	/// </summary>
 	std::vector<float> geodesics;
 
+	std::vector<float3> grid_vector;
+
 	Parameters* param;
 
-	PSHOffsetTable hasher;
-
-	//PSHOffsetTable hasher;
 
 	/// <summary>
 	/// Mapping from block position to level at that point.

@@ -352,24 +352,23 @@ __device__ float3 interpolateHermite(const int i, const int j, const int gap, co
 	cornersCel[10] = findPoint(kplus1, jy, GM, GN, g, 1, 0, gap, grid, count);		//10 leftdown
 	cornersCel[11] = findPoint(kplus1, ly, GM, GN, g, 1, 0, gap, grid, count);		//11 rightdown
 	
-	//If any of the extra points are in the black hole return a linear interpolation (we know the inner points are correct
-	bool r_finite = cornersCel[4].z < INFINITY;
+	//If any of the extra points are in the black hole return a linear interpolation (we know the inner points are correct)
+	//Or if the r coordinate differs too much meaning they are on different disk sections or in the background
+	float check_r = cornersCel[0].z;
 	for (int q = 4; q < 12; q++) {
-		if (isnan(cornersCel[q].x) || r_finite != (cornersCel[q].z < INFINITY)) return interpolateLinear(i, j, percDown, percRight, cornersCel);
+		if (isnan(cornersCel[q].x) || fabsf(check_r - cornersCel[q].z) > R_CHANGE_THRESHOLD) return interpolateLinear(i, j, percDown, percRight, cornersCel);
 	}
 
 	piCheckTot(cornersCel, 0.2f, 12);
 
 	float3 interpolateUp = hermite(percRight, cornersCel[4], cornersCel[0], cornersCel[1], cornersCel[5], 0.f, 0.f);
 	float3 interpolateDown = hermite(percRight, cornersCel[6], cornersCel[2], cornersCel[3], cornersCel[7], 0.f, 0.f);
-	float3 interpolateUpUp = { cornersCel[8].x + (cornersCel[9].x - cornersCel[8].x) * percRight,
-		cornersCel[8].y + (cornersCel[9].y - cornersCel[8].y) * percRight };
-	float3 interpolateDownDown = { cornersCel[10].x + (cornersCel[11].x - cornersCel[10].x) * percRight,
-		cornersCel[10].y + (cornersCel[11].y - cornersCel[10].y) * percRight };
+	float3 interpolateUpUp = cornersCel[8] + percRight * (cornersCel[9] - cornersCel[8]);
+	float3 interpolateDownDown = cornersCel[10] + percRight * (cornersCel[11] - cornersCel[10]);
 	//HERMITE FINITE
 	return hermite(percDown, interpolateUpUp, interpolateUp, interpolateDown, interpolateDownDown, 0.f, 0.f);
 }
-
+  
 __device__ float3 interpolateSpline(const int i, const int j, const int gap, const int GM, const int GN, const float thetaCam, const float phiCam, const int g,
 	float3* cornersCel, float* cornersCam, const float3* grid) {
 
@@ -378,24 +377,14 @@ __device__ float3 interpolateSpline(const int i, const int j, const int gap, con
 	float phiLeft = cornersCam[1];
 	float phiRight = cornersCam[3];
 
-	if (thetaUp == thetaCam) {
-		if (phiLeft == phiCam)	return cornersCel[0];
-		if (phiRight == phiCam)	return cornersCel[1];
-		if (i == 0.f) return cornersCel[0];
-
-	}
-	else if (thetaDown == thetaCam) {
-		if (phiLeft == phiCam) return cornersCel[2];
-		if (phiRight == phiCam) return cornersCel[3];
-	}
 
 	float percDown = (thetaCam - thetaUp) / (thetaDown - thetaUp);
 	float percRight = (phiCam - phiLeft) / (phiRight - phiLeft);
 
-	bool r_finite = cornersCel[0].z < INFINITY;
+	float r_check = cornersCel[0].z;
 	for (int q = 0; q < 4; q++) {
 		if (isnan(cornersCel[q].x)) return{ -1.f,-1.f,-1.f };
-		if (r_finite != (cornersCel[q].z < INFINITY)) return interpolateNeirestNeighbour(percDown, percRight, cornersCel);
+		if (fabsf(cornersCel[q].z - r_check) > INFINITY_CHECK) return interpolateNeirestNeighbour(percDown, percRight, cornersCel);
 	}
 
 	

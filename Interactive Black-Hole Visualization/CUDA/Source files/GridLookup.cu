@@ -133,7 +133,7 @@ __device__ void retrievePixelCorners(const float3* thphi, float* t, float* p, in
 
 #pragma unroll
 	for (int q = 0; q < 4; q++) {
-		if (isnan(t[q]) || p[q] < 0 || t[q] < 0) {
+		if (t[q] < 0 || p[q] < 0 || t[q] < 0) {
 			ind = -1;
 			return;
 		}

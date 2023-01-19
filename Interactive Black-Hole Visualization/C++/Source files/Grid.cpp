@@ -11,7 +11,6 @@
 #include "../Header files/Camera.h"
 #include "../Header files/BlackHole.h"
 #include "../Header files/Code.h"
-#include "../Header files/PSHOffsetTable.h"
 #include "../Header files/IntegrationDefines.h"
 #include <chrono>
 #include <numeric>
@@ -428,7 +427,7 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 
 	//if (CamToCel[i_j].z != CamToCel[k_j].z || CamToCel[k_j].z != CamToCel[i_l].z || CamToCel[i_l].z != CamToCel[k_l].z) return true;
 	
-	if (level < 6) return true;
+	if (level < param->gridMinLevel) return true;
 
 	// If the maximum diagonal is not less than required precision split the block
 	// Nan indicates 1 of the vertices was part of the black hole, meaning we want better resolution unless they were all BH.
@@ -619,6 +618,9 @@ Grid::Grid(const int maxLevelPrec, const int startLevel, const bool angle, const
 	M = (2 - equafactor) * 2 * (N - 1);
 	STARTM = (2 - equafactor) * 2 * (STARTN - 1);
 	steps = std::vector<int>(M * N);
+
+	grid_vector = std::vector<float3>(M * N, make_float3(-2,-2,-2));
+
 	auto start = std::chrono::high_resolution_clock::now();
 	raytrace();
 	auto end = std::chrono::high_resolution_clock::now();
@@ -656,21 +658,14 @@ void Grid::saveGeodesics(Parameters& param) {
 }
 
 void Grid::saveAsGpuHash() {
-	if (print) std::cout << "Computing Perfect Hash.." << std::endl;
-
-	std::vector<cv::Point2i> elements;
-	std::vector<cv::Point3f> data;
+	//TODO FIX SYMMETRY EXPLOIT
 	for (const std::pair<uint64_t, cv::Point3d>& entry : CamToCel) {
 		uint32_t el1 = entry.first >> 32;
 		uint32_t el2 = entry.first;
-
-
-		elements.push_back({ (int)el1, (int)el2 });
-		data.push_back({ (float)entry.second.x, (float)entry.second.y,(float)entry.second.z });
+		
+		grid_vector[el1 * M + el2] = { (float)entry.second.x,(float)entry.second.y,(float)entry.second.z };
 	}
-	hasher = PSHOffsetTable(elements, data);
 
-	if (print) std::cout << "Completed Perfect Hash" << std::endl;
 }
 
 

@@ -50,15 +50,11 @@ dc4 = 125.0 / 594.0 - 13525.0 / 55296.0, dc5 = -277.00 / 14336.0, dc6 = 512.0 / 
 #ifndef __CUDA_ARCH__
 #define BH_A metric::a<T>
 #define BH_ASQ metric::asq<T>
+#define BH_MAX_ACCRETION_RADIUS metric::accretionDiskRadius<T>
+#define BH_USE_ACCRETION_DISK metric::useAccretionDisk
 #else
 #define BH_A metric::a_dev<T>
 #define BH_ASQ metric::asq_dev<T>
-#endif // !__CUDA_ARCH__
-
-#ifndef __CUDA_ARCH__
-#define BH_AT metric::a<double>
-#define BH_ASQT metric::asq<double>
-#else
-#define BH_AT metric::a_dev<double>
-#define BH_ASQT metric::asq_dev<double>
+#define BH_MAX_ACCRETION_RADIUS metric::accretionDiskRadius_dev<T>
+#define BH_USE_ACCRETION_DISK metric::useAccretionDisk_dev
 #endif // !__CUDA_ARCH__

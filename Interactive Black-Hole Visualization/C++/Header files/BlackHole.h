@@ -11,7 +11,6 @@ public:
 
 	void setA(double afactor) {
 		a = afactor;
-		metric::setAngVel(afactor);
 		//integration::setA(a);
 	}
 

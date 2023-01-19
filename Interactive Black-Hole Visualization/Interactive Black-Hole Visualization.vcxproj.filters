@@ -47,9 +47,6 @@
     <ClInclude Include="C++\Header files\Parameters.h">
       <Filter>C++\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="C++\Header files\PSHOffsetTable.h">
-      <Filter>C++\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="C++\Header files\StarProcessor.h">
       <Filter>C++\Header Files</Filter>
     </ClInclude>
@@ -89,6 +86,9 @@
     <ClInclude Include="CUDA\Header files\vector_operations.cuh">
       <Filter>CUDA\Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="CUDA\Header files\AccretionDiskColorComputation.cuh">
+      <Filter>CUDA\Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="C++\Source files\Grid.cpp">
@@ -121,6 +121,9 @@
       <Filter>CUDA\Source Files</Filter>
     </CudaCompile>
     <CudaCompile Include="CUDA\Source files\StarDeformation.cu">
+      <Filter>CUDA\Source Files</Filter>
+    </CudaCompile>
+    <CudaCompile Include="CUDA\Source files\AccretionDiskColorComputation.cu">
       <Filter>CUDA\Source Files</Filter>
     </CudaCompile>
   </ItemGroup>

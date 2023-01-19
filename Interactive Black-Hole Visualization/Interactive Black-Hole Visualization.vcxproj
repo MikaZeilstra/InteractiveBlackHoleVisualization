@@ -235,9 +235,9 @@
     <ClInclude Include="C++\Header files\Grid.h" />
     <ClInclude Include="C++\Header files\IntegrationDefines.h" />
     <ClInclude Include="C++\Header files\Parameters.h" />
-    <ClInclude Include="C++\Header files\PSHOffsetTable.h" />
     <ClInclude Include="C++\Header files\StarProcessor.h" />
     <ClInclude Include="C++\Header files\Viewer.h" />
+    <ClInclude Include="CUDA\Header files\AccretionDiskColorComputation.cuh" />
     <ClInclude Include="CUDA\Header files\ColorComputation.cuh" />
     <ClInclude Include="CUDA\Header files\Constants.cuh" />
     <ClInclude Include="CUDA\Header files\GridInterpolation.cuh" />
@@ -255,6 +255,7 @@
     <ClCompile Include="C++\Source files\Source.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <CudaCompile Include="CUDA\Source files\AccretionDiskColorComputation.cu" />
     <CudaCompile Include="CUDA\Source files\ColorComputation.cu" />
     <CudaCompile Include="CUDA\Source files\GridInterpolation.cu" />
     <CudaCompile Include="CUDA\Source files\GridLookup.cu" />

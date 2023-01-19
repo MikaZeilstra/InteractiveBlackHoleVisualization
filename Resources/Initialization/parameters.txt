@@ -2,7 +2,7 @@
 sphereView = true
 
 // Output window size in pixels.
-windowWidth = 1920
+windowWidth = 2560
 windowHeight = 1080
 
 // Viewer settings
@@ -16,6 +16,13 @@ nrOfFrames = 1
 useRedshift = false
 useLensing = false
 useStars = false
+
+//AccretionDisk
+useAccretionDisk = true
+accretionDiskRadius = 20.
+temperatureLUTSize = 100
+blackholeMass = 3.5e9 //Mass of the black hole in solar masses
+blackholeAccretionRate = 0.1 //The accretion rate of the black hole in solar masses per year
 
 //Option to save the geodesics used to generate the image
 saveGeodesics = false
@@ -33,13 +40,14 @@ diffractionImg = "0s1.png"
 
 // Grid Settings
 gridStartLevel = 1
+gridMinLevel = 4
 gridMaxLevel = 10
 
 // Blackhole angular velocity
-afactor = 0.999;
+afactor = 0.982;
 
 // Camera location, speed, direction
-camRadius = 4.
+camRadius = 30.
 camInclination = 0.4 //*PI
 // If a custom user speed is used.
 userSpeed = false

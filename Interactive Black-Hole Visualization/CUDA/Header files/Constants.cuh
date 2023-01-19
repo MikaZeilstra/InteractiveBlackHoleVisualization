@@ -24,9 +24,12 @@
 #define PIc 3.141592653589793238f
 
 #define INFINITY 1e30
+#define INFINITY_CHECK 5e29
 #define PI 3.141592653589793238
 #define PI1_2  (PI / 2.)
 #define PI2 (PI*2.)
 #define PI1_4 (PI / 4.)
 #define HALF (1. / 2.)
- 
+
+#define SQRT3 1.73205080757
+#define SQRT6 2.44948974278
