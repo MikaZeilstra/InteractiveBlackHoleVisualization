@@ -25,7 +25,12 @@ __device__ double lookUpTemperature(double* table, const float step_size, const 
 	if (r < 3 || r >= (size * step_size + 3)) {
 		return 0;
 	}
-	return table[(int)floor((r-3)/step_size)];
+
+	float r_low = floor((r-3)/step_size);
+	float r_high = ceil((r - 3) / step_size);
+	float mix = (r-3) / step_size - r_low;
+
+	return (1-mix) * table[(int) r_low] + mix * table[(int) r_high];
 }
 
 __global__ void createTemperatureTable(const int size,double* table, const float step_size, float M, float Ma) {

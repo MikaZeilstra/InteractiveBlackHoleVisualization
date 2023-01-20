@@ -481,7 +481,7 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 
 		if (param.useAccretionDisk) {
 			callKernel("Calculate temperature LUT", createTemperatureTable, numBlocks_tempLUT, threadsPerBlock_32,
-				param.accretionTemperatureLUTSize, temperatureLUT_device, (param.accretionDiskMaxRadius - 3) / param.accretionTemperatureLUTSize, param.blackholeMass, param.blackholeAccretion);
+				param.accretionTemperatureLUTSize, temperatureLUT_device, (param.accretionDiskMaxRadius - 3) / (param.accretionTemperatureLUTSize-1), param.blackholeMass, param.blackholeAccretion);
 			checkCudaErrors();
 
 			callKernel("Add accretion Disk", addAccretionDisk, numBlocks_N_M_4_4, threadsPerBlock4_4,
