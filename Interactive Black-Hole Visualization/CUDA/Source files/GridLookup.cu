@@ -121,15 +121,38 @@ __device__ bool piCheckTot(float3* tp, float factor, int size) {
 }
 
 // Set values for projected pixel corners & update phi values in case of 2pi crossing.
+// If the corners cross into the accretion disk we set them to a known good value
 __device__ void retrievePixelCorners(const float3* thphi, float* t, float* p, int& ind, const int M, bool& picheck, float offset) {
-	t[0] = thphi[ind + M1].x;
 	t[1] = thphi[ind].x;
-	t[2] = thphi[ind + 1].x;
-	t[3] = thphi[ind + M1 + 1].x;
-	p[0] = thphi[ind + M1].y;
 	p[1] = thphi[ind].y;
-	p[2] = thphi[ind + 1].y;
-	p[3] = thphi[ind + M1 + 1].y;
+
+	if (thphi[ind + M1].z > INFINITY_CHECK) {
+		t[0] = thphi[ind + M1].x;
+		p[0] = thphi[ind + M1].y;
+
+	}
+	else {
+		t[0] = t[1];
+		p[0] = p[1];
+	}
+
+	if (thphi[ind + 1].z > INFINITY_CHECK) {
+		t[2] = thphi[ind + 1].x;
+		p[2] = thphi[ind + 1].y;
+	}
+	else {
+		t[2] = t[1];
+		p[2] = p[1];
+	}
+	
+	if (thphi[ind + M1 + 1].z > INFINITY_CHECK) {
+		t[3] = thphi[ind + M1 + 1].x;
+		p[3] = thphi[ind + M1 + 1].y;
+	}
+	else {
+		t[3] = t[2];
+		p[3] = p[2];
+	}
 
 #pragma unroll
 	for (int q = 0; q < 4; q++) {

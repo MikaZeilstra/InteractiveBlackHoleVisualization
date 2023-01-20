@@ -1,7 +1,7 @@
 #pragma once
 #include "cuda_runtime.h"
 
-#define R_CHANGE_THRESHOLD 1e-1
+#define R_CHANGE_THRESHOLD 10
 
 #define TILE_W 4
 #define TILE_H 4

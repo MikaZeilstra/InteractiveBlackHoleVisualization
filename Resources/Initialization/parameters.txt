@@ -20,7 +20,7 @@ useStars = false
 //AccretionDisk
 useAccretionDisk = true
 accretionDiskRadius = 20.
-temperatureLUTSize = 100
+temperatureLUTSize = 500
 blackholeMass = 3.5e9 //Mass of the black hole in solar masses
 blackholeAccretionRate = 0.1 //The accretion rate of the black hole in solar masses per year
 

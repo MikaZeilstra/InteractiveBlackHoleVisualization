@@ -399,6 +399,9 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 	uint32_t k = i + gap;
 	uint32_t l = (j + gap) % M;
 
+	//If the block level is still lower than the minimum required number return 
+	if (level < param->gridMinLevel) return true;
+
 	double th1 = CamToCel[i_j]_theta;
 	double th2 = CamToCel[k_j]_theta;
 	double th3 = CamToCel[i_l]_theta;
@@ -415,25 +418,32 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 	cv::Point3d bottomLeft = CamToCel[i_l];
 	cv::Point3d bottomRight = CamToCel[k_l];
 
-	
-	double diag = (topLeft - bottomRight).ddot(topLeft - bottomRight);
+	cv::Point2d topLeft_2d = { topLeft.x,topLeft.y };
+	cv::Point2d topRight_2d = { topRight.x,topRight.y };
+	cv::Point2d bottomLeft_2d = { bottomLeft.x,bottomLeft.y };
+	cv::Point2d bottomRight_2d = { bottomRight.x,bottomRight.y };
+
+	double diag = (topLeft_2d - bottomRight_2d).ddot(topLeft_2d - bottomRight_2d);
 	bottomRight.y += PI2;
-	diag = std::min(diag, (topLeft - bottomRight).ddot(topLeft - bottomRight));
+	diag = std::min(diag, (topLeft_2d - bottomRight_2d).ddot(topLeft_2d - bottomRight_2d));
 	
 
-	double diag2 = (topRight - bottomLeft).ddot(topRight - bottomLeft);
+	double diag2 = (topRight_2d - bottomLeft_2d).ddot(topRight_2d - bottomLeft_2d);
 	bottomRight.y += PI2;
-	diag2 = std::min(diag2, (topRight - bottomLeft).ddot(topRight - bottomLeft));
-
-	//if (CamToCel[i_j].z != CamToCel[k_j].z || CamToCel[k_j].z != CamToCel[i_l].z || CamToCel[i_l].z != CamToCel[k_l].z) return true;
-	
-	if (level < param->gridMinLevel) return true;
+	diag2 = std::min(diag2, (topRight_2d - bottomLeft_2d).ddot(topRight_2d - bottomLeft_2d));
 
 	// If the maximum diagonal is not less than required precision split the block
 	// Nan indicates 1 of the vertices was part of the black hole, meaning we want better resolution unless they were all BH.
 	// Nan comparison with nan is always false so we need to have the comparison return false if we want to split
 	bool AllBH = isnan(topLeft.x) && isnan(topRight.x) && isnan(bottomLeft.x) && isnan(bottomRight.x);
 	if (!(diag <= PRECCELEST && diag2 <= PRECCELEST) && !AllBH) return true;
+
+	// If the change in the radius is too large we need to refine
+	if (abs(bottomRight.z - topLeft.z) > (param->accretionDiskMaxRadius / cam->r) * R_CHANGE_THRESHOLD ||
+		abs(topRight.z - bottomLeft.z) > (param->accretionDiskMaxRadius / cam->r) * R_CHANGE_THRESHOLD) {
+		return true;
+	}
+
 
 	// If no refinement necessary, save level at position.
 	blockLevels[i_j] = level;
