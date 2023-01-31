@@ -503,18 +503,18 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 
 		for (int i = 0; i < grid.size(); i++) {
 			if (grid[i].x != -2.0 && grid[i].x != -1) {
-				grid[i].x = (grid[i].x / PI);
-				grid[i].y = (grid[i].y / PI2);
-
-				grid[i].x = grid[i].x - floor(grid[i].x);
-				grid[i].y = grid[i].y - floor(grid[i].y);
-
-				if (grid[i].z == INFINITY) {
+				if (grid[i].z > INFINITY_CHECK) {
 					grid[i].z = 0;
+					grid[i].x = (grid[i].x / PI);
 				}
 				else {
 					grid[i].z = grid[i].z / (grids.gridStart + q * (param.camRadiusChange ? grids.gridStep : 0));
+					grid[i].x = grid[i].x*0 / 2;
 				}
+				
+
+				grid[i].y = (grid[i].y / PI2)*0;
+				grid[i].z;
 			}
 			
 		}

@@ -1,7 +1,9 @@
 #include "./../Header files/AccretionDiskColorComputation.cuh"
 #include "./../Header files/Constants.cuh"
+#include "./../Header files/Metric.cuh"
 
 #include "device_launch_parameters.h"
+
 
 /// <summary>
 /// Calculates the actual temperature of the disk at a given radius r in schwarschild radii and actual Mass M and accretion rate Ma.
@@ -48,12 +50,18 @@ __global__ void addAccretionDisk(const float3* thphi, uchar4* out, double*temper
 	// Only compute if pixel is not black hole and i j is in image
 	if (i < N && j < M) {
 		if (bh[ijc] == 0 && thphi[ind].z < INFINITY_CHECK) {
-			double temp = lookUpTemperature(temperature_table, temperature_table_step_size, temperature_table_size, thphi[ind].z / 2);
-			double max_temp = lookUpTemperature(temperature_table, temperature_table_step_size, temperature_table_size, 4.8);
-
 			
 
-			out[ijc] = {0,0,(unsigned char) floor((temp / max_temp) * 255),255 };
+			double temp = lookUpTemperature(temperature_table, temperature_table_step_size, temperature_table_size, thphi[ind].z / 2);
+			
+			double max_temp = lookUpTemperature(temperature_table, temperature_table_step_size, temperature_table_size, 4.8);
+
+			float grav_redshift = metric::calculate_gravitational_redshift<float>(thphi[ind].z, thphi[ind].z * thphi[ind].z,1, cos(thphi[ind].x) * cos(thphi[ind].x), sin(thphi[ind].x) * sin(thphi[ind].x));
+			float doppler_redshift = thphi[ind].x;
+
+			float redshift = doppler_redshift * grav_redshift;
+
+			out[ijc] = {0,0,(unsigned char) floor(temp*255*redshift/(max_temp*1.5)),255 };
 		}
 	}
 }

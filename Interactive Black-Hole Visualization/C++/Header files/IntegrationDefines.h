@@ -47,6 +47,8 @@ c1 = 37.0 / 378.0, c3 = 250.0 / 621.0, c4 = 125.0 / 594.0, c6 = 512.0 / 1771.0
 #define BUTCHER_ERROR dc1 = 37.0 / 378.0 - 2825.0 / 27648.0, dc3 = 250.0 / 621.0 - 18575.0 / 48384.0,\
 dc4 = 125.0 / 594.0 - 13525.0 / 55296.0, dc5 = -277.00 / 14336.0, dc6 = 512.0 / 1771.0 - 0.25
 
+#define MIN_STABLE_ORBIT 6
+
 #ifndef __CUDA_ARCH__
 #define BH_A metric::a<T>
 #define BH_ASQ metric::asq<T>

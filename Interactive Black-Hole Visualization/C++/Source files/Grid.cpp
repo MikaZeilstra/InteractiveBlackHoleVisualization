@@ -402,16 +402,6 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 	//If the block level is still lower than the minimum required number return 
 	if (level < param->gridMinLevel) return true;
 
-	double th1 = CamToCel[i_j]_theta;
-	double th2 = CamToCel[k_j]_theta;
-	double th3 = CamToCel[i_l]_theta;
-	double th4 = CamToCel[k_l]_theta;
-
-	double ph1 = CamToCel[i_j]_phi;
-	double ph2 = CamToCel[k_j]_phi;
-	double ph3 = CamToCel[i_l]_phi;
-	double ph4 = CamToCel[k_l]_phi;
-
 	//Check if the points are well alligned
 	cv::Point3d topLeft = CamToCel[i_j];
 	cv::Point3d topRight = CamToCel[k_j];
@@ -423,26 +413,55 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 	cv::Point2d bottomLeft_2d = { bottomLeft.x,bottomLeft.y };
 	cv::Point2d bottomRight_2d = { bottomRight.x,bottomRight.y };
 
-	double diag = (topLeft_2d - bottomRight_2d).ddot(topLeft_2d - bottomRight_2d);
-	bottomRight.y += PI2;
-	diag = std::min(diag, (topLeft_2d - bottomRight_2d).ddot(topLeft_2d - bottomRight_2d));
-	
+	bool topLeft_finite = topLeft.z < INFINITY_CHECK;
 
-	double diag2 = (topRight_2d - bottomLeft_2d).ddot(topRight_2d - bottomLeft_2d);
-	bottomRight.y += PI2;
-	diag2 = std::min(diag2, (topRight_2d - bottomLeft_2d).ddot(topRight_2d - bottomLeft_2d));
-
-	// If the maximum diagonal is not less than required precision split the block
-	// Nan indicates 1 of the vertices was part of the black hole, meaning we want better resolution unless they were all BH.
-	// Nan comparison with nan is always false so we need to have the comparison return false if we want to split
-	bool AllBH = isnan(topLeft.x) && isnan(topRight.x) && isnan(bottomLeft.x) && isnan(bottomRight.x);
-	if (!(diag <= PRECCELEST && diag2 <= PRECCELEST) && !AllBH) return true;
-
-	// If the change in the radius is too large we need to refine
-	if (abs(bottomRight.z - topLeft.z) > (param->accretionDiskMaxRadius / cam->r) * R_CHANGE_THRESHOLD ||
-		abs(topRight.z - bottomLeft.z) > (param->accretionDiskMaxRadius / cam->r) * R_CHANGE_THRESHOLD) {
+	//If all r coordinates are not either finite or infinite we need to refine (Edge of accretion disk)
+	if (!((topLeft_finite == (topRight.z < INFINITY_CHECK)) && (topLeft_finite == (bottomLeft.z < INFINITY_CHECK)) && (topLeft_finite == ( bottomRight.z < INFINITY_CHECK)))) {
 		return true;
 	}
+
+	//If all vertices are not either in the blackhole or out we need to refine
+	// Nan indicates 1 of the vertices was part of the black hole, meaning we want better resolution unless they were all BH.
+	bool topLeftNan = isnan(topLeft.x);
+	if (!((topLeftNan == isnan(topRight.x)) && (topLeftNan == isnan(bottomLeft.x)) && (topLeftNan == isnan(bottomRight.x)))) {
+		return true;
+	}
+
+	//If we are one the accretion disk diagonal is in phi and r coordinates otherwise it is in phi and theta coordinates
+	if (topLeft_finite) {
+		double diag = abs(topLeft.y - bottomRight.y);
+		bottomRight.y += PI2;
+		diag = std::min(diag, abs(topLeft.y - bottomRight.y));
+
+		double diag2 = abs(topRight.y - bottomLeft.y);
+		bottomRight.y += PI2;
+		diag2 = std::min(diag2, abs(topRight.y - bottomLeft.y));
+
+		// If phi change is too large refine
+		if (diag > PRECCELEST || diag2 > PRECCELEST) return true;
+
+		// If the change in the radius is too large we need to refine
+		if (abs(bottomRight.z - topLeft.z) > (param->accretionDiskMaxRadius / cam->r) * R_CHANGE_THRESHOLD ||
+			abs(topRight.z - bottomLeft.z) > (param->accretionDiskMaxRadius / cam->r) * R_CHANGE_THRESHOLD) {
+			return true;
+		}
+	}
+	else {
+		double diag = (topLeft_2d - bottomRight_2d).ddot(topLeft_2d - bottomRight_2d);
+		bottomRight.y += PI2;
+		diag = std::min(diag, (topLeft_2d - bottomRight_2d).ddot(topLeft_2d - bottomRight_2d));
+
+
+		double diag2 = (topRight_2d - bottomLeft_2d).ddot(topRight_2d - bottomLeft_2d);
+		bottomRight.y += PI2;
+		diag2 = std::min(diag2, (topRight_2d - bottomLeft_2d).ddot(topRight_2d - bottomLeft_2d));
+
+		// If the maximum diagonal is not less than required precision split the block
+
+		if ( diag > PRECCELEST || diag2 > PRECCELEST) return true;
+	}
+
+	
 
 
 	// If no refinement necessary, save level at position.
@@ -575,7 +594,7 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 		qs.push_back(q);
 		pThetas.push_back(pTheta);
 	}
-	if (n < MIN_GPU_INTEGRATION) {
+	if (n < 100000000000) {
 	#pragma loop(hint_parallel(8))
 		for (int i = 0; i < n; i++) {
 			metric::rkckIntegrate1<double>(rS, thetaS, phiS, &pRs[i], &bs[i], &qs[i], &pThetas[i],param->savePaths, reinterpret_cast<float3*>( & (paths.data()[i * 3 * (MAXSTP / STEP_SAVE_INTERVAL)])));

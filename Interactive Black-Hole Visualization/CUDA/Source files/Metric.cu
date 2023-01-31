@@ -2,8 +2,9 @@
 #include "device_launch_parameters.h"
 
 #include "../Header files/metric.cuh"
-
+#include "../Header files/vector_operations.cuh"
 #include "../Header files/Constants.cuh"
+
 #include "../../C++/Header files/Code.h"
 #include "../../C++/Header files/IntegrationDefines.h"
 
@@ -86,10 +87,42 @@ namespace metric {
 		return q - cossq * (bsq / sinsq - BH_ASQ);
 	};
 
-	template <class T> __host__ T calcSpeed(T r, T theta) {
+	template <class T> __device__ __host__ __forceinline__ T _gtt_theta_half_pi(T r) {
+		return -(1-(2/r));
+	};
+
+	template <class T> __device__ __host__ __forceinline__ T _gphiphi_theta_half_pi(T r, T rsq) {
+		return rsq+BH_ASQ + ((2*BH_ASQ)/r);
+	};
+
+	template <class T> __device__ __host__ __forceinline__ T _gtphi_theta_half_pi(T r) {
+		return  -2 * BH_A / r;
+	};
+
+	template <class T> __device__ __host__ __forceinline__ T _Omega(T r) {
+		return 1. / (BH_A + pow(r, 1.5));
+	};
+
+
+	/// <summary>
+	/// Calculates the gravitational redshift of a photon emited by a particle in a  orbit around the black hole at theta = 0.5pi as seen by a distant observer
+	/// According to "Gravitational redshift in Kerr field" by Anuj Kumar Dubey and Asoke Kumar Sen
+	/// </summary>
+	/// <typeparam name="T"></typeparam>
+	/// <param name="r"></param>
+	/// <param name="theta"></param>
+	/// <param name="rsq"></param>
+	/// <param name="cossq"></param>
+	/// <param name="sinsq"></param>
+	/// <returns></returns>
+	template <class T> __device__ __host__ __forceinline__ T calculate_gravitational_redshift(T r, T rsq, T Obs_Theta, T Pixel_Polar_R, T Pixel_Polar_Phi) {
+		return sqrt(- _gtt_theta_half_pi(r) - 2 * _gtphi_theta_half_pi(r) * _Omega(r) - _gphiphi_theta_half_pi(r, rsq) * sq(_Omega(r)));
+	};
+
+
+	template <class T> __device__ __host__ __forceinline__ T calcSpeed(T r, T theta) {
 		T rsq = sq(r);
-		T omega = 1. / (BH_A + pow(r, 1.5));
-		T sp = _wbar(r, theta, rsq, sq(sin(theta)), sq(cos(theta))) / _alpha(r, theta, rsq, sq(sin(theta)), sq(cos(theta))) * (omega - _w(r, theta, rsq, sq(sin(theta))));
+		T sp = _wbar(r, theta, rsq, sq(sin(theta)), sq(cos(theta))) / _alpha(r, theta, rsq, sq(sin(theta)), sq(cos(theta))) * (_Omega(r) - _w(r, theta, rsq, sq(sin(theta))));
 		return sp;
 	}
 
@@ -110,6 +143,7 @@ namespace metric {
 		return (ax + b) / 2;
 	}
 
+
 	template <class T> __host__ T checkRup(T rV, T thetaV, T bV, T qV) {
 		if (BH_A == 0) return false;
 		T min = findMinGoldSec(thetaV, bV, qV, rV, 4 * rV, 0.00001);
@@ -127,6 +161,8 @@ namespace metric {
 	template <class T> __host__ T _q0(T r0) {
 		return -sq3(r0) * (sq3(r0) - 6. * sq(r0) + 9. * r0 - 4. * BH_ASQ) / (BH_ASQ * sq(r0 - 1.));
 	};
+
+
 
 	template <class T> __host__ T checkB_Q(T bV, T qV) {
 		T _r1 = 2. * (1. + cos(2. * acos(-BH_A) / 3.));
@@ -307,14 +343,48 @@ namespace metric {
 				return;
 			}
 
-			
+			//If we want the accretion disk and the theta has crossed the 1/2pi plane we return accretion disk colors
 			if (BH_USE_ACCRETION_DISK && (thetaVar > PI1_2 != last_theta)) {
 				float factor = (thetaVar - PI1_2) / (thetaVar - varStart[theta_index]);
-				double r = (1 - factor) * rVar + factor * varStart[r_index];
+				T r = (1 - factor) * rVar + factor * varStart[r_index];
 				if (r > 0 && r < BH_MAX_ACCRETION_RADIUS) {
+					
+					//Interpolate all vars to the disk
 					for (int i = 0; i < NUMBER_OF_EQUATIONS; i++) {
 						varStart[i] = (1 - factor) * var[i] + factor * varStart[i];
 					}
+
+					//Calculate derivatives at disk position
+					metric::derivs(varStart, dvdz, b, q);
+
+
+					T doppler_redshift = 0;
+					 
+					//If the radius is larger than the stable orbit the particle would go fast than the speed of light and we get nans
+					//Also light does not escape this region and the disk will be black anyway
+					if (r > MIN_STABLE_ORBIT) {
+						//Calculate doppler redshift
+						//Accretion disk particle moves in {0,1,0} direction so cosine is simply normalized phi direction
+						float3 lightdir = { dvdz[r_index], dvdz[theta_index],  dvdz[phi_index] };
+
+						T norm = vector_ops::dot(lightdir, lightdir);
+						T cos_incident_angle = rsqrt(norm) * lightdir.z;
+
+						T orbit_speed = metric::calcSpeed<T>(r, PI1_2);
+						doppler_redshift = (1 + orbit_speed * cos_incident_angle) / sqrt(1 - sq(orbit_speed));
+
+					}
+					else
+					{
+						doppler_redshift = 0;
+					}
+					
+
+					
+					
+
+					//Store the doppler redshift in the theta channel since its constant anyway.
+					varStart[theta_index] = doppler_redshift;					
 					return;
 				}							
 			}
