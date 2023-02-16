@@ -19,7 +19,7 @@ useStars = false
 
 //AccretionDisk
 useAccretionDisk = true
-accretionDiskRadius = 20.
+accretionDiskRadius = 15.
 temperatureLUTSize = 500
 blackholeMass = 3.5e9 //Mass of the black hole in solar masses
 blackholeAccretionRate = 0.1 //The accretion rate of the black hole in solar masses per year
@@ -40,15 +40,15 @@ diffractionImg = "0s1.png"
 
 // Grid Settings
 gridStartLevel = 1
-gridMinLevel = 4
+gridMinLevel = 7
 gridMaxLevel = 10
 
 // Blackhole angular velocity
 afactor = 0.982;
 
 // Camera location, speed, direction
-camRadius = 30.
-camInclination = 0.4 //*PI
+camRadius = 20.
+camInclination = 0.49 //*PI
 // If a custom user speed is used.
 userSpeed = false
 camSpeed = 0.32001

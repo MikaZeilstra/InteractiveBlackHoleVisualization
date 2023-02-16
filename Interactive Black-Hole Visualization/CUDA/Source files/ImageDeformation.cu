@@ -9,7 +9,10 @@ __global__ void distortEnvironmentMap(const float3* thphi, uchar4* out, const un
 	float4 color = { 0.f, 0.f, 0.f, 0.f };
 	int ind = i * M1 + j;
 	// Only compute if pixel is not black hole and i j is in image
+
 	if (i < N && j < M) {
+
+
 		if (bh[ijc] == 0 && thphi[ind].z > INFINITY_CHECK) {
 
 			volatile float t[4], p[4];
@@ -101,6 +104,8 @@ __global__ void distortEnvironmentMap(const float3* thphi, uchar4* out, const un
 
 					}
 				}
+
+				
 
 				color.x = min(255.f, powf(color.x / color.w, 1.f / 2.2f));
 				color.y = min(255.f, powf(color.y / color.w, 1.f / 2.2f));

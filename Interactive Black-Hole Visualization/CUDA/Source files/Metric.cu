@@ -347,7 +347,7 @@ namespace metric {
 			if (BH_USE_ACCRETION_DISK && (thetaVar > PI1_2 != last_theta)) {
 				float factor = (thetaVar - PI1_2) / (thetaVar - varStart[theta_index]);
 				T r = (1 - factor) * rVar + factor * varStart[r_index];
-				if (r > 0 && r < BH_MAX_ACCRETION_RADIUS) {
+				if (r > 6 && r < BH_MAX_ACCRETION_RADIUS) {
 					
 					//Interpolate all vars to the disk
 					for (int i = 0; i < NUMBER_OF_EQUATIONS; i++) {

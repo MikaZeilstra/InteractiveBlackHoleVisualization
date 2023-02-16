@@ -89,6 +89,9 @@
     <ClInclude Include="CUDA\Header files\AccretionDiskColorComputation.cuh">
       <Filter>CUDA\Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="CUDA\Header files\Temperature_color_lookup.cuh">
+      <Filter>CUDA\Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="C++\Source files\Grid.cpp">

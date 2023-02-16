@@ -248,6 +248,7 @@
     <ClInclude Include="CUDA\Header files\Metric.cuh" />
     <ClInclude Include="CUDA\Header files\ShadowComputation.cuh" />
     <ClInclude Include="CUDA\Header files\StarDeformation.cuh" />
+    <ClInclude Include="CUDA\Header files\Temperature_color_lookup.cuh" />
     <ClInclude Include="CUDA\Header files\vector_operations.cuh" />
   </ItemGroup>
   <ItemGroup>
