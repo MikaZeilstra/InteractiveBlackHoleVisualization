@@ -75,8 +75,8 @@ __global__ void addAccretionDisk(const float3* thphi, uchar4* out, double*temper
 
 
 				//Out image in BGR format while table is RGB
-				//out[ijc] = { (unsigned char)(temperature_sRGB.z*255),(unsigned char)(temperature_sRGB.y * 255),(unsigned char)(temperature_sRGB.x * 255),255 };
-				out[ijc] = { 255,255,0,255 };
+				out[ijc] = { (unsigned char)(temperature_sRGB.z*255),(unsigned char)(temperature_sRGB.y * 255),(unsigned char)(temperature_sRGB.x * 255),255 };
+				//out[ijc] = { 255,255,0,255 };
 			}
 			else {
 				//out[ijc] = { 0,0,0,255 };
