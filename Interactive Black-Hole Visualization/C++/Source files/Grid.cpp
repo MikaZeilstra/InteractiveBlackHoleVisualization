@@ -594,7 +594,7 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 		qs.push_back(q);
 		pThetas.push_back(pTheta);
 	}
-	if (n < 100000000000) {
+	if (n < MIN_GPU_INTEGRATION) {
 	#pragma loop(hint_parallel(8))
 		for (int i = 0; i < n; i++) {
 			metric::rkckIntegrate1<double>(rS, thetaS, phiS, &pRs[i], &bs[i], &qs[i], &pThetas[i],param->savePaths, reinterpret_cast<float3*>( & (paths.data()[i * 3 * (MAXSTP / STEP_SAVE_INTERVAL)])));
