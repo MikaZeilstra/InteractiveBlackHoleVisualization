@@ -24,7 +24,7 @@ struct Parameters {
 	double afactor;
 	double accretionDiskMaxRadius;
 	double blackholeMass, blackholeAccretion;
-	int accretionTemperatureLUTSize;
+	int accretionTemperatureLUTSize = 0;
 	int gridStartLevel, gridMaxLevel, gridMinLevel;
 	int gridNum = 1;
 
