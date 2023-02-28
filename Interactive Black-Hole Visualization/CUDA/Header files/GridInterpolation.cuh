@@ -32,8 +32,25 @@ __device__ float3 hermite(float aValue, float3 const& aX0, float3 const& aX1, fl
 __device__ float3 findPoint(const int i, const int j, const int GM, const int GN, const int g,
 	const int offver, const int offhor, const int gap, const float3* grid, int count);
 
+
+/// <summary>
+/// Uses hermite interpolation to find the celestial sky coordinates for the give camera coordinates
+/// </summary>
+/// <param name="i">i coordinate of camera coordinate</param>
+/// <param name="j">j coordinate of camera coordinate</param>
+/// <param name="gap">The gapsize at the non-interpolated celesetion sky grid</param>
+/// <param name="GM">Gridsize in j direction (horizontal)</param>
+/// <param name="GN">Gridsize in i direction (vertical)</param>
+/// <param name="percDown">decimal part of requested coordinate in i direction</param>
+/// <param name="percRight">decimal part of requested coordinate in j direction</param>
+/// <param name="g"></param>
+/// <param name="cornersCel">array of size 12 with first 4 points filled with (i,j) to (i+1,j+1)</param>
+/// <param name="grid">grid containing ray traced coordinates</param>
+/// <param name="count"></param>
+/// <param name="correct_pi">wheter the first 4 points needed to be corrected for phi = 2PI crossing </param>
+/// <returns></returns>
 __device__ float3 interpolateHermite(const int i, const int j, const int gap, const int GM, const int GN, const float percDown, const float percRight,
-	const int g, float3* cornersCel, const float3* grid, int count);
+	const int g, float3* cornersCel, const float3* grid, int count, bool no_phi_cross);
 
 __device__ float3 interpolateSpline(const int i, const int j, const int gap, const int GM, const int GN, const float thetaCam, const float phiCam, const int g,
 	float3* cornersCel, float* cornersCam, const float3* grid);

@@ -21,59 +21,6 @@ __global__ void makeGrid(const int g, const int GM, const int GN, const int GN1,
 	}
 }
 
-/// <summary>
-/// Checks and corrects phi values for 2-pi crossings.
-/// </summary>
-/// <param name="p">The phi values to check.</param>
-/// <param name="factor">The factor to check if a point is close to the border.</param>
-/// <returns></returns>
-__device__ bool piCheck(volatile float* p, float factor) {
-	float factor1 = PI2c * (1.f - factor);
-	bool check = false;
-#pragma unroll
-	for (int q = 0; q < 4; q++) {
-		if (p[q] > factor1) {
-			check = true;
-			break;
-		}
-	}
-	if (!check) return false;
-	check = false;
-	float factor2 = PI2c * factor;
-#pragma unroll
-	for (int q = 0; q < 4; q++) {
-		if (p[q] < factor2) {
-			p[q] += PI2c;
-			check = true;
-		}
-	}
-	return check;
-}
-
-__device__ bool piCheck(volatile float3* p, float factor) {
-	float factor1 = PI2c * (1.f - factor);
-	bool check = false;
-#pragma unroll
-	for (int q = 0; q < 4; q++) {
-		if (p[q].y > factor1) {
-			check = true;
-			break;
-		}
-	}
-	if (!check) return false;
-	check = false;
-	float factor2 = PI2c * factor;
-#pragma unroll
-	for (int q = 0; q < 4; q++) {
-		if (p[q].y < factor2) {
-			p[q].y += PI2c;
-			check = true;
-		}
-	}
-	return check;
-}
-
-
 
 __device__ void findBlock(const float theta, const float phi, const int g, const float3* grid,
 	const int GM, const int GN, int& i, int& j, int& gap, const int level) {
@@ -91,33 +38,6 @@ __device__ void findBlock(const float theta, const float phi, const int g, const
 			gap = ngap;
 		}
 	}
-}
-
-/// <summary>
-/// Checks and corrects phi values for 2-pi crossings.
-/// </summary>
-/// <param name="p">The phi values to check.</param>
-/// <param name="factor">The factor to check if a point is close to the border.</param>
-/// <returns></returns>
-__device__ bool piCheckTot(float3* tp, float factor, int size) {
-	float factor1 = PI2c * (1.f - factor);
-	bool check = false;
-	for (int q = 0; q < size; q++) {
-		if (tp[q].y > factor1) {
-			check = true;
-			break;
-		}
-	}
-	if (!check) return false;
-	check = false;
-	float factor2 = PI2c * factor;
-	for (int q = 0; q < size; q++) {
-		if (tp[q].y < factor2) {
-			tp[q].y += PI2c;
-			check = true;
-		}
-	}
-	return check;
 }
 
 // Set values for projected pixel corners & update phi values in case of 2pi crossing.
@@ -154,7 +74,12 @@ __device__ void retrievePixelCorners(const float3* thphi, float* t, float* p, in
 		p[3] = p[2];
 	}
 
-#pragma unroll
+	for (int q = 0; q < 4; q++) {
+		t[q] = fmod(t[q] + PI2, PI2);
+	}
+
+
+	#pragma unroll
 	for (int q = 0; q < 4; q++) {
 		if (t[q] < 0 || p[q] < 0 || t[q] < 0) {
 			ind = -1;
@@ -162,8 +87,10 @@ __device__ void retrievePixelCorners(const float3* thphi, float* t, float* p, in
 		}
 		p[q] = fmodf(p[q] + offset, PI2c);
 	}
-	// Check and correct for 2pi crossings.
-	picheck = piCheck(p, .2f);
+	//Move phi over 2pi border for easier enviroment map integration
+	piCheck(p, offset);
+
+	
 }
 
 
@@ -206,4 +133,33 @@ __device__ float3 hashLookup(int2 key, const float3* hashTable, const int2* hash
 
 	if (hashPosTag[hstart + hindex.x * hw + hindex.y].x != key.x || hashPosTag[hstart + hindex.x * hw + hindex.y].y != key.y) return{ -2.f, -2.f, -2.f };
 	else return hashTable[hstart + hindex.x * hw + hindex.y];
+}
+
+/// <summary>
+/// Checks and corrects phi values for 2-pi crossings.
+/// </summary>
+/// <param name="p">The phi values to check.</param>
+/// <param name="factor">The factor to check if a point is close to the border.</param>
+/// <returns></returns>
+__device__ bool piCheck(volatile float* p, float factor) {
+	float factor1 = PI2c * (1.f - factor);
+	bool check = false;
+#pragma unroll
+	for (int q = 0; q < 4; q++) {
+		if (p[q] > factor1) {
+			check = true;
+			break;
+		}
+	}
+	if (!check) return false;
+	check = false;
+	float factor2 = PI2c * factor;
+#pragma unroll
+	for (int q = 0; q < 4; q++) {
+		if (p[q] < factor2) {
+			p[q] += PI2c;
+			check = true;
+		}
+	}
+	return check;
 }

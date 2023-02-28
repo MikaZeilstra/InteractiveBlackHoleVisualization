@@ -12,7 +12,12 @@ inline __host__ __device__  float3 operator- (float3 a, float3 b) {
 
 inline __host__ __device__ float3 operator*(float b, float3 a)
 {
-	return make_float3(b * a.x, b * a.y, b * a.z);
+	return make_float3(b * (float) a.x, b * (float) a.y, b * (float) a.z);
+}
+
+inline __host__ __device__ float3 operator*(float b, uchar3 a)
+{
+	return make_float3(b * (float) a.x, b * (float) a.y, b * (float) a.z);
 }
 
 namespace vector_ops {

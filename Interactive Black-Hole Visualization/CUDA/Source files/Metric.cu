@@ -115,7 +115,7 @@ namespace metric {
 	/// <param name="cossq"></param>
 	/// <param name="sinsq"></param>
 	/// <returns></returns>
-	template <class T> __device__ __host__ __forceinline__ T calculate_gravitational_redshift(T r, T rsq, T Obs_Theta, T Pixel_Polar_R, T Pixel_Polar_Phi) {
+	template <class T> __device__ __host__ __forceinline__ T calculate_gravitational_redshift(T r, T rsq) {
 		return sqrt(- _gtt_theta_half_pi(r) - 2 * _gtphi_theta_half_pi(r) * _Omega(r) - _gphiphi_theta_half_pi(r, rsq) * sq(_Omega(r)));
 	};
 

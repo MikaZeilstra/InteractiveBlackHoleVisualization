@@ -35,8 +35,8 @@ namespace metric {
 	template <class T> __device__ __host__ __forceinline__ T _gtphi_theta_half_pi(T r);
 	template <class T> __device__ __host__ __forceinline__ T _gphiphi_theta_half_pi(T r,T rsq);
 	template <class T> __device__ __host__ __forceinline__ T _Omega(T r);
-	template <class T> __device__ __host__ __forceinline__ T calculate_gravitational_redshift(T r, T rsq, T Obs_Theta, T Pixel_Polar_R, T Pixel_Polar_Phi);
-	template __device__ __host__ __forceinline__ float calculate_gravitational_redshift<float>(float r, float rsq, float Obs_Theta, float Pixel_Polar_R, float Pixel_Polar_Phi);
+	template <class T> __device__ __host__ __forceinline__ T calculate_gravitational_redshift(T r, T rsq);
+	template __device__ __host__ __forceinline__ float calculate_gravitational_redshift<float>(float r, float rsq);
 
 	template <class T> __host__ void setMetricParameters(T afactor, T accretionRadius, bool useDisk);
 	template __host__ void setMetricParameters<double>(double afactor, double accretionRadius, bool useDisk);

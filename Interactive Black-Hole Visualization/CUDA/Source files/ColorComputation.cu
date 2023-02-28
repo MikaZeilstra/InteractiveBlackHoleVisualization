@@ -3,11 +3,11 @@
 __global__ void findArea(const float3* thphi, const int M, const int N, float* area) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
+	int ind = i * M1 + j;
 	if (i < N && j < M) {
 		bool picheck = false;
 		float t[4];
 		float p[4];
-		int ind = i * M1 + j;
 		retrievePixelCorners(thphi, t, p, ind, M, picheck, 0.0f);
 		float th1[3] = { t[0], t[1], t[2] };
 		float ph1[3] = { p[0], p[1], p[2] };

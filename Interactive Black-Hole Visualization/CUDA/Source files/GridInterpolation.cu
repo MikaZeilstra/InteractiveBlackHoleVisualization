@@ -204,18 +204,13 @@ __device__ void interpolate(float t0, float t1, float t2, float t3, float p0, fl
 /// <returns></returns>
 __device__ float3 interpolateNeirestNeighbour(float percDown, float percRight, float3* cornersCel) {
 	float3 corners[4] = { cornersCel[0], cornersCel[1], cornersCel[2], cornersCel[3] };
-	
-
-	piCheck(corners, 0.2);
 	return corners[(int)(2 * roundf(percDown) + roundf(percRight))];
-	return (1 - percRight) * ((1 - percDown) * corners[0] + percDown * corners[2]) + percRight * ((1 - percDown) * corners[1] + percDown * corners[3]);
 }
 
 __device__ float3 interpolateLinear(int i, int j, float percDown, float percRight, float3* cornersCel) {
 	float3 corners[4] = { cornersCel[0], cornersCel[1], cornersCel[2], cornersCel[3]};
 
 
-	piCheck(corners, 0.2);	
 
 	return (1-percRight) * ((1 - percDown) * corners[0] + percDown * corners[2]) + percRight * ((1 - percDown) * corners[1] + percDown * corners[3]);
 }
@@ -287,12 +282,10 @@ __device__ float3 findPoint(const int i, const int j, const int GM, const int GN
 			if (ijprev.x > -2 && ijnext.x > -2) {
 				float3 pt[4] = { ijprev, ij0, ij2, ijnext };
 				if (pt[0].x != -1 && pt[3].x != -1) {
-					piCheckTot(pt, 0.2f, 4);
 					return hermite(0.5f, pt[0], pt[1], pt[2], pt[3], 0.f, 0.f);
 				}
 			}
 			float3 pt[2] = { ij2, ij0 };
-			piCheckTot(pt, 0.2f, 2);
 			return{ .5f * (pt[0].x + pt[1].x), .5f * (pt[0].y + pt[1].y) };
 		}
 		else {
@@ -309,17 +302,34 @@ __device__ float3 findPoint(const int i, const int j, const int GM, const int GN
 			cornersCel2[2] = grid[GM * GN * g + (i - gap) * GM + j1];
 			cornersCel2[3] = grid[GM * GN * g + (i + gap) * GM + j1];
 
+			bool no_phi_cross = true;
+			float3 r_check = cornersCel2[0];
 			for (int q = 0; q < 4; q++) {
+				no_phi_cross &= fabsf(r_check.y - cornersCel2[q].y) < PI;
 				if (cornersCel2[q].x == -1 || cornersCel2[q].x == -2) return { -1, -1 };
 			}
-			return interpolateHermite(i - gap, j1, 2 * gap, GM, GN, .5f, .5f, g, cornersCel2, grid, 1);
+
+
+			//Correct the values such that they are correctly increasing and we can simply interpolate
+			if (!no_phi_cross) {
+				for (int q = 0; q < 4; q++) {
+					if (cornersCel2[q].y < PI) {
+						cornersCel2[q].y += PI2;
+					}
+				}
+			}
+
+
+			float3 interpolated = interpolateHermite(i - gap, j1, 2 * gap, GM, GN, .5f, .5f, g, cornersCel2, grid, 1, no_phi_cross);
+			metric::wrapToPi(interpolated.x, interpolated.y);
+			return interpolated;
 		}
 	}
 	return gridpt;
 }
 
 __device__ float3 interpolateHermite(const int i, const int j, const int gap, const int GM, const int GN, const float percDown, const float percRight,
-	const int g, float3* cornersCel, const float3* grid, int count) {
+	const int g, float3* cornersCel, const float3* grid, int count,bool no_phi_cross) {
 
 	int k = i + gap;
 	int l = (j + gap) % GM;
@@ -354,17 +364,26 @@ __device__ float3 interpolateHermite(const int i, const int j, const int gap, co
 	
 	//If any of the extra points are in the black hole return a linear interpolation (we know the inner points are correct)
 	//Or if the r coordinate differs too much meaning they are on different disk sections or in the background
-	float check_r = cornersCel[0].z;
+	//Or if they cross the phi = 2pi barrier
+	float3 check = cornersCel[0];
 	for (int q = 4; q < 12; q++) {
-		if (isnan(cornersCel[q].x) || fabsf(check_r - cornersCel[q].z) > R_CHANGE_THRESHOLD) return interpolateLinear(i, j, percDown, percRight, cornersCel);
+		if (isnan(cornersCel[q].x) || fabsf(check.z - cornersCel[q].z) > R_CHANGE_THRESHOLD) return interpolateLinear(i, j, percDown, percRight, cornersCel);
+		no_phi_cross &= fabsf(check.y - cornersCel[q].y) < PI;
 	}
 
-	piCheckTot(cornersCel, 0.2f, 12);
+	if (!no_phi_cross) {
+		for (int q = 0; q < 12; q++) {
+			if (cornersCel[q].y < PI) {
+				cornersCel[q].y += PI2;
+			}
+		}
+	}
 
 	float3 interpolateUp = hermite(percRight, cornersCel[4], cornersCel[0], cornersCel[1], cornersCel[5], 0.f, 0.f);
 	float3 interpolateDown = hermite(percRight, cornersCel[6], cornersCel[2], cornersCel[3], cornersCel[7], 0.f, 0.f);
 	float3 interpolateUpUp = cornersCel[8] + percRight * (cornersCel[9] - cornersCel[8]);
 	float3 interpolateDownDown = cornersCel[10] + percRight * (cornersCel[11] - cornersCel[10]);
+	
 	//HERMITE FINITE
 	return hermite(percDown, interpolateUpUp, interpolateUp, interpolateDown, interpolateDownDown, 0.f, 0.f);
 }
@@ -381,14 +400,33 @@ __device__ float3 interpolateSpline(const int i, const int j, const int gap, con
 	float percDown = (thetaCam - thetaUp) / (thetaDown - thetaUp);
 	float percRight = (phiCam - phiLeft) / (phiRight - phiLeft);
 
-	float r_check = cornersCel[0].z;
+
+	//If any of the extra points are in the black hole return a linear interpolation (we know the inner points are correct)
+	//Or if the r coordinate differs too much meaning they are on different disk sections or in the background
+	//If the phi = 2PI border is crossed mark that we need to correct 2 pi
+	float3 r_check = cornersCel[0];
+	bool no_phi_cross = true;
 	for (int q = 0; q < 4; q++) {
 		if (isnan(cornersCel[q].x)) return{ -1.f,-1.f,-1.f };
-		if (fabsf(cornersCel[q].z - r_check) > INFINITY_CHECK) return interpolateNeirestNeighbour(percDown, percRight, cornersCel);
+		if (fabsf(cornersCel[q].z - r_check.z) > R_CHANGE_THRESHOLD) return interpolateNeirestNeighbour(percDown, percRight, cornersCel);
+		no_phi_cross &= fabsf(r_check.y - cornersCel[q].y) < PI;
+	}
+
+
+	//Correct the values such that they are correctly increasing and we can simply interpolate
+	if (!no_phi_cross) {
+		for (int q = 0; q < 4; q++) {
+			if (cornersCel[q].y < PI) {
+				cornersCel[q].y += PI2;
+			}
+		}
 	}
 
 	
+	float3 interpolated = interpolateHermite(i, j, gap, GM, GN, percDown, percRight, g, cornersCel, grid, 0, no_phi_cross);
+	
+	metric::wrapToPi(interpolated.x, interpolated.y);
 
-	return interpolateHermite(i, j, gap, GM, GN, percDown, percRight, g, cornersCel, grid, 0);
+	return interpolated;
 	//return interpolateLinear(i, j, percDown, percRight, cornersCel);
 }

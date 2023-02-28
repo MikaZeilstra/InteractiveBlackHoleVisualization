@@ -84,6 +84,7 @@ double* theta_device;
 double* phi_device;
 
 double* temperatureLUT_device;
+float3* dev_accretionDiskTexture = 0;
 
 cudaError_t CUDA::cleanup() {
 	cudaFree(dev_hashTable);
@@ -132,6 +133,7 @@ cudaError_t CUDA::cleanup() {
 	cudaFree(phi_device);
 
 	cudaFree(temperatureLUT_device);
+	cudaFree(dev_accretionDiskTexture);
 
 	cudaStreamDestroy(stream);
 
@@ -174,7 +176,7 @@ void CUDA::init() {
 }
 
 
-void CUDA::call(std::vector<Grid>& grids_, std::vector<Camera>& cameras_, StarProcessor& stars_, Viewer& view, CelestialSkyProcessor& celestialsky, Parameters& param) {
+void CUDA::call(std::vector<Grid>& grids_, std::vector<Camera>& cameras_, StarProcessor& stars_, Viewer& view, CelestialSkyProcessor& celestialsky, Texture& accretionTexture, Parameters& param) {
 	std::cout << "Preparing CUDA parameters..." << std::endl;
 
 	CelestialSky celestSky(celestialsky);
@@ -184,8 +186,8 @@ void CUDA::call(std::vector<Grid>& grids_, std::vector<Camera>& cameras_, StarPr
 	StarVis starvis(stars, image, param);
 	BlackHoleProc bhproc(1000);
 
-	memoryAllocationAndCopy(grids, image, celestSky, stars, bhproc, starvis,param);
-	runKernels(grids, image, celestSky, stars, bhproc, starvis, param);
+	memoryAllocationAndCopy(grids, image, celestSky, stars, bhproc, starvis, accretionTexture,param);
+	runKernels(grids, image, celestSky, stars, bhproc, starvis, accretionTexture, param);
 }
 
 void CUDA::allocateGridMemory(size_t size) {
@@ -226,7 +228,7 @@ template <class T> void CUDA::integrateGrid(const T rV, const T thetaV, const T 
 }
 
 void CUDA::memoryAllocationAndCopy(const Grids& grids, const Image& image, const CelestialSky& celestialSky,
-	const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis, const Parameters& param) {
+	const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis,const Texture accretionTexture, const Parameters& param) {
 
 	std::cout << "Allocating CUDA memory..." << std::endl;
 
@@ -290,7 +292,7 @@ void CUDA::memoryAllocationAndCopy(const Grids& grids, const Image& image, const
 	allocate(dev_gradient, rastSize * sizeof(float2), "gradient");
 
 	allocate(temperatureLUT_device, param.accretionTemperatureLUTSize * sizeof(double),"temperature table");
-
+	allocate(dev_accretionDiskTexture, accretionTexture.width * accretionTexture.height * sizeof(float3), "AccretionTexture");
 
 	std::cout << "Copying variables into CUDA memory..." << std::endl;
 
@@ -305,6 +307,7 @@ void CUDA::memoryAllocationAndCopy(const Grids& grids, const Image& image, const
 	copyHostToDevice(dev_diffraction, starvis.diffraction, starvis.diffSize * starvis.diffSize * sizeof(uchar3), "diffraction");
 
 	copyHostToDevice(dev_summedCelestialSky, celestialSky.summedCelestialSky, celestSize * sizeof(float4), "summedCelestialSky");
+	copyHostToDevice(dev_accretionDiskTexture, accretionTexture.summed.data(), accretionTexture.height * accretionTexture.width * sizeof(float3), "accretionTexture");
 
 	checkCudaErrors();
 
@@ -321,7 +324,7 @@ float ver = 0.0f;
 //bool lensingOn = true;
 
 void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky& celestialSky,
-	const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis, const Parameters& param) {
+	const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis, const Texture& accretionDiskTexture,  const Parameters& param) {
 	bool star = param.useStars;
 
 	std::vector<float> cameraUsed(7);
@@ -480,13 +483,20 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 		std::cout << std::endl;
 
 		if (param.useAccretionDisk) {
-			callKernel("Calculate temperature LUT", createTemperatureTable, numBlocks_tempLUT, threadsPerBlock_32,
-				param.accretionTemperatureLUTSize, temperatureLUT_device, (param.accretionDiskMaxRadius - 3) / (param.accretionTemperatureLUTSize-1), param.blackholeMass, param.blackholeAccretion);
-			checkCudaErrors();
+			if (!param.useAccretionDiskTexture) {
+				callKernel("Calculate temperature LUT", createTemperatureTable, numBlocks_tempLUT, threadsPerBlock_32,
+					param.accretionTemperatureLUTSize, temperatureLUT_device, (param.accretionDiskMaxRadius - 3) / (param.accretionTemperatureLUTSize - 1), param.blackholeMass, param.blackholeAccretion);
+				checkCudaErrors();
 
-			callKernel("Add accretion Disk", addAccretionDisk, numBlocks_N_M_4_4, threadsPerBlock4_4,
-				dev_interpolatedGrid, dev_outputImage, temperatureLUT_device,(param.accretionDiskMaxRadius/param.accretionTemperatureLUTSize), param.accretionTemperatureLUTSize, dev_blackHoleMask, image.M, image.N);
-			checkCudaErrors();
+				callKernel("Add accretion Disk", addAccretionDisk, numBlocks_N_M_4_4, threadsPerBlock4_4,
+					dev_interpolatedGrid, dev_outputImage, temperatureLUT_device, (param.accretionDiskMaxRadius / param.accretionTemperatureLUTSize), param.accretionTemperatureLUTSize, dev_blackHoleMask, image.M, image.N);
+				checkCudaErrors();
+			}
+			else {
+				callKernel("Add accretion Disk Texture", addAccretionDiskTexture, numBlocks_N_M_4_4, threadsPerBlock4_4,
+					dev_interpolatedGrid, image.M, dev_blackHoleMask, dev_outputImage, dev_accretionDiskTexture, param.accretionDiskMaxRadius, accretionDiskTexture.width, accretionDiskTexture.height
+				)
+			}
 		}
 
 		checkCudaErrors();

@@ -12,7 +12,7 @@ struct Parameters {
 	cv::Point2i viewOffset;
 	int nrOfFrames;
 
-	std::string celestialSkyImg, starCatalogue, diffractionImg;
+	std::string celestialSkyImg, starCatalogue, diffractionImg, accretionDiskTexture;
 	int starTreeLevel, starMagnitudeCut;
 	double br, bphi, btheta;
 	bool userSpeed;
@@ -25,6 +25,7 @@ struct Parameters {
 	double accretionDiskMaxRadius;
 	double blackholeMass, blackholeAccretion;
 	int accretionTemperatureLUTSize = 0;
+	bool useAccretionDiskTexture = false;
 	int gridStartLevel, gridMaxLevel, gridMinLevel;
 	int gridNum = 1;
 
@@ -38,6 +39,10 @@ struct Parameters {
 
 	std::string getStarFolder() const {
 		return getResourceFolder() + "Stars/";
+	}
+
+	std::string getAccretionDiskTextureFolder() const {
+		return getResourceFolder() + "AccretionDiskTexture/";
 	}
 
 	std::string getCelestialSkyFolder() const {
@@ -223,6 +228,12 @@ struct Parameters {
 
 			useAccretionDisk = config.lookup("useAccretionDisk");
 			if (useAccretionDisk) {
+				useAccretionDiskTexture = config.lookup("useAccretionDiskTexture");
+				if (useAccretionDiskTexture) {
+					std::string str = config.lookup("accretionDiskTexture");
+					accretionDiskTexture = str;
+				}
+
 				accretionDiskMaxRadius = config.lookup("accretionDiskRadius");
 				accretionTemperatureLUTSize = config.lookup("temperatureLUTSize");
 				blackholeMass = config.lookup("blackholeMass");

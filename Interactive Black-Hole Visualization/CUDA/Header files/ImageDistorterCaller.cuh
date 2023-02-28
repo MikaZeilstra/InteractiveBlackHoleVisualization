@@ -24,6 +24,8 @@
 #include "../../C++/Header files/Camera.h"
 #include "../../C++/Header files/Viewer.h"
 
+#include "../../CUDA/Header files/vector_operations.cuh"
+
 #ifndef CUDA_FUNCTIONS
 #define CUDA_FUNCTIONS
 
@@ -77,6 +79,47 @@ namespace CUDA {
 		mutable std::vector<uchar4> result;
 		// Image and frame parameters
 		std::vector<int> compressionParams;
+
+	};
+
+	struct Texture {
+		cv::Mat texture;
+		int width;
+		int height;
+		std::vector<float3> summed;
+
+		Texture() {
+			width = 0;
+			height = 0;
+		};
+
+		Texture(cv::Mat texture_, int width_, int height_) {
+			texture = texture_;
+			width = width_;
+			height = height_;
+
+			uchar3* texture_pointer = reinterpret_cast<uchar3*>(texture.data);
+
+
+			summed = std::vector<float3>(width * height);
+			summed[0] = (1/255.f) * texture_pointer[0] ;
+
+
+			for (int i = 1; i < width; i++) {
+				summed[i * height] = summed[(i - 1) * height] + (1 / 255.f) * texture_pointer[i];
+			}
+
+			for (int i = 1; i < height; i++) {
+				summed[i] = summed[i - 1] + (1 / 255.f) * texture_pointer[i * width];
+			}
+
+			for (int x = 1; x < width; x++) {
+				for (int y = 1; y < height; y++) {
+					summed[x * height+ y] = summed[(x) * height + (y-1)] + summed[(x-1)*height + (y)] + (1 / 255.f) * texture_pointer[y * width + x] - summed[(x-1)*height + (y - 1)];
+				}
+			}
+		};
+
 
 	};
 
@@ -159,17 +202,17 @@ namespace CUDA {
 
 	void init();
 
-	void call(std::vector<Grid>& grids, std::vector<Camera>& cameras, StarProcessor& stars, Viewer& view, CelestialSkyProcessor& celestialSky, Parameters& param);
+	void call(std::vector<Grid>& grids, std::vector<Camera>& cameras, StarProcessor& stars, Viewer& view, CelestialSkyProcessor& celestialSky, Texture& accretionTexture, Parameters& param);
 
 	//unsigned char* getDiffractionImage(const int size);
 	void allocateGridMemory(size_t size);
 
 
 	void memoryAllocationAndCopy(const Grids& grids, const Image& image, const CelestialSky& celestialSky,
-		const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis, const Parameters& param);
+		const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis,const Texture accretionTexture, const Parameters& param);
 
 	void runKernels(const Grids& grids, const Image& image, const CelestialSky& celestialSky,
-		const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis, const Parameters& param);
+		const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis, const Texture& accretionDiskTexture, const Parameters& param);
 
 	template <class T> void integrateGrid(const T rV, const T thetaV, const T phiV, std::vector <T>& pRV,
 		std::vector <T>& bV, std::vector <T>& qV, std::vector <T>& pThetaV);

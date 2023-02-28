@@ -118,6 +118,8 @@ int main()
 
 		std::cout << "Initialized Camera at Radius " << camRad;
 		std::cout << " and Inclination " << camInc / PI << "pi" << std::endl;
+		
+
 
 		/* ------------------ GRID LOADING / COMPUTATION ------------------ */
 		#pragma region loading grid from file or computing new grid
@@ -143,6 +145,17 @@ int main()
 	}
 	std::cout << "Initialized all grids" << std::endl << std::endl;
 	
+	CUDA::Texture accretionTexture = {};
+
+	/* ------------------- ACCRETION DISK TEXTURE --------------------- */
+	if (param.useAccretionDiskTexture) {
+
+		cv::Mat accretionTextureMat = cv::imread(param.getAccretionDiskTextureFolder() + param.accretionDiskTexture);
+
+		accretionTexture = { accretionTextureMat ,accretionTextureMat.cols, accretionTextureMat.rows };
+	}
+
+
 	/* -------------------- INITIALIZATION STARS ---------------------- */
 
 
@@ -186,6 +199,6 @@ int main()
 
 	/* ----------------------- CALL CUDA ----------------------- */
 	//Distorter spacetime(&grids, &view, &starProcessor, &cams, &celestialProcessor);
-	CUDA::call(grids, cams, starProcessor, view, celestialSkyProcessor, param);
+	CUDA::call(grids, cams, starProcessor, view, celestialSkyProcessor, accretionTexture, param);
 
 }

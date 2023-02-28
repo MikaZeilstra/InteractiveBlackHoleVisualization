@@ -37,19 +37,6 @@ public:
 		else {
 			std::cout << "Could not open image " << param.celestialSkyImg << std::endl;
 			exit(1);
-			//celestialSky = 
-			//rows = celestialSky.rows;
-			//cols = celestialSky.cols;
-
-			//std::cout << "Computing summed celestial sky image..." << std::endl;
-			//summedImageVec.resize(4 * rows * cols);
-			//createSummedImage();
-
-			//std::cout << "Writing summed celestial sky image..." << std::endl;
-			//std::vector<int> compressionParams = { cv::IMWRITE_PNG_COMPRESSION, 0 };
-			//cv::Mat temp = cv::Mat(rows, cols, CV_32FC4, (void*)&summedImageVec[0]);
-
-			//cv::imwrite(searchSummed, temp);// , compressionParams);
 		}
 
 	}

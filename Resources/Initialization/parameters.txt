@@ -24,11 +24,14 @@ temperatureLUTSize = 500
 blackholeMass = 3.5e9 //Mass of the black hole in solar masses
 blackholeAccretionRate = 0.1 //The accretion rate of the black hole in solar masses per year
 
+useAccretionDiskTexture = true
+accretionDiskTexture = "rainbow.png"
+
 //Option to save the geodesics used to generate the image
 saveGeodesics = false
 
 // Image location.
-celestialSkyImg = "rainbow.png"
+celestialSkyImg = "black.png"
 // Star file location.
 starCatalogue = "sterren.txt"
 // Star binary tree depth
@@ -40,7 +43,7 @@ diffractionImg = "0s1.png"
 
 // Grid Settings
 gridStartLevel = 1
-gridMinLevel = 6
+gridMinLevel = 7
 gridMaxLevel = 10
 
 // Blackhole angular velocity
