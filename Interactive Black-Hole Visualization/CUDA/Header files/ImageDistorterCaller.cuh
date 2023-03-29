@@ -23,8 +23,10 @@
 #include "../../C++/Header files/StarProcessor.h"
 #include "../../C++/Header files/Camera.h"
 #include "../../C++/Header files/Viewer.h"
+#include "../../C++/Header files/ViewCamera.h"
 
 #include "../../CUDA/Header files/vector_operations.cuh"
+
 
 #ifndef CUDA_FUNCTIONS
 #define CUDA_FUNCTIONS
@@ -70,13 +72,13 @@ namespace CUDA {
 			viewer = (float2*)&(view.viewMatrix[0]);
 			compressionParams.push_back(cv::IMWRITE_PNG_COMPRESSION);
 			compressionParams.push_back(0);
-			result.resize(N * M);
+			result.resize(N * M* 4);
 		}
 		int M;
 		int N;
 		float viewAngle;
 		float2* viewer;
-		mutable std::vector<uchar4> result;
+		mutable std::vector<uchar> result;
 		// Image and frame parameters
 		std::vector<int> compressionParams;
 
@@ -131,10 +133,10 @@ namespace CUDA {
 			for (int g = 0; g < G; g++) {
 				grid_vectors.push_back(grids[g].grid_vector);
 			}
-			camParams.resize(7 * G);
+			camParams.resize(10 * G);
 			for (int g = 0; g < G; g++) {
 				std::vector<float> camParamsG = cameras[g].getParamArray();
-				for (int cp = 0; cp < 7; cp++) camParams[g * 7 + cp] = camParamsG[cp];
+				for (int cp = 0; cp < 10; cp++) camParams[g * 10 + cp] = camParamsG[cp];
 			}
 			gridStart = cameras[0].r;
 			gridStep = (cameras[G - 1].r - gridStart) / (1.f * G - 1.f);
@@ -146,7 +148,7 @@ namespace CUDA {
 
 		}
 		std::vector<float> camParams;
-		std::vector<std::vector<float3>>grid_vectors;
+		std::vector<std::vector<float4>>grid_vectors;
 		int GM;
 		int GN;
 		int GN1;
@@ -218,6 +220,11 @@ namespace CUDA {
 		std::vector <T>& bV, std::vector <T>& qV, std::vector <T>& pThetaV);
 	template void integrateGrid<double>(const double rV, const double thetaV, const double phiV, std::vector <double>& pRV,
 		std::vector <double>& bV, std::vector <double>& qV, std::vector <double>& pThetaV);
+
+	ViewCamera* glfw_setup(int screen_width, int screen_height);
+
+	std::string readFile(const char* filePath);
+
 }
 
 #endif // !CUDA_FUNCTIONS

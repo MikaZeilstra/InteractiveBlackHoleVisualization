@@ -161,13 +161,13 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Libraries\cereal-1.3.2\include;$(SolutionDir)Libraries\freeglut\include;$(SolutionDir)Libraries\opencv\build\include;$(SolutionDir)Libraries\libconfig-1.7.3\lib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Libraries\cereal-1.3.2\include;$(SolutionDir)Libraries\opencv\build\include;$(SolutionDir)Libraries\libconfig-1.7.3\lib;$(SolutionDir)Libraries\GLFW;$(SolutionDir)Libraries\GLAD;$(SolutionDir)Libraries\KHR;C:\Users\Mika\source\repos\InteractiveBlackHoleVisualization\Libraries\STBI_image;$(SolutionDir)Libraries\glm;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)Libraries\libconfig-1.7.3\build\x64\;$(SolutionDir)Libraries\opencv\build\x64\vc15\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>libconfigd.lib;libconfig++d.lib;opencv_world460d.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)Libraries\libconfig-1.7.3\build\x64\;$(SolutionDir)Libraries\opencv\build\x64\vc15\lib;$(SolutionDir)Libraries\GLFW;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>libconfigd.lib;libconfig++d.lib;opencv_world460d.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <CudaCompile>
       <CodeGeneration>compute_50,sm_50</CodeGeneration>
@@ -183,15 +183,15 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)Libraries\cereal-1.3.2\include;$(SolutionDir)Libraries\freeglut\include;$(SolutionDir)Libraries\opencv\build\include;$(SolutionDir)Libraries\libconfig-1.7.3\lib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Libraries\cereal-1.3.2\include;$(SolutionDir)Libraries\opencv\build\include;$(SolutionDir)Libraries\libconfig-1.7.3\lib;$(SolutionDir)Libraries\GLFW;$(SolutionDir)Libraries\GLAD;$(SolutionDir)Libraries\KHR;C:\Users\Mika\source\repos\InteractiveBlackHoleVisualization\Libraries\STBI_image;$(SolutionDir)Libraries\glm;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)Libraries\libconfig-1.7.3\build\x64\;$(SolutionDir)Libraries\opencv\build\x64\vc15\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>libconfig.lib;libconfig++.lib;opencv_world460.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)Libraries\libconfig-1.7.3\build\x64\;$(SolutionDir)Libraries\opencv\build\x64\vc15\lib;$(SolutionDir)Libraries\GLFW;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>libconfig.lib;libconfig++.lib;opencv_world460.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <CudaCompile>
       <CodeGeneration>compute_50,sm_50</CodeGeneration>
@@ -208,14 +208,14 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)Libraries\cereal-1.3.2\include;$(SolutionDir)Libraries\freeglut\include;$(SolutionDir)Libraries\opencv\build\include;$(SolutionDir)Libraries\libconfig-1.7.3\lib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Libraries\cereal-1.3.2\include;$(SolutionDir)Libraries\opencv\build\include;$(SolutionDir)Libraries\libconfig-1.7.3\lib;$(SolutionDir)Libraries\GLFW;$(SolutionDir)Libraries\GLAD;$(SolutionDir)Libraries\KHR;C:\Users\Mika\source\repos\InteractiveBlackHoleVisualization\Libraries\STBI_image;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)Libraries\libconfig-1.7.3\build\x64\;$(SolutionDir)Libraries\opencv\build\x64\vc15\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)Libraries\libconfig-1.7.3\build\x64\;$(SolutionDir)Libraries\opencv\build\x64\vc15\lib;$(SolutionDir)Libraries\GLFW;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>libconfig.lib;libconfig++.lib;opencv_world460.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <CudaCompile>
@@ -236,6 +236,7 @@
     <ClInclude Include="C++\Header files\IntegrationDefines.h" />
     <ClInclude Include="C++\Header files\Parameters.h" />
     <ClInclude Include="C++\Header files\StarProcessor.h" />
+    <ClInclude Include="C++\Header files\ViewCamera.h" />
     <ClInclude Include="C++\Header files\Viewer.h" />
     <ClInclude Include="CUDA\Header files\AccretionDiskColorComputation.cuh" />
     <ClInclude Include="CUDA\Header files\ColorComputation.cuh" />
@@ -252,8 +253,10 @@
     <ClInclude Include="CUDA\Header files\vector_operations.cuh" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\Libraries\GLAD\glad.c" />
     <ClCompile Include="C++\Source files\Grid.cpp" />
     <ClCompile Include="C++\Source files\Source.cpp" />
+    <ClCompile Include="C++\Source files\ViewCamera.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="CUDA\Source files\AccretionDiskColorComputation.cu" />
@@ -265,6 +268,10 @@
     <CudaCompile Include="CUDA\Source files\Metric.cu" />
     <CudaCompile Include="CUDA\Source files\ShadowComputation.cu" />
     <CudaCompile Include="CUDA\Source files\StarDeformation.cu" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\Resources\Shaders\FragmentShader.frag" />
+    <None Include="..\Resources\Shaders\VertexShader.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

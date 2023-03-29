@@ -65,7 +65,7 @@ public:
 	};
 
 	std::vector<float> getParamArray() {
-		std::vector<float> camera(7);
+		std::vector<float> camera(10);
 		camera[0] = speed;
 		camera[1] = alpha;
 		camera[2] = w;
@@ -73,6 +73,9 @@ public:
 		camera[4] = br;
 		camera[5] = btheta;
 		camera[6] = bphi;
+		camera[7] = theta;
+		camera[8] = phi;
+		camera[9] = r;
 
 		return camera;
 	};

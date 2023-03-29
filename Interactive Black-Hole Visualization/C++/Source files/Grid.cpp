@@ -18,6 +18,7 @@
 #include "../../CUDA/Header files/Metric.cuh"
 #include "../../CUDA/Header files/ImageDistorterCaller.cuh"
 #include "../../CUDA/Header files/Constants.cuh"
+#include "../../CUDA/Header files/Vector_operations.cuh"
 
 #define PRECCELEST 0.015
 #define ERROR 0.001//1e-6
@@ -28,7 +29,7 @@
 
 
 
-bool Grid::check2PIcross(const std::vector<cv::Point3d>& spl, float factor) {
+bool Grid::check2PIcross(const std::vector<float4>& spl, float factor) {
 	for (int i = 0; i < spl.size(); i++) {
 		if (spl[i]_phi > PI2 * (1. - 1. / factor))
 			return true;
@@ -36,7 +37,7 @@ bool Grid::check2PIcross(const std::vector<cv::Point3d>& spl, float factor) {
 	return false;
 };
 
-bool Grid::correct2PIcross(std::vector<cv::Point3d>& spl, float factor) {
+bool Grid::correct2PIcross(std::vector<float4>& spl, float factor) {
 		bool check = false;
 		for (int i = 0; i < spl.size(); i++) {
 			if (spl[i]_phi < PI2 * (1. / factor)) {
@@ -137,7 +138,7 @@ void Grid::checkAdjacentBlock(uint64_t ij, uint64_t ij2, int level, int udlr, in
 
 		bool succes = false;
 		if (find(ijprev) && find(ijnext)) {
-			std::vector<cv::Point3d> check = { CamToCel[ijprev], CamToCel[ij], CamToCel[ij2], CamToCel[ijnext] };
+			std::vector<float4> check = { CamToCel[ijprev], CamToCel[ij], CamToCel[ij2], CamToCel[ijnext] };
 			if (CamToCel[ijprev].x != -1 && CamToCel[ijnext].x != -1
 				&& abs(CamToCel[ijprev].z- CamToCel[ij].z) < R_CHANGE_THRESHOLD
 				&& abs(CamToCel[ijnext].z - CamToCel[ij2].z) < R_CHANGE_THRESHOLD) {
@@ -148,7 +149,7 @@ void Grid::checkAdjacentBlock(uint64_t ij, uint64_t ij2, int level, int udlr, in
 			}
 		}
 		if (!succes) {
-			std::vector<cv::Point3d> check = { CamToCel[ij], CamToCel[ij2] };
+			std::vector<float4> check = { CamToCel[ij], CamToCel[ij2] };
 			if (check2PIcross(check, 5.)) correct2PIcross(check, 5.);
 			CamToCel[i_j] = 1. / 2. * (check[1] + check[0]);
 		}
@@ -162,7 +163,7 @@ bool Grid::find(uint64_t ij) {
 	return CamToCel.find(ij) != CamToCel.end();
 }
 
-cv::Point3d const Grid::hermite(double aValue, cv::Point3d const& aX0, cv::Point3d const& aX1, cv::Point3d const& aX2, cv::Point3d const& aX3, double aTension, double aBias) {
+float4 const Grid::hermite(double aValue, float4 const& aX0, float4 const& aX1, float4 const& aX2, float4 const& aX3, double aTension, double aBias) {
 	/* Source:
 	* http://paulbourke.net/miscellaneous/interpolation/
 	*/
@@ -174,8 +175,8 @@ cv::Point3d const Grid::hermite(double aValue, cv::Point3d const& aX0, cv::Point
 	double const aa = (double(1) + aBias) * (double(1) - aTension) / double(2);
 	double const bb = (double(1) - aBias) * (double(1) - aTension) / double(2);
 
-	cv::Point3d const m0 = aa * (aX1 - aX0) + bb * (aX2 - aX1);
-	cv::Point3d const m1 = aa * (aX2 - aX1) + bb * (aX3 - aX2);
+	float4 const m0 = aa * (aX1 - aX0) + bb * (aX2 - aX1);
+	float4 const m1 = aa * (aX2 - aX1) + bb * (aX3 - aX2);
 
 	double const u0 = double(2) * v3 - double(3) * v2 + double(1);
 	double const u1 = v3 - double(2) * v2 + v;
@@ -327,9 +328,9 @@ void Grid::integrateFirst(const int gap) {
 /// <param name="thetavals">The computed theta values (celestial sky).</param>
 /// <param name="phivals">The computed phi values (celestial sky).</param>
 void Grid::fillGridCam(const std::vector<uint64_t>& ijvals, const size_t s, std::vector<double>& thetavals,
-	std::vector<double>& phivals, std::vector<double>& r, std::vector<int>& step) {
+	std::vector<double>& phivals, std::vector<double>& r,std::vector<double>& distance_to_point, std::vector<int>& step) {
 	for (int k = 0; k < s; k++) {
-		CamToCel[ijvals[k]] = cv::Point3d(thetavals[k], phivals[k],r[k]);
+		CamToCel[ijvals[k]] = make_float4(thetavals[k], phivals[k],r[k], distance_to_point[k]);
 		uint64_t ij = ijvals[k];
 		steps[i_32 * M + j_32] = step[k];
 	}
@@ -362,7 +363,7 @@ std::vector<T> Grid::apply_permutation(
 /// <param name="ijvec">The ijvec.</param>
 void Grid::integrateCameraCoordinates(std::vector<uint64_t>& ijvec) {
 	size_t s = ijvec.size();
-	std::vector<double> theta(s), phi(s), r(s);
+	std::vector<double> theta(s), phi(s), r(s), distances(s);
 
 	std::vector<int> step(s);
 	for (int q = 0; q < s; q++) {
@@ -371,7 +372,7 @@ void Grid::integrateCameraCoordinates(std::vector<uint64_t>& ijvec) {
 		int j = j_32;
 		j = j % M;
 		
-
+	
 		theta[q] = (double)i_32 / (N - 1) * PI / (2 - equafactor);
 		phi[q] = (double)j_32 / M * PI2;
 		
@@ -380,8 +381,8 @@ void Grid::integrateCameraCoordinates(std::vector<uint64_t>& ijvec) {
 	
 
 	auto start_time = std::chrono::high_resolution_clock::now();
-	integration_wrapper(theta, phi,r, s, step);
-	fillGridCam(ijvec, s, theta, phi, r, step);
+	integration_wrapper(theta, phi,r, distances, s, step);
+	fillGridCam(ijvec, s, theta, phi, r,distances, step);
 	auto end_time = std::chrono::high_resolution_clock::now();
 	//int count = 0;
 	//for (int q = 0; q < s; q++) if (step[q] != 0) count++;
@@ -403,15 +404,15 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 	if (level < param->gridMinLevel) return true;
 
 	//Check if the points are well alligned
-	cv::Point3d topLeft = CamToCel[i_j];
-	cv::Point3d topRight = CamToCel[k_j];
-	cv::Point3d bottomLeft = CamToCel[i_l];
-	cv::Point3d bottomRight = CamToCel[k_l];
+	float4 topLeft = CamToCel[i_j];
+	float4 topRight = CamToCel[k_j];
+	float4 bottomLeft = CamToCel[i_l];
+	float4 bottomRight = CamToCel[k_l];
 
-	cv::Point2d topLeft_2d = { topLeft.x,topLeft.y };
-	cv::Point2d topRight_2d = { topRight.x,topRight.y };
-	cv::Point2d bottomLeft_2d = { bottomLeft.x,bottomLeft.y };
-	cv::Point2d bottomRight_2d = { bottomRight.x,bottomRight.y };
+	float4 topLeft_2d = { topLeft.x,topLeft.y };
+	float4 topRight_2d = { topRight.x,topRight.y };
+	float4 bottomLeft_2d = { bottomLeft.x,bottomLeft.y };
+	float4 bottomRight_2d = { bottomRight.x,bottomRight.y };
 
 	bool topLeft_finite = topLeft.z < INFINITY_CHECK;
 
@@ -429,13 +430,13 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 
 	//If we are one the accretion disk diagonal is in phi and r coordinates otherwise it is in phi and theta coordinates
 	if (topLeft_finite) {
-		double diag = abs(topLeft.y - bottomRight.y);
+		float diag = abs(topLeft.y - bottomRight.y);
 		bottomRight.y += PI2;
-		diag = std::min(diag, abs(topLeft.y - bottomRight.y));
+		diag = std::min(diag,abs(topLeft.y - bottomRight.y));
 
-		double diag2 = abs(topRight.y - bottomLeft.y);
+		float diag2 = abs(topRight.y - bottomLeft.y);
 		bottomRight.y += PI2;
-		diag2 = std::min(diag2, abs(topRight.y - bottomLeft.y));
+		diag2 = std::min(diag2, (float)abs(topRight.y - bottomLeft.y));
 
 		// If phi change is too large refine
 		if (diag > PRECCELEST || diag2 > PRECCELEST) return true;
@@ -447,14 +448,14 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 		}
 	}
 	else {
-		double diag = (topLeft_2d - bottomRight_2d).ddot(topLeft_2d - bottomRight_2d);
+		float diag = vector_ops::dot((topLeft_2d - bottomRight_2d),(topLeft_2d - bottomRight_2d));
 		bottomRight.y += PI2;
-		diag = std::min(diag, (topLeft_2d - bottomRight_2d).ddot(topLeft_2d - bottomRight_2d));
+		diag = std::min(diag, vector_ops::dot((topLeft_2d - bottomRight_2d),(topLeft_2d - bottomRight_2d)));
 
 
-		double diag2 = (topRight_2d - bottomLeft_2d).ddot(topRight_2d - bottomLeft_2d);
+		float diag2 = vector_ops::dot((topRight_2d - bottomLeft_2d),(topRight_2d - bottomLeft_2d));
 		bottomRight.y += PI2;
-		diag2 = std::min(diag2, (topRight_2d - bottomLeft_2d).ddot(topRight_2d - bottomLeft_2d));
+		diag2 = std::min(diag2, vector_ops::dot((topRight_2d - bottomLeft_2d),(topRight_2d - bottomLeft_2d)));
 
 		// If the maximum diagonal is not less than required precision split the block
 
@@ -480,7 +481,7 @@ void Grid::fillVector(std::vector<uint64_t>& toIntIJ, uint32_t i, uint32_t j) {
 	auto iter = CamToCel.find(i_j);
 	if (iter == CamToCel.end()) {
 		toIntIJ.push_back(i_j);
-		CamToCel[i_j] = cv::Point3d(-10, -10,-10);
+		CamToCel[i_j] = float4{ -10, -10, -10,-10 };
 	}
 }
 
@@ -539,7 +540,7 @@ void Grid::adaptiveBlockIntegration(int level) {
 /// <param name="theta">The theta positions.</param>
 /// <param name="phi">The phi positions.</param>
 /// <param name="n">The size of the vectors.</param>
-void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& phi, std::vector<double>& r, const int n, std::vector<int>& step) {
+void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& phi, std::vector<double>& r, std::vector<double>& distances, const int n, std::vector<int>& step) {
 	double thetaS = cam->theta;
 	double phiS = cam->phi;
 	double rS = cam->r;
@@ -589,11 +590,15 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 		double b = pPhi;
 		double q = pTheta * pTheta + cos(thetaS) * cos(thetaS) * (b * b / (sin(thetaS) * sin(thetaS)) - metric::asq<double>);
 
+
+
 		pRs.push_back(pR);
 		bs.push_back(b);
 		qs.push_back(q);
 		pThetas.push_back(pTheta);
 	}
+
+
 	if (n < MIN_GPU_INTEGRATION) {
 	#pragma loop(hint_parallel(8))
 		for (int i = 0; i < n; i++) {
@@ -601,6 +606,7 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 			theta[i] = bs[i];
 			phi[i] = qs[i];
 			r[i] = pThetas[i];
+			distances[i] = pRs[i];
 
 			
 		}
@@ -613,9 +619,11 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 		CUDA::integrateGrid<double>(rS, thetaS, phiS, pRs, bs, qs, pThetas);
 #pragma loop(hint_parallel(8))
 		for (int i = 0; i < n; i++) {
+
 			theta[i] = bs[i];
 			phi[i] = qs[i];
 			r[i] = pThetas[i];
+			distances[i] = pRs[i];
 		}
 	}
 
@@ -648,7 +656,7 @@ Grid::Grid(const int maxLevelPrec, const int startLevel, const bool angle, const
 	STARTM = (2 - equafactor) * 2 * (STARTN - 1);
 	steps = std::vector<int>(M * N);
 
-	grid_vector = std::vector<float3>(M * N, make_float3(-2,-2,-2));
+	grid_vector = std::vector<float4>(M * N, make_float4(-2, -2, -2, -2));
 
 	auto start = std::chrono::high_resolution_clock::now();
 	raytrace();
@@ -688,11 +696,14 @@ void Grid::saveGeodesics(Parameters& param) {
 
 void Grid::saveAsGpuHash() {
 	//TODO FIX SYMMETRY EXPLOIT
-	for (const std::pair<uint64_t, cv::Point3d>& entry : CamToCel) {
+	for (const std::pair<uint64_t, float4>& entry : CamToCel) {
 		uint32_t el1 = entry.first >> 32;
 		uint32_t el2 = entry.first;
 		
-		grid_vector[el1 * M + el2] = { (float)entry.second.x,(float)entry.second.y,(float)entry.second.z };
+	
+
+
+		grid_vector[el1 * M + el2] = { (float)entry.second.x,(float)entry.second.y,(float)entry.second.z,(float)entry.second.w };
 	}
 
 }

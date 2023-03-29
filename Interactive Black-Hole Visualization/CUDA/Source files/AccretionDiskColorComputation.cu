@@ -4,6 +4,7 @@
 #include "./../Header files/Temperature_color_lookup.cuh"
 #include "./../Header files/vector_operations.cuh"
 #include "../../C++/Header files/IntegrationDefines.h"
+#include "../../CUDA/Header files/ColorComputation.cuh"
 
 #include "device_launch_parameters.h"
 
@@ -25,7 +26,14 @@ __device__ double getRealTemperature(const float& M, const float& Ma, const floa
 		(M * M * pow(r, 2.5) * (2.0 * r - 3.0)), 0.25);
 }
 
-//
+/// <summary>
+/// Looks up temperature in provided lookup table
+/// </summary>
+/// <param name="table">Array containing lookup table</param>
+/// <param name="step_size">Size of the steps between r values</param>
+/// <param name="size">Ampount of entries in the table</param>
+/// <param name="r">r in schwarschild radii (r/2 if r is in boyler-linqiust)</param>
+/// <returns></returns>
 __device__ double lookUpTemperature(double* table, const float step_size, const int size, const float r) {
 	if (r < 3 || r >= (size * step_size + 3)) {
 		return 0;
@@ -38,6 +46,15 @@ __device__ double lookUpTemperature(double* table, const float step_size, const 
 	return (1-mix) * table[(int) (r_low/step_size)] + mix * table[(int) (r_high / step_size)];
 }
 
+/// <summary>
+/// Creates a temperature look table
+/// </summary>
+/// <param name="size">Number of entries to generate</param>
+/// <param name="table">Pointer to array to store the table</param>
+/// <param name="step_size">Size of the steps between r values</param>
+/// <param name="M">Mass of the black hole in solar masses</param>
+/// <param name="Ma">Accretion rate of the black hole in solar masses per year</param>
+/// <returns></returns>
 __global__ void createTemperatureTable(const int size,double* table, const float step_size, float M, float Ma) {
 	int id = (blockIdx.x * blockDim.x) + threadIdx.x;
 	if (id < size) {
@@ -45,43 +62,87 @@ __global__ void createTemperatureTable(const int size,double* table, const float
 	}
 }
 
-__global__ void addAccretionDisk(const float3* thphi, uchar4* out, double*temperature_table,const float temperature_table_step_size, const int temperature_table_size, const unsigned char* bh, const int M, const int N) {
+__global__ void addAccretionDisk(const float4* thphi, uchar4* out, double*temperature_table,const float temperature_table_step_size, const int temperature_table_size, const unsigned char* bh, const int M, const int N,
+	const float* camParam, const float* solidangle, float2* viewthing, bool lensingOn, const unsigned char* diskMask) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
-	float4 color = { 0.f, 0.f, 0.f, 0.f };
 	int ind = i * M1 + j;
 	// Only compute if pixel is not black hole and i j is in image
+	float4 color = { 0.f, 0.f, 0.f };
+
 
 	if (i < N && j < M) {
-		if (bh[ijc] == 0 && thphi[ind].z < INFINITY_CHECK) {
-			if (thphi[ind].z > MIN_STABLE_ORBIT) {
-				double temp = lookUpTemperature(temperature_table, temperature_table_step_size, temperature_table_size, thphi[ind].z / 2);
+		bool r_check = false;
+		float4 corners[4] = {thphi[ind] ,thphi[ind + 1] , thphi[ind + M1] ,thphi[ind + M1 + 1]};
+		
 
-				float grav_redshift = metric::calculate_gravitational_redshift<float>(thphi[ind].z, thphi[ind].z * thphi[ind].z);
-				float doppler_redshift = thphi[ind].x;
-
-				float redshift = doppler_redshift * grav_redshift;
-
-				//Apply redshift and clip temperature to [100,29000] outside this range barely any change 
-				double observerd_temp = temp * redshift;
-				float3 temperature_sRGB;
-				if (observerd_temp < 10000) {
-					float mix = (observerd_temp / 100) - floor(observerd_temp / 100);
-					temperature_sRGB = (1-mix) * temperature_LUT[(int)(observerd_temp / 100)] + mix * temperature_LUT[(int)(observerd_temp / 100) + 1];
-					//temperature_sRGB = temperature_LUT[(int)(observerd_temp / 100)];
+		if (bh[ijc] == 0 && diskMask[ijc]) {
+			
+			float4 avg_thp = { 0,0,0,0 };
+			int disk_count = 0;
+			for (int k = 0; k < 4; k++) {
+				if (corners[k].z < INFINITY_CHECK) {
+					avg_thp = avg_thp + corners[k];
+					disk_count++;
 				}
-				else {
-					temperature_sRGB = temperature_LUT[(int)(((observerd_temp - 10000) / 1000) + 99)];
-				}
+			}
+			avg_thp = (1.0f / (float)disk_count) * avg_thp;
+
+			double temp = lookUpTemperature(temperature_table, temperature_table_step_size, temperature_table_size, fmaxf(avg_thp.z / 2,MIN_STABLE_ORBIT/2));
+			double max_temp = lookUpTemperature(temperature_table, temperature_table_step_size, temperature_table_size, 4.8);
+
+			float grav_redshift = metric::calculate_gravitational_redshift<float>(avg_thp.z, avg_thp.z * avg_thp.z);
+			float doppler_redshift = avg_thp.x;
+
+			float redshift = doppler_redshift * grav_redshift;
+
+			//Apply redshift and clip temperature to [100,29000] outside this range barely any change 
+			double observerd_temp = temp * redshift;
+
+				
+
+			if (observerd_temp < TEMP_SPLIT) {
+				float mix = (observerd_temp / TEMP_STEP_SMALL) - floor(observerd_temp / TEMP_STEP_SMALL);
+				color = (1-mix) * temperature_LUT[(int)(observerd_temp / TEMP_STEP_SMALL)] + mix * temperature_LUT[(int)(observerd_temp / TEMP_STEP_SMALL) + 1];
+				//temperature_sRGB = temperature_LUT[(int)(observerd_temp / 100)];
+			}
+			else if(observerd_temp < TEMP_MAX) {
+				color = temperature_LUT[(int)(((observerd_temp - TEMP_SPLIT) / TEMP_STEP_LARGE) + 99)];
+			}
+
+			float max_intensity;
+			if (max_temp < TEMP_SPLIT) {
+				float mix = (max_temp / TEMP_STEP_SMALL) - floor(max_temp / TEMP_STEP_SMALL);
+				max_intensity = ((1 - mix) * temperature_LUT[(int)(max_temp / TEMP_STEP_SMALL)] + mix * temperature_LUT[(int)(max_temp / TEMP_STEP_SMALL) + 1]).w;
+				//temperature_sRGB = temperature_LUT[(int)(observerd_temp / 100)];
+			}
+			else if (max_intensity < TEMP_MAX) {
+				max_intensity = temperature_LUT[(int)(((max_temp - TEMP_SPLIT) / TEMP_STEP_LARGE) + 99)].w;
+			}
+
+			float H, S, P;
+			RGBtoHSP(color.x, color.y , color.z , H, S, P);
+			float intensity_factor = fminf(color.w / max_intensity,1.f);
+			float redshft = 1;
+			float frac = 1;
+			findLensingRedshift(M, ind, camParam, viewthing, frac, redshft, solidangle[ijc]);
+			if (lensingOn) P *= frac;
+
+			P *= intensity_factor;
+
+			HSPtoRGB(H, S, fminf(1.f, P), color.x, color.y, color.z);
+
+			color = {
+				fminf(color.x, 1.0f),
+				fminf(color.y, 1.0f),
+				fminf(color.z, 1.0f)
+			};
 
 
-				//Out image in BGR format while table is RGB
-				out[ijc] = { (unsigned char)(temperature_sRGB.z*255),(unsigned char)(temperature_sRGB.y * 255),(unsigned char)(temperature_sRGB.x * 255),255 };
-				//out[ijc] = { 255,255,0,255 };
-			}
-			else {
-				//out[ijc] = { 0,0,0,255 };
-			}
+			//Out image in BGR format while table is RGB
+			out[ijc] = { (unsigned char)(color.z*255), (unsigned char)(color.y*255), (unsigned char)(color.x * 255),255 };
+			//out[ijc] = { 255,255,0,255 };
+
 
 			
 		}
@@ -103,38 +164,71 @@ __device__ int2 coord_min(int2* coords) {
 	};
 }
 
-__global__ void addAccretionDiskTexture(const float3* thphi, const int M, const unsigned char* bh, uchar4* out, float3* summed_texture, float  maxAccretionRadius, int tex_width, int tex_height) {
+__global__ void addAccretionDiskTexture(const float4* thphi, const int M, const unsigned char* bh, uchar4* out, float3* summed_texture, float  maxAccretionRadius, int tex_width, int tex_height,
+	const float* camParam, const float* solidangle, float2* viewthing, bool lensingOn, const unsigned char* diskMask) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 	int ind = i * M1 + j;
 	
 
-
-	bool r_check = false;
-	r_check = (thphi[ind].z < INFINITY_CHECK) || (thphi[ind + 1].z < INFINITY_CHECK) || (thphi[ind + M1].z < INFINITY_CHECK) || (thphi[ind + M1 + 1].z < INFINITY_CHECK);
-
-	if (bh[ijc] == 0 && r_check) {
-		//Calculate texture coordinates of the pixel corners
-		int2 tex_coord[4] = {
-			{ (thphi[ind].y / PI2) * (tex_width - 1), fmaxf(fminf((thphi[ind].z - MIN_STABLE_ORBIT) / (maxAccretionRadius - MIN_STABLE_ORBIT),1.0f),0.0f)* (tex_height - 1)},
-			{ (thphi[ind + 1].y / PI2) * (tex_width - 1),fmaxf(fminf((thphi[ind + 1].z - MIN_STABLE_ORBIT) / (maxAccretionRadius - MIN_STABLE_ORBIT),1.0f),0.0f) * (tex_height - 1)},
-			{ (thphi[ind + M1].y / PI2) * (tex_width - 1), fmaxf(fminf((thphi[ind + M1].z - MIN_STABLE_ORBIT) / (maxAccretionRadius - MIN_STABLE_ORBIT),1.0f),0.0f) * (tex_height - 1)},
-			{ (thphi[ind + M1 + 1].y / PI2) * (tex_width - 1), fmaxf(fminf((thphi[ind + M1 + 1].z - MIN_STABLE_ORBIT) / (maxAccretionRadius - MIN_STABLE_ORBIT),1.0f),0.0f) * (tex_height - 1)}
+	float3 color = { 0.f, 0.f, 0.f };
+	
+	if (bh[ijc] == 0 && diskMask[ijc]) {
+		//Get the coordinates of the disk
+		float4 corners[4] = {
+			thphi[ind],
+			thphi[ind + 1],
+			thphi[ind + M1],
+			thphi[ind + M1 + 1]
 		};
 
+		//Find a point on the disk we can set faulty points to
+		int good_point_ind = -1;
+		float min_r = INFINITY;
+		for (int k = 0; k < 4; k++) {
+			if (corners[k].z < min_r) {
+				min_r = corners[k].z;
+				good_point_ind = k;
+			}
+		}
+
+		//Check if we are at the lower or higher edge of the disk
+		bool lower_edge = corners[good_point_ind].z < (maxAccretionRadius / 2);
+
+
+		int2 tex_coord[4] = {};
+		//Calculate texture coordinates of the pixel corners
+		for (int k = 0; k < 4; k++) {
+			if (fabsf(corners[good_point_ind].z - corners[k].z) < 10) {
+				tex_coord[k] = {
+					((int)(((corners[k].y / PI2) * (tex_width - 1)) + tex_width) % tex_width),
+					(int) (fmaxf(fminf((corners[k].z - MIN_STABLE_ORBIT) / (maxAccretionRadius - MIN_STABLE_ORBIT), 1.0f), 0.0f) * (tex_height - 1))
+				};
+			}
+			else {
+				tex_coord[k] = {
+					((int)(((corners[good_point_ind].y / PI2) * (tex_width - 1)) + tex_width) % tex_width),
+					lower_edge ? 0 : (tex_width - 1)
+				};
+			}
+		}
+		
 		int2 max_coord = coord_max(tex_coord);
 		int2 min_coord = coord_min(tex_coord);
 
-		//If the difference in y coordinates is more than half the height 1 ore more corners were of the disk and we need to clamp them to 0. The 
-		if (abs(max_coord.y - min_coord.y) > tex_height / 2) {
-			max_coord.y = min_coord.y;
-			min_coord.y = 0;
-		}
-
 		//If max and min coordinates are the same add 1 pixel to the area such that the pixel area is non-zero
 		if ((max_coord.x) == (min_coord.x)) {
-			max_coord.x += 1;
+			if (max_coord.x == (tex_width - 1)) {
+				min_coord.x = 0;
+			}
+			else {
+				max_coord.x += 1;
+			}
+	
 		}
+
+
+		
 
 		if (max_coord.y == min_coord.y) {
 			if (max_coord.y != tex_height - 1) {
@@ -146,11 +240,6 @@ __global__ void addAccretionDiskTexture(const float3* thphi, const int M, const 
 				
 		}
 
-			
-			
-
-
-		float3 color = { 0.f, 0.f, 0.f };
 		int pix_sum = 0;
 
 		//If the area of the pixel is 1 block approximate it by a square and integrate it.
@@ -208,7 +297,40 @@ __global__ void addAccretionDiskTexture(const float3* thphi, const int M, const 
 			fminf(1.0f,color.z)
 		};
 
+	
+
+		float H, S, P;
+		if (lensingOn) {
+			RGBtoHSP(color.z, color.y, color.x , H, S, P);
+
+
+			float redshft = 1;
+			float frac = 1;
+			findLensingRedshift(M, ind, camParam, viewthing, frac, redshft, solidangle[ijc]);
+			if (lensingOn) P *= frac;
+			HSPtoRGB(H, S, min(1.f, P), color.z, color.y, color.x);
+		}
+
+
+		color = {
+				fminf(color.x,1.0f),
+				fminf(color.y,1.0f),
+				fminf(color.z,1.0f)
+		};
 
  		out[ijc] = {(unsigned char)(color.x * 255),(unsigned char)(color.y * 255),(unsigned char)(color.z * 255), 255};
+	}
+}
+
+__global__ void makeDiskCheck(const float4* thphi, unsigned char* disk, const int M, const int N) {
+	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
+	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
+	int ind = i * M1 + j;
+
+	if (i < N && j < M) {
+		bool r_check = false;
+		float4 corners[4] = { thphi[ind] ,thphi[ind + 1] , thphi[ind + M1] ,thphi[ind + M1 + 1] };
+		r_check = (corners[0].z < INFINITY_CHECK) || (corners[1].z < INFINITY_CHECK) || (corners[2].z < INFINITY_CHECK) || (corners[3].z < INFINITY_CHECK);
+		disk[ijc] = r_check ? 1 : 0;
 	}
 }

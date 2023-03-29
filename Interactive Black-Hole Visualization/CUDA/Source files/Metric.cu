@@ -250,6 +250,31 @@ namespace metric {
 		return ret;
 	}
 
+	//Wraps the theta and phi coordinates back to their respective domains [0,PI] and [0,2PI) respectively returns wheter phi has been reduced back from larger than Pi.
+	template <class T>  __device__ __host__ bool wrapPhiToPi(T & phiW) {
+		bool ret = false;
+
+		phiW = fmodf(phiW, PI2);
+		if (phiW < 0) {
+			phiW += PI2;
+		}
+
+		return ret;
+	}
+
+	/// <summary>
+	/// Calculates next coordinates for a given stepsize according to butcher tableau
+	/// </summary>
+	/// <param name="var">Position to step</param>
+	/// <param name="dvdz">Derivatives at current position</param>
+	/// <param name="h">Stepsize</param>
+	/// <param name="varOut">output of next position</param>
+	/// <param name="varErr">the estimated error of this step</param>
+	/// <param name="b"></param>
+	/// <param name="q"></param>
+	/// <param name="aks"></param>
+	/// <param name="varTmpInt"></param>
+	/// <returns></returns>
 	template <class T> __device__ __host__ static void rkck(volatile T* var, volatile T* dvdz, const T h,
 		volatile T* varOut, volatile T* varErr, const T b, const T q, volatile T* aks,
 		volatile T* varTmpInt) {
@@ -275,6 +300,21 @@ namespace metric {
 			varErr[i] = h * (dc1 * dvdz[i] + dc3 * aks[i + 5] + dc4 * aks[i + 10] + dc5 * aks[i + 15] + dc6 * aks[i + 20]);
 	}
 
+	/// <summary>
+	/// Steps the RK integrator with stepsize h and updates the step size
+	/// </summary>
+	/// <param name="var">Array with current variables</param>
+	/// <param name="dvdz">Array with derivatives at current position</param>
+	/// <param name="z">Sum of all steps taken</param>
+	/// <param name="h">Current stepsize</param>
+	/// <param name="varScal"></param>
+	/// <param name="b"></param>
+	/// <param name="q"></param>
+	/// <param name="varErr"></param>
+	/// <param name="varTemp">Array to use for temporary variable storage</param>
+	/// <param name="aks"></param>
+	/// <param name="varTmpInt"></param>
+	/// <returns></returns>
 	template <class T> __device__ __host__ static void rkqs(volatile T* var, volatile  T* dvdz, T& z, T& h,
 		volatile T* varScal, const T b, const T q,
 		volatile T* varErr, volatile T* varTemp, volatile T* aks, volatile T* varTmpInt) {
@@ -310,7 +350,7 @@ namespace metric {
 
 		T z = 0.0;
 		T h = INITIAL_STEP_SIZE * sgn(INTEGRATION_MAX);
-
+		T z_prev = 0;
 		
 
 		for (int i = 0; i < NUMBER_OF_EQUATIONS; i++) var[i] = varStart[i];
@@ -340,6 +380,7 @@ namespace metric {
 			//If the traveled distance is large enough we can approximate space-time as flat and use these coordinates as the result
 			if (z <= INTEGRATION_MAX) {
 				varStart[r_index] = INFINITY;
+				varStart[3] = INTEGRATION_MAX;
 				return;
 			}
 
@@ -347,44 +388,37 @@ namespace metric {
 			if (BH_USE_ACCRETION_DISK && (thetaVar > PI1_2 != last_theta)) {
 				float factor = (thetaVar - PI1_2) / (thetaVar - varStart[theta_index]);
 				T r = (1 - factor) * rVar + factor * varStart[r_index];
-				if (r > 6 && r < BH_MAX_ACCRETION_RADIUS) {
-					
-					//Interpolate all vars to the disk
-					for (int i = 0; i < NUMBER_OF_EQUATIONS; i++) {
-						varStart[i] = (1 - factor) * var[i] + factor * varStart[i];
-					}
 
+				if (r > MIN_STABLE_ORBIT && r < BH_MAX_ACCRETION_RADIUS) {
+					//Reset vars to previous positions
+					for (int i = 0; i < NUMBER_OF_EQUATIONS; i++) var[i] = varStart[i];
+					z = z_prev;
+					stepUntilDisk(var, dvdz, z, h, varScal, b, q, varErr, varTemp, aks, varTmpInt, varStart);
+					
+					r = varStart[r_index];
+					 
 					//Calculate derivatives at disk position
 					metric::derivs(varStart, dvdz, b, q);
 
 
 					T doppler_redshift = 0;
 					 
-					//If the radius is larger than the stable orbit the particle would go fast than the speed of light and we get nans
-					//Also light does not escape this region and the disk will be black anyway
-					if (r > MIN_STABLE_ORBIT) {
-						//Calculate doppler redshift
-						//Accretion disk particle moves in {0,1,0} direction so cosine is simply normalized phi direction
-						float3 lightdir = { dvdz[r_index], dvdz[theta_index],  dvdz[phi_index] };
+					//Calculate doppler redshift
+					//Accretion disk particle moves in {0,1,0} direction so cosine is simply normalized phi direction
+					float3 lightdir = { dvdz[r_index], dvdz[theta_index],  dvdz[phi_index] };
 
-						T norm = vector_ops::dot(lightdir, lightdir);
-						T cos_incident_angle = rsqrt(norm) * lightdir.z;
+					T norm = vector_ops::dot(lightdir, lightdir);
+					T cos_incident_angle = rsqrt(norm) * lightdir.z;
 
-						T orbit_speed = metric::calcSpeed<T>(r, PI1_2);
-						doppler_redshift = (1 + orbit_speed * cos_incident_angle) / sqrt(1 - sq(orbit_speed));
-
-					}
-					else
-					{
-						doppler_redshift = 0;
-					}
-					
+					T orbit_speed = metric::calcSpeed<T>(r, PI1_2);
+					doppler_redshift = (1 + orbit_speed * cos_incident_angle) / sqrt(1 - sq(orbit_speed));					
 
 					
 					
 
 					//Store the doppler redshift in the theta channel since its constant anyway.
-					varStart[theta_index] = doppler_redshift;					
+					varStart[theta_index] = doppler_redshift;
+					varStart[3] = z;
 					return;
 				}							
 			}
@@ -392,14 +426,68 @@ namespace metric {
 
 			last_theta = thetaVar > PI1_2;
 			for (int i = 0; i < NUMBER_OF_EQUATIONS; i++) varStart[i] = var[i];
+			z_prev = z;
 		}
 
 		//If we take too many steps or reached a too low step count we assume the ray hits the black hole
 		varStart[theta_index] = nanf("");
 		varStart[phi_index] = nanf("");
 		varStart[r_index] = 0;
+		varStart[3] = z;
 	};
 
+
+	/// <summary>
+	/// Take small steps to accuratly estimate where the ray-disk intersection is
+	/// </summary>
+	/// <param name="var">Array with current variables</param>
+	/// <param name="dvdz">Array with derivatives at current position</param>
+	/// <param name="z">Sum of all steps taken, Output is accurate length untill intersection</param>
+	/// <param name="h">Current stepsize</param>
+	/// <param name="varScal"></param>
+	/// <param name="b"></param>
+	/// <param name="q"></param>
+	/// <param name="varErr"></param>
+	/// <param name="varTemp"></param>
+	/// <param name="aks"></param>
+	/// <param name="varTmpInt"></param>
+	/// <param name="varOut">Output of more accurate intersection point </param>
+	/// <returns></returns>
+	template <class T> __device__ __host__ void stepUntilDisk(volatile T* var, volatile  T* dvdz, T& z, T& h,
+		volatile T* varScal, const T b, const T q,
+		volatile T* varErr, volatile T* varTemp, volatile T* aks, volatile T* varTmpInt, volatile T* varOut) {
+		bool last_theta = thetaVar > PI1_2;
+
+		bool step_size = MIN_STEP_SIZE;
+		T z_prev = z;
+
+		while (thetaVar > PI1_2 == last_theta) {
+			//Save the current position for interpolation
+			for (int i = 0; i < NUMBER_OF_EQUATIONS; i++) varOut[i] = var[i];
+			z_prev = z;
+			//Save the position relative to the disk
+			last_theta = thetaVar > PI1_2;
+
+
+			//Prepare for the step
+			metric::derivs(var, dvdz, b, q);
+			for (int i = 0; i < NUMBER_OF_EQUATIONS; i++)
+				varScal[i] = fabs(var[i]) + fabs(dvdz[i] * h) + TINY;
+ 			//Reduce h to go to zero near the disk to be more accurate
+			h = fminf(fabs(thetaVar - PI1_2) * h, MIN_DISK_STEP_SIZE);
+			//h = MIN_STEP_SIZE;
+			//Take a step
+			rkqs(var, dvdz, z, h, varScal, b, q, varErr, varTemp, aks, varTmpInt);
+		}
+
+		//Interpolate all vars to the disk
+		float factor = (thetaVar - PI1_2) / (thetaVar - varOut[theta_index]);
+		for (int i = 0; i < NUMBER_OF_EQUATIONS; i++) {
+			varOut[i] = (1 - factor) * var[i] + factor * varOut[i];
+		}
+		z = (1 - factor) * z_prev + factor * z;
+
+	}
 
 
 	template <class T> __device__ __host__ void rkckIntegrate1(const T rV, const T thetaV, const T phiV, T* pRV,
@@ -412,16 +500,20 @@ namespace metric {
 		*bV = varStart[theta_index];
 		*qV = varStart[phi_index];
 		*pThetaV = varStart[r_index];
+		*pRV = varStart[3];
 
-
-		if (!isnan(varStart[theta_index])) {
+		if (!isnan(varStart[theta_index]) && varStart[r_index] > INFINITY_CHECK) {
 			wrapToPi(*bV, *qV);
+		}
+		else if (!isnan(varStart[theta_index])) {
+			wrapPhiToPi(*qV);
 		}
 	}
 
 	template <class T> __global__ void integrate_kernel(const T rV, const T thetaV, const T phiV, T* pRV,
 		T* bV, T* qV, T* pThetaV, int size) {
 		int index = blockDim.x * blockIdx.x + threadIdx.x;
+
 		if (index < size) {
 			rkckIntegrate1(rV, thetaV, phiV, &pRV[index], &bV[index], &qV[index], &pThetaV[index],false,nullptr);
 		}

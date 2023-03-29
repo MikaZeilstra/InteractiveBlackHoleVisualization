@@ -3,6 +3,39 @@
 #include "../../C++/Header files/IntegrationDefines.h"
 #include "./../Header files/AccretionDiskColorComputation.cuh"
 
+
+#include <fstream>
+
+#include "glad.h"
+#include <glfw3.h>
+
+#include <cuda_gl_interop.h>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stbi_image.h"
+
+
+void CheckOpenGLError(const char* stmt, const char* fname, int line)
+{
+	GLenum err = glGetError();
+	if (err != GL_NO_ERROR)
+	{
+		printf("OpenGL error %08x, at %s:%i - for %s\n", err, fname, line, stmt);
+		abort();
+	}
+}
+
+#ifdef _DEBUG
+#define GL_CHECK(stmt) do { \
+            stmt; \
+            CheckOpenGLError(#stmt, __FILE__, __LINE__); \
+        } while (0)
+#else
+#define GL_CHECK(stmt) stmt
+#endif
+
+
+
 #define copyHostToDevice(dev_pointer, host_pointer, size, txt) { std::string errtxt = ("Host to Device copy Error " + std::string(txt)); \
 																 checkCudaStatus(cudaMemcpy(dev_pointer, host_pointer, size, cudaMemcpyHostToDevice), errtxt.c_str()); }
 
@@ -44,9 +77,9 @@ int2* dev_offsetTable = 0;
 int2* dev_hashPosTag = 0;
 int2* dev_tableSize = 0;
 
-float3* dev_grid = 0;
-float3* dev_grid_2 = 0;
-static float3* dev_interpolatedGrid = 0;
+float4* dev_grid = 0;
+float4* dev_grid_2 = 0;
+static float4* dev_interpolatedGrid = 0;
 int* dev_gridGap = 0;
 static float* dev_cameras = 0;
 float* dev_camera0 = 0;
@@ -55,6 +88,7 @@ float2* dev_viewer = 0;
 float4* dev_summedCelestialSky = 0;
 
 unsigned char* dev_blackHoleMask = 0;
+unsigned char* dev_diskMask = 0;
 float2* dev_blackHoleBorder0 = 0;
 float2* dev_blackHoleBorder1 = 0;
 
@@ -104,6 +138,7 @@ cudaError_t CUDA::cleanup() {
 	cudaFree(dev_summedCelestialSky);
 
 	cudaFree(dev_blackHoleMask);
+	cudaFree(dev_diskMask);
 	cudaFree(dev_blackHoleBorder0);
 	cudaFree(dev_blackHoleBorder1);
 
@@ -122,8 +157,7 @@ cudaError_t CUDA::cleanup() {
 	cudaFree(dev_starLight0);
 	cudaFree(dev_starLight1);
 
-	cudaFree(dev_outputImage);
-	cudaFree(dev_starImage);
+ 	cudaFree(dev_starImage);
 
 	cudaFree(pRvs_device);
 	cudaFree(bs_device);
@@ -159,7 +193,7 @@ void CUDA::checkCudaErrors() {
 
 void CUDA::checkCudaStatus(cudaError_t cudaStatus, const char* message) {
 	if (cudaStatus != cudaSuccess) {
-		fprintf(stderr, message);
+		fprintf(stderr, "%s, %s", message, cudaGetErrorString(cudaStatus));
 		printf("\n");
 		//cleanup();
 	}
@@ -223,9 +257,12 @@ template <class T> void CUDA::integrateGrid(const T rV, const T thetaV, const T 
 	copyDeviceToHost(bV.data(), bs_device, bV.size() * sizeof(T), "found theta");
 	copyDeviceToHost(qV.data(), qs_device, qV.size() * sizeof(T), "found phi");
 	copyDeviceToHost(pThetaV.data(), pThetas_device, pThetaV.size() * sizeof(T), "found r");
+	copyDeviceToHost(pRV.data(), pRvs_device, pRV.size() * sizeof(T), "found r");
 	checkCudaErrors();
 
 }
+
+
 
 void CUDA::memoryAllocationAndCopy(const Grids& grids, const Image& image, const CelestialSky& celestialSky,
 	const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis,const Texture accretionTexture, const Parameters& param) {
@@ -256,16 +293,17 @@ void CUDA::memoryAllocationAndCopy(const Grids& grids, const Image& image, const
 	//allocate(dev_tableSize, grids.G * sizeof(int2), "tableSize");
 	//allocate(dev_hashPosTag, grids.hashTableSize * sizeof(int2), "hashPosTag");
 
-	allocate(dev_grid, gridnum * gridsize * sizeof(float3), "grid");
+	allocate(dev_grid, gridnum * gridsize * sizeof(float4), "grid");
 	dev_grid_2 = &dev_grid[gridsize];
 
-	allocate(dev_interpolatedGrid, rastSize * sizeof(float3), "interpolatedGrid");
+	allocate(dev_interpolatedGrid, rastSize * sizeof(float4), "interpolatedGrid");
 	allocate(dev_gridGap, rastSize * sizeof(int), "gridGap");
 
-	allocate(dev_cameras, 7 * grids.G * sizeof(float), "cameras");
-	allocate(dev_camera0, 7 * sizeof(float), "camera0");
+	allocate(dev_cameras, 10 * grids.G * sizeof(float), "cameras");
+	allocate(dev_camera0, 10 * sizeof(float), "camera0");
 
 	allocate(dev_blackHoleMask, imageSize * sizeof(unsigned char), "blackHoleMask");
+	allocate(dev_diskMask, imageSize * sizeof(unsigned char), "blackHoleMask");
 	allocate(dev_blackHoleBorder0, (bhproc.angleNum + 1) * 2 * sizeof(float2), "blackHoleBorder0");
 	allocate(dev_blackHoleBorder1, (bhproc.angleNum + 1) * 2 * sizeof(float2), "BlackHOleBorder1");
 
@@ -276,7 +314,6 @@ void CUDA::memoryAllocationAndCopy(const Grids& grids, const Image& image, const
 
 	allocate(dev_summedCelestialSky, celestSize * sizeof(float4), "summedCelestialSky");
 
-	allocate(dev_outputImage, imageSize * sizeof(uchar4), "outputImage");
 	allocate(dev_starImage, imageSize * sizeof(uchar4), "starImage");
 	allocate(dev_starLight0, imageSize * starvis.diffusionFilter * starvis.diffusionFilter * sizeof(float3), "starLight0");
 	allocate(dev_starLight1, imageSize * sizeof(float3), "starLight1");
@@ -296,7 +333,7 @@ void CUDA::memoryAllocationAndCopy(const Grids& grids, const Image& image, const
 
 	std::cout << "Copying variables into CUDA memory..." << std::endl;
 
-	copyHostToDevice(dev_cameras, grids.camParam, 7 * grids.G * sizeof(float), "cameras");
+	copyHostToDevice(dev_cameras, grids.camParam, 10 * grids.G * sizeof(float), "cameras");
 	copyHostToDevice(dev_viewer, image.viewer, rastSize * sizeof(float2), "viewer");
 
 	copyHostToDevice(dev_blackHoleBorder0, bhproc.bhBorder, (bhproc.angleNum + 1) * 2 * sizeof(float2), "blackHoleBorder0");
@@ -327,8 +364,8 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 	const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis, const Texture& accretionDiskTexture,  const Parameters& param) {
 	bool star = param.useStars;
 
-	std::vector<float> cameraUsed(7);
-	for (int q = 0; q < 7; q++) cameraUsed[q] = grids.camParam[q];
+	std::vector<float> cameraUsed(10);
+	for (int q = 0; q < 10; q++) cameraUsed[q] = grids.camParam[q];
 
 	
 
@@ -354,7 +391,7 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 	std::cout << "Running Kernels" << std::endl << std::endl;
 
 	if (grids.G == 1) {
-		copyHostToDevice(dev_grid, grids.grid_vectors[0].data(), grids.grid_vectors[0].size() * sizeof(float3), "grid");
+		copyHostToDevice(dev_grid, grids.grid_vectors[0].data(), grids.grid_vectors[0].size() * sizeof(float4), "grid");
 		checkCudaErrors();
 	}
 
@@ -363,10 +400,99 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 	int grid_nr = -1;
 	int startframe = 0;
 
+	int q = startframe;
 	
-	for (int q = 0 + startframe; q < param.nrOfFrames + startframe; q++) {
+	std::vector<float4> grid((grids.GM) * (grids.GN1));
+	std::vector<float4> depth((image.N + 1) * (image.M + 1), { 0,0,0,1 });
+	std::vector<float4> interpolated_grid((image.N + 1) * (image.M + 1));
+	std::vector<float> area((image.N) * (image.M));
+
+	ViewCamera* viewer = glfw_setup(param.windowWidth, param.windowHeight);
+
+	//Create texture for generated image
+	GLuint gl_Tex;
+	GLuint gl_Tex2;
+	GLuint gl_PBO;
+	GLuint VAO;
+	GLuint VBO;
+
+	cudaGraphicsResource* cuda_pbo_resource;
+	cudaArray* viewCudaArray;
+	
+	cudaTextureObject_t m_texture;
+	cudaSurfaceObject_t m_surface;
+
+	
+	uchar4*  h_Src = (uchar4*)malloc(image.N * image.M * 4);
+	/*glEnable(GL_TEXTURE_2D);
+	glGenTextures(1, &gl_Tex);
+	glBindTexture(GL_TEXTURE_2D, gl_Tex);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, image.N, image.M, 0, GL_BGRA, GL_UNSIGNED_BYTE, h_Src);
+	*/
+
+	glGenBuffers(1, &gl_PBO);
+	glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, gl_PBO);
+	GL_CHECK(glBufferData(GL_PIXEL_UNPACK_BUFFER_ARB, image.N * image.M * 4, h_Src, GL_STREAM_COPY));
+
+	//free(h_Src);
+	
+
+	float vertices[] = {
+	 -1.0f,  -1.0f, // Vertex 1 (X, Y)
+	 -1.0f, 1.0f, // Vertex 2 (X, Y)
+	 1.0f, -1.0f,  // Vertex 3 (X, Y)
+	 1.0f, 1.0f
+	};
+	GLuint vbo;
+	glGenBuffers(1, &vbo); // Generate 1 buffer
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+
+
+	//Compile vertexShader for geodesics
+	std::string vertexShaderText = readFile("../Resources/Shaders/VertexShader.vert");
+	const char* vertexPointer = vertexShaderText.c_str();
+	GLuint vertexShader;
+	vertexShader = glCreateShader(GL_VERTEX_SHADER);
+	glShaderSource(vertexShader, 1, &vertexPointer, NULL);
+	glCompileShader(vertexShader);
+
+	//Compile fragment shader for geodesics
+	std::string fragShaderText = readFile("../Resources/Shaders/FragmentShader.frag");
+	const char* fragPointer = fragShaderText.c_str();
+	GLuint fragmentShader;
+	fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+	glShaderSource(fragmentShader, 1, &fragPointer, NULL);
+	glCompileShader(fragmentShader);
+
+
+	//Create shader program for geodesics
+	GLuint shaderProgram;
+	shaderProgram = glCreateProgram();
+
+	glAttachShader(shaderProgram, vertexShader);
+	glAttachShader(shaderProgram, fragmentShader);
+	glLinkProgram(shaderProgram);
+	glUseProgram(shaderProgram);
+
+
+	while(q < param.nrOfFrames + startframe && !glfwWindowShouldClose(viewer->get_window())) {
+		checkCudaStatus(cudaGraphicsGLRegisterBuffer(&cuda_pbo_resource, gl_PBO,
+			cudaGraphicsMapFlagsWriteDiscard),"register");
+
+		checkCudaStatus( cudaGraphicsMapResources(1, &cuda_pbo_resource, 0),"map_resource");
+		size_t num_bytes;
+		checkCudaStatus(cudaGraphicsResourceGetMappedPointer((void**)&dev_outputImage, &num_bytes, cuda_pbo_resource),"get_pointer");
+
 		float speed = 1.f / cameraUsed[0];
-		float offset = PI2 * q / (.25f * speed * image.M);
+		
+		//Calculate phi offset due to camera movement
+		float camera_phi_offset = PI2 * q / (.25f * speed * image.M);
 
 		//TODO Fix grid_vector for more grids
 		if (grids.G > 1) {
@@ -375,9 +501,9 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 			alpha = fmodf(grid_value, 1.f);
 			if (grid_nr != (int)grid_value) {
 				grid_nr = (int)grid_value;
-				copyHostToDevice(dev_grid, grids.grid_vectors[grid_nr].data(), grids.grid_vectors[grid_nr].size() * sizeof(float3), "grid");
+				copyHostToDevice(dev_grid, grids.grid_vectors[grid_nr].data(), grids.grid_vectors[grid_nr].size() * sizeof(float4), "grid");
 				checkCudaErrors();
-				copyHostToDevice(dev_grid, grids.grid_vectors[grid_nr+1].data(), grids.grid_vectors[grid_nr+1].size() * sizeof(float3), "grid");
+				copyHostToDevice(dev_grid_2, grids.grid_vectors[grid_nr+1].data(), grids.grid_vectors[grid_nr+1].size() * sizeof(float4), "grid");
 				checkCudaErrors();
 				callKernel("Find black-hole shadow center", findBhCenter, numBlocks_GN_GM_5_25, threadsPerBlock5_25,
 					grids.GM, grids.GN1, dev_grid, dev_blackHoleBorder0);
@@ -403,7 +529,7 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 			checkCudaErrors();
 
 
-			checkCudaStatus(cudaMemcpy(&cameraUsed[0], dev_camera0, 7 * sizeof(float), cudaMemcpyDeviceToHost), "cudaMemcpy failed! Dev to Host Cam");
+			checkCudaStatus(cudaMemcpy(&cameraUsed[0], dev_camera0, 10 * sizeof(float), cudaMemcpyDeviceToHost), "cudaMemcpy failed! Dev to Host Cam");
 
 			grid_value += .5f;
 		}
@@ -417,19 +543,25 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 			dev_interpolatedGrid, image.M, image.N, dev_blackHoleMask);
 		checkCudaErrors();
 
-		callKernel("Calculated solid angles", findArea, numBlocks_N_M_5_25, threadsPerBlock5_25,
-			dev_interpolatedGrid, image.M, image.N, dev_solidAngles0);
+		callKernel("Constructed disk mask", makeDiskCheck, numBlocks_N_M_5_25, threadsPerBlock5_25,
+			dev_interpolatedGrid, dev_diskMask, image.M, image.N);
 		checkCudaErrors();
 
+		
+		callKernel("Calculated solid angles", findArea, numBlocks_N_M_5_25, threadsPerBlock5_25,
+			dev_interpolatedGrid, image.M, image.N, dev_solidAngles0,dev_camera0, param.accretionDiskMaxRadius, dev_diskMask);
+		checkCudaErrors();
+
+		
 		callKernel("Smoothed solid angles horizontally", smoothAreaH, numBlocks_N_M_5_25, threadsPerBlock5_25,
-			dev_solidAngles1, dev_solidAngles0, dev_blackHoleMask, dev_gridGap, image.M, image.N);
+			dev_solidAngles1, dev_solidAngles0, dev_blackHoleMask, dev_gridGap, image.M, image.N, dev_diskMask);
 		checkCudaErrors();
 
 
 		callKernel("Smoothed solid angles vertically", smoothAreaV, numBlocks_N_M_5_25, threadsPerBlock5_25,
-			dev_solidAngles0, dev_solidAngles1, dev_blackHoleMask, dev_gridGap, image.M, image.N);
+			dev_solidAngles0, dev_solidAngles1, dev_blackHoleMask, dev_gridGap, image.M, image.N, dev_diskMask);
 		checkCudaErrors();
-
+		
 
 
 		if (star) {
@@ -444,7 +576,7 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 			callKernel("Distorted star map", distortStarMap, numBlocks_N_M_4_4, threadsPerBlock4_4,
 				dev_starLight0, dev_interpolatedGrid, dev_blackHoleMask, dev_starPositions, dev_starTree, stars.starSize,
 				dev_camera0, dev_starMagnitudes, stars.treeLevel,
-				image.M, image.N, starvis.gaussian, offset, dev_treeSearch, starvis.searchNr, dev_starCache, dev_nrOfImagesPerStar,
+				image.M, image.N, starvis.gaussian, camera_phi_offset, dev_treeSearch, starvis.searchNr, dev_starCache, dev_nrOfImagesPerStar,
 				dev_starTrails, starvis.trailnum, dev_gradient, q, dev_viewer, param.useRedshift, param.useLensing, dev_solidAngles0);
 			checkCudaErrors();
 
@@ -466,8 +598,8 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 
 		if (map) {
 			callKernel("Distorted celestial sky image", distortEnvironmentMap, numBlocks_N_M_4_4, threadsPerBlock4_4,
-				dev_interpolatedGrid, dev_outputImage, dev_blackHoleMask, celestialSky.imsize, image.M, image.N, offset,
-				dev_summedCelestialSky, dev_cameras, dev_solidAngles0, dev_viewer, param.useRedshift, param.useLensing);
+				dev_interpolatedGrid, dev_outputImage, dev_blackHoleMask, celestialSky.imsize, image.M, image.N, camera_phi_offset,
+				dev_summedCelestialSky, dev_cameras, dev_solidAngles0, dev_viewer, param.useRedshift, param.useLensing, dev_diskMask);
 			checkCudaErrors();
 
 		}
@@ -489,71 +621,237 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 				checkCudaErrors();
 
 				callKernel("Add accretion Disk", addAccretionDisk, numBlocks_N_M_4_4, threadsPerBlock4_4,
-					dev_interpolatedGrid, dev_outputImage, temperatureLUT_device, (param.accretionDiskMaxRadius / param.accretionTemperatureLUTSize), param.accretionTemperatureLUTSize, dev_blackHoleMask, image.M, image.N);
+					dev_interpolatedGrid, dev_outputImage, temperatureLUT_device, (param.accretionDiskMaxRadius / param.accretionTemperatureLUTSize), param.accretionTemperatureLUTSize,
+					dev_blackHoleMask, image.M, image.N, dev_cameras, dev_solidAngles0, dev_viewer, param.useLensing, dev_diskMask);
 				checkCudaErrors();
 			}
 			else {
 				callKernel("Add accretion Disk Texture", addAccretionDiskTexture, numBlocks_N_M_4_4, threadsPerBlock4_4,
-					dev_interpolatedGrid, image.M, dev_blackHoleMask, dev_outputImage, dev_accretionDiskTexture, param.accretionDiskMaxRadius, accretionDiskTexture.width, accretionDiskTexture.height
+					dev_interpolatedGrid, image.M, dev_blackHoleMask, dev_outputImage, dev_accretionDiskTexture, param.accretionDiskMaxRadius,
+					accretionDiskTexture.width, accretionDiskTexture.height, dev_cameras, dev_solidAngles0, dev_viewer, param.useLensing, dev_diskMask
 				)
 			}
 		}
 
+		
+
+		checkCudaStatus(cudaMemcpy(&image.result[0], dev_outputImage, image.N * image.M * 4 * sizeof(uchar), cudaMemcpyDeviceToHost), "cudaMemcpy failed! Dev to Host");
+		checkCudaStatus(cudaMemcpy(grid.data(), dev_grid, (grids.GN1) * (grids.GM) * sizeof(float4), cudaMemcpyDeviceToHost), "cudaMemcpy failed! Dev to Host");
+		checkCudaStatus(cudaMemcpy(area.data(), dev_solidAngles0, (image.N) * (image.M) * sizeof(float), cudaMemcpyDeviceToHost), "cudaMemcpy failed! Dev to Host");
+		checkCudaStatus(cudaMemcpy(interpolated_grid.data(), dev_interpolatedGrid, (image.N + 1) * (image.M + 1) * sizeof(float4), cudaMemcpyDeviceToHost), "cudaMemcpy failed! Dev to Host");
+		
+		cudaGraphicsUnmapResources(1, &cuda_pbo_resource, 0);
+
+
 		checkCudaErrors();
 
-		// Copy output vector from GPU buffer to host memory.
-		checkCudaStatus(cudaMemcpy(&image.result[0], dev_outputImage, image.N * image.M * sizeof(uchar4), cudaMemcpyDeviceToHost), "cudaMemcpy failed! Dev to Host");
-		cv::Mat img = cv::Mat(image.N, image.M, CV_8UC4, (void*)&image.result[0]);
-		cv::imwrite(param.getResultFileName(grid_value, q), img, image.compressionParams);
+		q++;
+
+		glClearColor(0.0f, 1.0f, 1.0f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		//glBindTexture(GL_TEXTURE_2D, gl_Tex);
+		//glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.N, image.M, GL_RGBA, GL_UNSIGNED_BYTE, ((char*)0));
+
+		//glBindVertexArray(VAO);
+        //glBindBuffer(GL_ARRAY_BUFFER, VBO);
 
 
-		//Write grid results to file
-		std::vector<float3> grid((grids.GM)* (grids.GN1));
-		checkCudaStatus(cudaMemcpy(grid.data(), dev_grid, (grids.GN1)* (grids.GM) * sizeof(float3), cudaMemcpyDeviceToHost), "cudaMemcpy failed! Dev to Host");
-
-		for (int i = 0; i < grid.size(); i++) {
-			if (grid[i].x != -2.0 && grid[i].x != -1) {
-				if (grid[i].z > INFINITY_CHECK) {
-					grid[i].z = 0;
-					grid[i].x = (grid[i].x / PI);
-				}
-				else {
-					grid[i].z = grid[i].z / (grids.gridStart + q * (param.camRadiusChange ? grids.gridStep : 0));
-					grid[i].x = grid[i].x*0 / 2;
-				}
-				
-
-				grid[i].y = (grid[i].y / PI2)*0;
-				grid[i].z;
-			}
-			
+		unsigned int texture;
+		glGenTextures(1, &texture);
+		glBindTexture(GL_TEXTURE_2D, texture);
+		// set the texture wrapping/filtering options (on the currently bound texture object)
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		// load and generate the texture
+		int width, height, nrChannels;
+		unsigned char* data = stbi_load("C:\\Users\\Mika\\source\\repos\\InteractiveBlackHoleVisualization\\Results\\Grid_1_to_10_Spin_0.982_Rad_50_Inc_0.4pi_0.png", &width, &height, &nrChannels, 0);
+		if (data)
+		{
+			GL_CHECK(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data));
+			glGenerateMipmap(GL_TEXTURE_2D);
 		}
+		else
+		{
+			std::cout << "Failed to load texture" << std::endl;
+		}
+		stbi_image_free(data);
 
-		cv::Mat gridmat = cv::Mat((grids.GN1), (grids.GM), CV_32FC3, (void*)grid.data());
-		cv::Mat gridUchar;
-		gridmat.convertTo(gridUchar, CV_8UC3, 255.0);
-		cv::imwrite(param.getGridResultFileName(grid_value, q, "_grid"), gridUchar, image.compressionParams);
+
+		//GL_CHECK(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.M, image.N, 0, GL_RGBA, GL_FLOAT, celestialSky.summedCelestialSky));
+		//glGenerateMipmap(GL_TEXTURE_2D);
+
 		
-		std::vector<float3> interpolated_grid((image.N + 1)* (image.M + 1));
-		checkCudaStatus(cudaMemcpy(interpolated_grid.data(), dev_interpolatedGrid, (image.N + 1)* (image.M + 1) * sizeof(float3), cudaMemcpyDeviceToHost), "cudaMemcpy failed! Dev to Host");
 
-		for (int i = 0; i < interpolated_grid.size(); i++) {
-			interpolated_grid[i].x = (interpolated_grid[i].x / PI);
-			interpolated_grid[i].y = (interpolated_grid[i].y / PI2);
 
-			if (interpolated_grid[i].z == INFINITY) {
-				interpolated_grid[i].z = 0;
-			}
-			else {
-				interpolated_grid[i].z = interpolated_grid[i].z / (grids.gridStart + q * (param.camRadiusChange ? grids.gridStep : 0));
-			}
-		}
+		GLint posAttrib = glGetAttribLocation(shaderProgram, "position");
+		glVertexAttribPointer(posAttrib, 2, GL_FLOAT, GL_FALSE, 0, 0);
 
-		cv::Mat gridIntermat = cv::Mat((image.N + 1), (image.M + 1), CV_32FC3, (void*)interpolated_grid.data());
-		cv::Mat gridInterUchar;
-		gridIntermat.convertTo(gridInterUchar, CV_8UC3, 255.0);
-		cv::imwrite(param.getInterpolatedGridResultFileName(grid_value, q, "_interpolated_grid"), gridInterUchar, image.compressionParams);
+		glEnableVertexAttribArray(posAttrib);
+
+		//glActiveTexture(GL_TEXTURE0);
+		//glBindTexture(GL_TEXTURE_2D, gl_Tex);
+		glActiveTexture(GL_TEXTURE0); // activate the texture unit first before binding texture
+		glBindTexture(GL_TEXTURE_2D, texture);
+		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+
+
+
+		glfwSwapBuffers(viewer->get_window());
+		glfwPollEvents();
+
+		checkCudaErrors();
 	}
 
+	//Save last output to file
 
+	// Copy output vector from GPU buffer to host memory.
+	
+	cv::Mat img = cv::Mat(image.N, image.M, CV_8UC4, (void*)&image.result[0]);
+	cv::imwrite(param.getResultFileName(grid_value, q), img, image.compressionParams);
+
+
+	//Write grid results to file
+	
+
+	for (int i = 0; i < grid.size(); i++) {
+		if (grid[i].x > -2.0) {
+			if (grid[i].z > INFINITY_CHECK) {
+				grid[i].z = 0;
+				grid[i].x = (grid[i].x / PI);
+			}
+			else {
+				grid[i].z = grid[i].z / param.accretionDiskMaxRadius;
+				grid[i].x = grid[i].x / 2;
+			}
+
+
+			grid[i].y = (grid[i].y / PI2);
+			grid[i].w = 1;
+
+		}
+		else {
+			grid[i] = { 0,0,0,1 };
+		}
+
+	}
+
+	cv::Mat gridmat = cv::Mat((grids.GN1), (grids.GM), CV_32FC4, (void*)grid.data());
+	cv::Mat gridUchar;
+	gridmat.convertTo(gridUchar, CV_8UC4, 255.0);
+	cv::imwrite(param.getGridResultFileName(grid_value, q, "_grid"), gridUchar, image.compressionParams);
+
+
+
+	
+	
+	float depth_max = 0;
+	//for (int i = 0; i < area.size(); i++) area[i] = area[i] / 1e-2;
+
+	
+
+
+
+	
+	for (int i = 0; i < interpolated_grid.size(); i++) {
+		interpolated_grid[i].x = (interpolated_grid[i].x / PI);
+		interpolated_grid[i].y = (interpolated_grid[i].y / PI2);
+
+		if (interpolated_grid[i].z == INFINITY) {
+			interpolated_grid[i].z = 0;
+		}
+		else {
+			interpolated_grid[i].z = interpolated_grid[i].z / (grids.gridStart + q * (param.camRadiusChange ? grids.gridStep : 0));
+		}
+		//depth[i].y = interpolated_grid[i].w / -30;
+		interpolated_grid[i].w = 1;
+		if (i % (image.M) < image.M && i < image.M * image.N) {
+			depth[i].x = abs(area[i - (i / image.M)] / 10e-6);
+		}
+
+	}
+
+	cv::Mat depthmat = cv::Mat((image.N + 1), (image.M + 1), CV_32FC4, (void*)depth.data());
+	cv::Mat depthUchar;
+	depthmat.convertTo(depthUchar, CV_8U, 255.0);
+	cv::imwrite(param.getInterpolatedGridResultFileName(grid_value, q, "_depth"), depthUchar, image.compressionParams);
+
+
+
+	cv::Mat gridIntermat = cv::Mat((image.N + 1), (image.M + 1), CV_32FC4, (void*)interpolated_grid.data());
+	cv::Mat gridInterUchar;
+	gridIntermat.convertTo(gridInterUchar, CV_8UC4, 255.0);
+	cv::imwrite(param.getInterpolatedGridResultFileName(grid_value, q, "_interpolated_grid"), gridInterUchar, image.compressionParams);
+	
+	while (!glfwWindowShouldClose(viewer->get_window())) {
+		//glfwSwapBuffers(viewer->get_window());
+		glfwPollEvents();
+	};
+
+	//Cleanup
+	CUDA::cleanup();
+	glfwTerminate();
+	delete viewer;
+
+
+}
+
+ViewCamera* CUDA::glfw_setup(int screen_width, int screen_height) {
+	glfwInit();
+	GLFWwindow* window = glfwCreateWindow(screen_width, screen_height, "LearnOpenGL", NULL, NULL);
+	ViewCamera* camera = new ViewCamera(window);
+
+
+	if (window == NULL)
+	{
+		std::cout << "Failed to create GLFW window" << std::endl;
+		glfwTerminate();
+		return nullptr;
+	}
+	glfwMakeContextCurrent(window);
+
+	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+	{
+		std::cout << "Failed to initialize GLAD" << std::endl;
+		return nullptr;
+	}
+
+	//Setup viewport after loading glad
+	glViewport(0, 0, screen_width, screen_height);
+
+	//Turn off vsync
+	glfwSwapInterval(0);
+
+	//Setup opengl
+	gladLoadGL();
+	glClearColor(0, 0, 0, 1);
+	glClear(GL_COLOR_BUFFER_BIT);
+	glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+	//Setup initial screen
+	//glfwSwapBuffers(window);
+
+	return camera;
+}
+
+std::string CUDA::readFile(const char* filePath) {
+	std::string content;
+	std::ifstream fileStream(filePath, std::ios::in);
+
+
+	if (!fileStream.is_open()) {
+		std::cerr << "Could not read file " << filePath << ". File does not exist." << std::endl;
+		return "";
+	}
+
+	std::string line = "";
+	while (!fileStream.eof()) {
+		std::getline(fileStream, line);
+		content.append(line + "\n");
+	}
+
+	fileStream.close();
+	return content;
 }

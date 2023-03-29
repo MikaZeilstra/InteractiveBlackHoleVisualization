@@ -66,7 +66,12 @@ namespace metric {
 		float* bV, float* qV, float* pThetaV, bool savePath, float3* pathSave);
 
 
+	template <class T> __device__ __host__ void stepUntilDisk(volatile T* var, volatile  T* dvdz, T& z, T& h,
+		volatile T* varScal, const T b, const T q,
+		volatile T* varErr, volatile T* varTemp, volatile T* aks, volatile T* varTmpInt, volatile T* varOut);
+
 	template <class T>  __device__ __host__ bool wrapToPi(T& thetaW, T& phiW);
+	template <class T>  __device__ __host__ bool wrapPhiToPi(T& phiW);
 
 	//Variables
 	template  __device__ __host__ bool wrapToPi<double>(double &thetaW, double& phiW);

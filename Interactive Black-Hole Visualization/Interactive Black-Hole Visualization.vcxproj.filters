@@ -21,6 +21,12 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
+    <Filter Include="Glad">
+      <UniqueIdentifier>{5c14da6c-e7ca-491d-9d7d-b510ee427f8f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{19d71b40-8b90-4ff6-80f5-7dc4a7db634f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="C++\Header files\Archive.h">
@@ -92,12 +98,21 @@
     <ClInclude Include="CUDA\Header files\Temperature_color_lookup.cuh">
       <Filter>CUDA\Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="C++\Header files\ViewCamera.h">
+      <Filter>C++\Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="C++\Source files\Grid.cpp">
       <Filter>C++\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="C++\Source files\Source.cpp">
+      <Filter>C++\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Libraries\GLAD\glad.c">
+      <Filter>Glad</Filter>
+    </ClCompile>
+    <ClCompile Include="C++\Source files\ViewCamera.cpp">
       <Filter>C++\Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -129,5 +144,13 @@
     <CudaCompile Include="CUDA\Source files\AccretionDiskColorComputation.cu">
       <Filter>CUDA\Source Files</Filter>
     </CudaCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\Resources\Shaders\FragmentShader.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\Resources\Shaders\VertexShader.vert">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

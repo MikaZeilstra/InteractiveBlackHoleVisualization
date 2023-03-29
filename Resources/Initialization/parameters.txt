@@ -5,6 +5,10 @@ sphereView = true
 windowWidth = 1920
 windowHeight = 1080
 
+//Intermediate texture size in pixels
+texWidth = 1920
+texHeight = 1080
+
 // Viewer settings
 viewAngle = 0.5 //*PI
 offsetX = 0 // *PI
@@ -14,17 +18,17 @@ nrOfFrames = 1
 
 //Effect settings
 useRedshift = false
-useLensing = false
+useLensing = true
 useStars = false
 
 //AccretionDisk
 useAccretionDisk = true
-accretionDiskRadius = 15.
+accretionDiskRadius = 40.
 temperatureLUTSize = 500
 blackholeMass = 3.5e9 //Mass of the black hole in solar masses
 blackholeAccretionRate = 0.1 //The accretion rate of the black hole in solar masses per year
 
-useAccretionDiskTexture = true
+useAccretionDiskTexture = false
 accretionDiskTexture = "rainbow.png"
 
 //Option to save the geodesics used to generate the image
@@ -50,7 +54,7 @@ gridMaxLevel = 10
 afactor = 0.982;
 
 // Camera location, speed, direction
-camRadius = 20.
+camRadius = 50.
 camInclination = 0.40 //*PI
 // If a custom user speed is used.
 userSpeed = false

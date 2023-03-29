@@ -1,12 +1,19 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 #include "intellisense_cuda_intrinsics.cuh"
-#include "Constants.cuh"
-#include "GridLookup.cuh"
 
-__global__ void findArea(const float3* thphi, const int M, const int N, float* area);
-__global__ void smoothAreaH(float* areaSmooth, float* area, const unsigned char* bh, const int* gap, const int M, const int N);
-__global__ void smoothAreaV(float* areaSmooth, float* area, const unsigned char* bh, const int* gap, const int M, const int N);
+
+
+__global__ void findArea(const float4* thphi, const int M, const int N, float* area, float* cam, float max_accretion_radius, const unsigned char* diskMask);
+__global__ void smoothAreaH(float* areaSmooth, float* area, const unsigned char* bh, const int* gap, const int M, const int N, const unsigned char* diskMask);
+__global__ void smoothAreaV(float* areaSmooth, float* area, const unsigned char* bh, const int* gap, const int M, const int N, const unsigned char* diskMask);
+
+/// <summary>
+/// Gets the index of the element with minimum radius of 4 long array vertices
+/// </summary>
+/// <param name="vertices">4 vertices to find the minimum of</param>
+/// <returns>index of minimum element</returns>
+__device__ int radius_arg_min(float4* vertices);
 
 /// <summary>
 /// Computes a semigaussian for the specified distance value.
@@ -77,11 +84,12 @@ __device__ float hue2rgb(float p, float q, float t);
 */
 __device__ void hslToRgb(float h, float s, float l, float& r, float& g, float& b);
 
-__device__ __host__ float calcArea(float t[4], float p[4]);
+__device__ __host__ void getCartesianCoordinatesSky(float* t, float* p, volatile float* x, volatile float* y, volatile float* z);
+__device__ __host__ float solid_angle_tetrahedron(float* xi, float* yi, float* zi);
 
 __device__ __host__ float calcAreax(float t[3], float p[3]);
 
 __device__ void bv2rgb(float& r, float& g, float& b, float bv);
 
-__device__ void findLensingRedshift(volatile float* t, volatile float* p, const int M, const int ind, const float* camParam,
+__device__ void findLensingRedshift(const int M, const int ind, const float* camParam,
 	const float2* viewthing, float& frac, float& redshft, float solidAngle);

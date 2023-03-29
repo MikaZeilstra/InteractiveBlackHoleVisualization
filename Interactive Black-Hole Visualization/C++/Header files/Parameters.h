@@ -8,6 +8,7 @@ struct Parameters {
 	
 	bool sphereView, angleView;
 	int windowWidth, windowHeight = 1920;
+	int texWidth, texHeight;
 	double viewAngle;
 	cv::Point2i viewOffset;
 	int nrOfFrames;
@@ -183,10 +184,13 @@ struct Parameters {
 
 		try {
 			sphereView = config.lookup("sphereView");
+			//Width and height of window
 			windowWidth = config.lookup("windowWidth");
 			windowHeight = config.lookup("windowHeight");
 
-
+			//Width and height of distorted sky texture
+			texWidth = config.lookup("texWidth");
+			texHeight = config.lookup("texHeight");
 
 			viewAngle = config.lookup("viewAngle");
 			viewAngle *= PI;
@@ -271,6 +275,6 @@ struct Parameters {
 		else if (camInclinationChange) gridNum = 1. + round(abs(camInclinationFromTo.y - camInclinationFromTo.x) / camInclinationStepsize);
 		else if (camSpeedChange) gridNum = 1. + round(abs(camSpeedFromTo.y - camSpeedFromTo.x) / camSpeedStepsize);
 
-		if (sphereView) windowHeight = (int)floor(windowWidth / 2);
+		if (sphereView) texHeight = (int)floor(texWidth / 2);
 	}
 };

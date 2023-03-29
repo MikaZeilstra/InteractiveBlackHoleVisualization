@@ -1,8 +1,8 @@
 #include "../Header files/ImageDeformation.cuh"
 
-__global__ void distortEnvironmentMap(const float3* thphi, uchar4* out, const unsigned char* bh, const int2 imsize,
-										const int M, const int N, float offset, float4* sumTable, const float* camParam,
-										const float* solidangle, float2* viewthing, bool redshiftOn, bool lensingOn) {
+__global__ void distortEnvironmentMap(const float4* thphi, uchar4* out, const unsigned char* bh, const int2 imsize,
+										const int M, const int N, float camera_phi_offset, float4* sumTable, const float* camParam,
+										const float* solidangle, float2* viewthing, bool redshiftOn, bool lensingOn, const unsigned char* dev_diskMask) {
 	
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
@@ -10,18 +10,21 @@ __global__ void distortEnvironmentMap(const float3* thphi, uchar4* out, const un
 	int ind = i * M1 + j;
 	// Only compute if pixel is not black hole and i j is in image
 
+
+
 	if (i < N && j < M) {
 
 
-		if (bh[ijc] == 0 && thphi[ind].z > INFINITY_CHECK) {
+		if (!bh[ijc] && !dev_diskMask[ijc]) {
+
 
 			volatile float t[4], p[4];
 			bool picheck = false;
-			retrievePixelCorners(thphi, const_cast<float*>(t), const_cast<float*>(p), ind, M, picheck, offset);
+			retrievePixelCorners(thphi, const_cast<float*>(t), const_cast<float*>(p), ind, M, picheck, camera_phi_offset);
 
 			if (ind > 0) {
 
-				float pixSize = PIc / float(imsize.x);
+				float pixSize = PI / float(imsize.x);
 				float phMax = max(max(p[0], p[1]), max(p[2], p[3]));
 				float phMin = min(min(p[0], p[1]), min(p[2], p[3]));
 				int pixMax = int(phMax / pixSize);
@@ -104,12 +107,14 @@ __global__ void distortEnvironmentMap(const float3* thphi, uchar4* out, const un
 
 					}
 				}
-
 				
 
 				color.x = min(255.f, powf(color.x / color.w, 1.f / 2.2f));
 				color.y = min(255.f, powf(color.y / color.w, 1.f / 2.2f));
 				color.z = min(255.f, powf(color.z / color.w, 1.f / 2.2f));
+
+		
+
 
 				float H, S, P;
 				if (lensingOn || redshiftOn) {
@@ -117,10 +122,9 @@ __global__ void distortEnvironmentMap(const float3* thphi, uchar4* out, const un
 
 					float redshft = 1;
 					float frac = 1;
-					findLensingRedshift(t, p, M, ind, camParam, viewthing, frac, redshft, solidangle[ijc]);
+					findLensingRedshift( M, ind, camParam, viewthing, frac, redshft, solidangle[ijc]);
 					if (lensingOn) P *= frac;
 					if (redshiftOn) P = powf(P, redshft);
-					//Redshift does not change Hue channel?
 					HSPtoRGB(H, S, min(1.f, P), color.z, color.y, color.x);
 					color.x *= 255.f;
 					color.y *= 255.f;

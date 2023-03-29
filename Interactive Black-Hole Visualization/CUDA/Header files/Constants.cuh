@@ -1,7 +1,8 @@
 #pragma once
 #include "cuda_runtime.h"
 
-#define R_CHANGE_THRESHOLD 10
+#define R_CHANGE_THRESHOLD 3
+#define W_SURFACE_DISCRIMINANT 5
 
 #define TILE_W 4
 #define TILE_H 4
@@ -17,11 +18,11 @@
 #define cam_br cam[4]
 #define cam_btheta cam[5]
 #define cam_bphi cam[6]
+#define cam_theta cam[7]
+#define cam_phi cam[8]
+#define cam_r cam[9]
 
 #define SQRT2PI 2.506628274631f
-
-#define PI2c 6.283185307179586476f
-#define PIc 3.141592653589793238f
 
 #define INFINITY 1e30
 #define INFINITY_CHECK 5e29
@@ -33,3 +34,7 @@
 
 #define SQRT3 1.73205080757
 #define SQRT6 2.44948974278
+
+#define CUDART_NAN_F            __int_as_float(0x7fffffff)
+
+#define PI_CHECK_FACTOR 0.1

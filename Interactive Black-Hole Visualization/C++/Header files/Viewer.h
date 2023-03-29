@@ -18,8 +18,8 @@ public:
 	Viewer(){};
 
 	Viewer(Parameters& param) {
-		pixelwidth = param.windowWidth;
-		pixelheight = param.windowHeight;
+		pixelwidth = param.texWidth;
+		pixelheight = param.texHeight;
 
 		//+1 to complete the last pixel, because every pixel has 4 corners
 		viewMatrix = std::vector<cv::Point2f>((pixelheight + 1) * (pixelwidth + 1));
@@ -27,7 +27,7 @@ public:
 		if (param.sphereView) makeSphereView();
 		else {
 			viewAngleWide = param.viewAngle;
-			viewAngleUp = 1.*param.windowHeight * viewAngleWide / (1.*param.windowWidth);
+			viewAngleUp = 1.*param.texHeight * viewAngleWide / (1.*param.texWidth);
 			makeCameraView(param.viewOffset.y, param.viewOffset.x);
 		}
 	};

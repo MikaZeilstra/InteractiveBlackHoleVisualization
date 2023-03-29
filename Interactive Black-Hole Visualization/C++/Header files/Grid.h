@@ -37,7 +37,7 @@ private:
 	/// <param name="poss">The coordinates of the polygon corners.</param>
 	/// <param name="factor">The factor to check whether a point is close to the border.</param>
 	/// <returns>Boolean indicating if the polygon is a likely 2pi cross candidate.</returns>
-	static bool check2PIcross(const std::vector<cv::Point3d>& spl, float factor);
+	static bool check2PIcross(const std::vector<float4>& spl, float factor);
 
 	/// <summary>
 	/// Assumes the polygon crosses 2pi and adds 2pi to every corner value of a polygon
@@ -45,7 +45,7 @@ private:
 	/// </summary>
 	/// <param name="poss">The coordinates of the polygon corners.</param>
 	/// <param name="factor">The factor to check whether a point is close to the border.</param>
-	static bool correct2PIcross(std::vector<cv::Point3d>& spl, float factor);
+	static bool correct2PIcross(std::vector<float4>& spl, float factor);
 
 	///TODO FIX SERIALISATION
 	// Cereal settings for serialization
@@ -128,7 +128,7 @@ private:
 
 	bool find(uint64_t ij);
 
-	cv::Point3d const hermite(double aValue, cv::Point3d const& aX0, cv::Point3d const& aX1, cv::Point3d const& aX2, cv::Point3d const& aX3, double aTension, double aBias);
+	float4 const hermite(double aValue, float4 const& aX0, float4 const& aX1, float4 const& aX2, float4 const& aX3, double aTension, double aBias);
 
 
 
@@ -158,7 +158,7 @@ private:
 	/// <param name="thetavals">The computed theta values (celestial sky).</param>
 	/// <param name="phivals">The computed phi values (celestial sky).</param>
 	void fillGridCam(const std::vector<uint64_t>& ijvals, const size_t s, std::vector<double>& thetavals,
-		std::vector<double>& phivals, std::vector<double>& r, std::vector<int>& step);
+		std::vector<double>& phivals, std::vector<double>& r, std::vector<double>& distance_to_point, std::vector<int>& step);
 
 	template <typename T, typename Compare>
 	std::vector<std::size_t> sort_permutation(
@@ -208,7 +208,7 @@ private:
 	/// <param name="theta">The theta positions.</param>
 	/// <param name="phi">The phi positions.</param>
 	/// <param name="n">The size of the vectors.</param>
-	void integration_wrapper(std::vector<double>& theta, std::vector<double>& phi,std::vector<double>& r, const int n, std::vector<int>& step);
+	void integration_wrapper(std::vector<double>& theta, std::vector<double>& phi,std::vector<double>& r, std::vector<double>& distances, const int n, std::vector<int>& step);
 
 	#pragma endregion private
 
@@ -227,7 +227,7 @@ public:
 	/// <summary>
 	/// Mapping from camera sky position to celestial angle.
 	/// </summary>
-	std::unordered_map <uint64_t, cv::Point3d, hashing_func2> CamToCel;
+	std::unordered_map <uint64_t, float4, hashing_func2> CamToCel;
 
 	std::vector<int> steps;
 
@@ -236,7 +236,7 @@ public:
 	/// </summary>
 	std::vector<float> geodesics;
 
-	std::vector<float3> grid_vector;
+	std::vector<float4> grid_vector;
 
 	Parameters* param;
 

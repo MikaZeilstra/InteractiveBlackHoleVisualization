@@ -1,4 +1,6 @@
 #include "../Header files/StarDeformation.cuh"
+#include "../Header files/GridLookup.cuh"
+
 __constant__ const int tempToRGB[1173] = { 255, 56, 0, 255, 71, 0, 255, 83, 0, 255, 93, 0, 255, 101, 0, 255, 109, 0, 255, 115, 0, 255, 121, 0,
 												255, 126, 0, 255, 131, 0, 255, 137, 18, 255, 142, 33, 255, 147, 44, 255, 152, 54, 255, 157, 63, 255, 161, 72,
 												255, 165, 79, 255, 169, 87, 255, 173, 94, 255, 177, 101, 255, 180, 107, 255, 184, 114, 255, 187, 120,
@@ -75,7 +77,7 @@ __device__ bool starInPolygon(const float* t, const float* p, float start, float
 }
 
 
-__global__ void makeGradField(const float3* thphi, const int M, const int N, float2* grad) {
+__global__ void makeGradField(const float4* thphi, const int M, const int N, float2* grad) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 	if (i < N1 && j < M1) {
@@ -99,8 +101,8 @@ __global__ void makeGradField(const float3* thphi, const int M, const int N, flo
 
 __device__ void searchTree(const int* tree, const float* thphiPixMin, const float* thphiPixMax, const int treeLevel,
 							int* searchNrs, int startNr, int& pos, int picheck) {
-	float nodeStart[2] = { 0.f, 0.f + picheck * PIc };
-	float nodeSize[2] = { PIc, PI2c };
+	float nodeStart[2] = { 0.f, 0.f + picheck * PI };
+	float nodeSize[2] = { PI, PI2 };
 	int node = 0;
 	unsigned int bitMask = powf(2, treeLevel);
 	int level = 0;
@@ -177,7 +179,7 @@ __device__ void addTrails(const int starsToCheck, const int starSize, const int 
 		if (loc < trailnum) stCache[trailnum * cache + 2 * (trailnum * q) + loc] = { i, j };
 
 		float traildist = M;
-		float angle = PI2c;
+		float angle = PI2;
 		int2 prev;
 		int num = -1;
 		bool line = false;
@@ -201,7 +203,7 @@ __device__ void addTrails(const int starsToCheck, const int starSize, const int 
 			float a1 = acosf((1.f * dx * gr.x + 1.f * dy * gr.y) / div);
 			float a2 = acosf((1.f * dx * -gr.x + 1.f * dy * -gr.y) / div);
 			float a = min(a1, a2);
-			if (a > angle || a > PIc * .25f) continue;
+			if (a > angle || a > PI * .25f) continue;
 			else if (a < angle) {
 				angle = a;
 				traildist = dist;
@@ -246,9 +248,9 @@ __device__ void addTrails(const int starsToCheck, const int starSize, const int 
 	}
 }
 
-__global__ void distortStarMap(float3* starLight, const float3* thphi, const unsigned char* bh, const float* stars, const int* tree,
+__global__ void distortStarMap(float3* starLight, const float4* thphi, const unsigned char* bh, const float* stars, const int* tree,
 	const int starSize, const float* camParam, const float* magnitude, const int treeLevel,
-	const int M, const int N, const int step, float offset, int* search, int searchNr, int2* stCache,
+	const int M, const int N, const int step, float camera_phi_offset, int* search, int searchNr, int2* stCache,
 	int* stnums, float3* trail, int trailnum, float2* grad, const int framenumber, const float2* viewthing, bool redshiftOn, bool lensingOn, const float* area) {
 
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
@@ -270,7 +272,7 @@ __global__ void distortStarMap(float3* starLight, const float3* thphi, const uns
 			volatile float t[4], p[4];
 			int ind = i * M1 + j;
 			bool picheck = false;
-			retrievePixelCorners(thphi, const_cast<float*>(t), const_cast<float*>(p), ind, M, picheck, offset);
+			retrievePixelCorners(thphi, const_cast<float*>(t), const_cast<float*>(p), ind, M, picheck, camera_phi_offset);
 
 			// Search where in the star tree the bounding box of the projected pixel falls.
 			const float thphiPixMax[2] = { max(max(t[0], t[1]), max(t[2], t[3])),
@@ -290,7 +292,12 @@ __global__ void distortStarMap(float3* starLight, const float3* thphi, const uns
 			// Calculate redshift and lensing effect
 			float redshft = 1.f;
 			float frac = 1.f;
-			if (lensingOn || redshiftOn) findLensingRedshift(t, p, M, ind, camParam, viewthing, frac, redshft, area[ijc]);
+
+			findLensingRedshift(M, ind, camParam, viewthing, frac, redshft, area[ijc]);
+			
+			frac = lensingOn ? frac : 1.0f;
+			redshft = redshiftOn ? redshft : 1.0f;
+
 			float red = 4.f * log10f(redshft);
 			float maxDistSq = (step + .5f) * (step + .5f);
 
@@ -305,7 +312,7 @@ __global__ void distortStarMap(float3* starLight, const float3* thphi, const uns
 				}
 				starsToCheck += (tree[node] - startN);
 			}
-
+		
 			// Check stars in tree leaves
 			for (int s = 0; s < pos; s++) {
 				int node = search[startnr + s];
@@ -317,11 +324,15 @@ __global__ void distortStarMap(float3* starLight, const float3* thphi, const uns
 					float start = stars[2 * q];
 					float starp = stars[2 * q + 1];
 					bool starInPoly = starInPolygon(const_cast<float*>(t), const_cast<float*>(p), start, starp, sgn);
-					if (picheck && !starInPoly && starp < PI2c * .2f) {
-						starp += PI2c;
+					if (picheck && !starInPoly && starp < PI2 * .2f) {
+						starp += PI2;
 						starInPoly = starInPolygon(const_cast<float*>(t), const_cast<float*>(p), start, starp, sgn);
 					}
 					if (starInPoly) {
+						if (i == 500 && j == 509) {
+							i;
+						}
+
 						interpolate(t[0], t[1], t[2], t[3], p[0], p[1], p[2], p[3], start, starp, sgn, i, j);
 						float part = magnitude[2 * q] + red;
 						float temp = 46.f / redshft * ((1.f / ((0.92f * magnitude[2 * q + 1]) + 1.7f)) +
