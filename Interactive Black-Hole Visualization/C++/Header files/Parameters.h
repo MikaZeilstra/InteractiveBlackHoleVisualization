@@ -8,6 +8,7 @@ struct Parameters {
 	
 	bool sphereView, angleView;
 	int windowWidth, windowHeight = 1920;
+	float focalLength = 5;
 	int texWidth, texHeight;
 	double viewAngle;
 	cv::Point2i viewOffset;

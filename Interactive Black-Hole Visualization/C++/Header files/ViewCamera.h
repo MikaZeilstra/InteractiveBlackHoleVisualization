@@ -3,29 +3,37 @@
 
 #define GLFW_INCLUDE_NONE
 #include <glfw3.h>
+#include "../../CUDA/Header files/Constants.cuh"
+
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
+void mouse_cursor_callback(GLFWwindow* window, double xpos, double ypos);
 
 class ViewCamera {
 public:
 
     ViewCamera(GLFWwindow* pWindow);
-    ViewCamera(GLFWwindow* pWindow, const glm::vec3& pos, const glm::vec3& forward, const glm::vec3& up);
+    ViewCamera(GLFWwindow* pWindow, glm::vec3 CameraDirection, int window_width, int window_height, float Fov);
 
-
-    void updateInput();
     GLFWwindow* get_window();
 
-    glm::vec3 cameraPos() const;
-    glm::mat4 viewMatrix() const;
+    glm::dvec2 previous_mouse_pos = {};
 
-    glm::vec3 m_position{ 10,0,0 };
-    glm::vec3 m_forward{ -1, 0, 0 };
-    glm::vec3 m_up{ 0, 1, 0 };
-
-private:
-
-
-private:
-
+    //Direction of camera in spherical coordinates (R, Theta phi)
+    glm::vec3 m_CameraDirection;
+    
     GLFWwindow* m_pWindow;
     glm::dvec2 m_prevCursorPos{ 0 };
+    
+    glm::mat4 inv_project_matrix;
+
+    float m_CameraFov = {};
+
+    bool mouse_pressed = false;
+
+    void updateInput();
+    
+
+private:
+
+    
 };

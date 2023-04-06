@@ -3,6 +3,7 @@
 #include "../../C++/Header files/IntegrationDefines.h"
 #include "./../Header files/AccretionDiskColorComputation.cuh"
 
+#define STB_IMAGE_IMPLEMENTATION
 
 #include <fstream>
 
@@ -11,20 +12,27 @@
 
 #include <cuda_gl_interop.h>
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "stbi_image.h"
+#include <glm/gtc/type_ptr.hpp>
 
+#include <stbi_image.h>
 
+/// <summary>
+/// Checks if there was an error generated on any previous opengl call and prints the error. Also prints the statement this function was called with (not nececerally the cause of the error). 
+/// </summary>
+/// <param name="stmt">Statement to blame on error</param>
+/// <param name="fname">Filename of the statement</param>
+/// <param name="line">Line number of the statement</param>
 void CheckOpenGLError(const char* stmt, const char* fname, int line)
 {
 	GLenum err = glGetError();
 	if (err != GL_NO_ERROR)
 	{
-		printf("OpenGL error %08x, at %s:%i - for %s\n", err, fname, line, stmt);
+		printf("OpenGL error %03x, at %s:%i - for %s\n", err, fname, line, stmt);
 		abort();
 	}
 }
 
+//Macro to automatically check for opengl error after a call. Only does things in the debug build.
 #ifdef _DEBUG
 #define GL_CHECK(stmt) do { \
             stmt; \
@@ -286,12 +294,7 @@ void CUDA::memoryAllocationAndCopy(const Grids& grids, const Image& image, const
 	cudaDeviceSetLimit(cudaLimitStackSize, 16384);
 	cudaDeviceGetLimit(&size_heap, cudaLimitMallocHeapSize);
 	cudaDeviceGetLimit(&size_stack, cudaLimitStackSize);
-	//printf("Heap size found to be %d; Stack size found to be %d\n", (int)size_heap, (int)size_stack);
 
-	//allocate(dev_hashTable, grids.hashTableSize * sizeof(float3), "hashTable");
-	//allocate(dev_offsetTable, grids.offsetTableSize * sizeof(int2), "offsetTable");
-	//allocate(dev_tableSize, grids.G * sizeof(int2), "tableSize");
-	//allocate(dev_hashPosTag, grids.hashTableSize * sizeof(int2), "hashPosTag");
 
 	allocate(dev_grid, gridnum * gridsize * sizeof(float4), "grid");
 	dev_grid_2 = &dev_grid[gridsize];
@@ -327,6 +330,8 @@ void CUDA::memoryAllocationAndCopy(const Grids& grids, const Image& image, const
 	allocate(dev_starTree, treeSize * sizeof(int), "starTree");
 	allocate(dev_treeSearch, starvis.searchNr * imageSize * sizeof(int), "treeSearch");
 	allocate(dev_gradient, rastSize * sizeof(float2), "gradient");
+	allocate(dev_outputImage, image.N * image.M * sizeof(uchar4),"output")
+
 
 	allocate(temperatureLUT_device, param.accretionTemperatureLUTSize * sizeof(double),"temperature table");
 	allocate(dev_accretionDiskTexture, accretionTexture.width * accretionTexture.height * sizeof(float3), "AccretionTexture");
@@ -409,52 +414,54 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 
 	ViewCamera* viewer = glfw_setup(param.windowWidth, param.windowHeight);
 
-	//Create texture for generated image
+	//Setup pointers for openGL objects
 	GLuint gl_Tex;
-	GLuint gl_Tex2;
 	GLuint gl_PBO;
 	GLuint VAO;
-	GLuint VBO;
 
+	//Cuda OpenGl interop object pointer
 	cudaGraphicsResource* cuda_pbo_resource;
-	cudaArray* viewCudaArray;
-	
-	cudaTextureObject_t m_texture;
-	cudaSurfaceObject_t m_surface;
 
-	
-	uchar4*  h_Src = (uchar4*)malloc(image.N * image.M * 4);
-	/*glEnable(GL_TEXTURE_2D);
+
+	//Reserve texture object in opengl to use in the shaders
+	glEnable(GL_TEXTURE_2D);
 	glGenTextures(1, &gl_Tex);
+
 	glBindTexture(GL_TEXTURE_2D, gl_Tex);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, image.N, image.M, 0, GL_BGRA, GL_UNSIGNED_BYTE, h_Src);
-	*/
 
-	glGenBuffers(1, &gl_PBO);
-	glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, gl_PBO);
-	GL_CHECK(glBufferData(GL_PIXEL_UNPACK_BUFFER_ARB, image.N * image.M * 4, h_Src, GL_STREAM_COPY));
 
-	//free(h_Src);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.M, image.N, 0, GL_BGRA, GL_UNSIGNED_BYTE, 0); // no upload, just reserve 
+	glBindTexture(GL_TEXTURE_2D, 0); // unbind
 	
+	//Reserve PBO spaCe
+	glGenBuffers(1, &gl_PBO);
+	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, gl_PBO);
+	glBufferData(GL_PIXEL_UNPACK_BUFFER, image.N *  image.M * sizeof(uchar4), 0, GL_DYNAMIC_DRAW);
+	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0); //unbind
 
+
+	//Register the PBO to cuda so we can write to it
+	checkCudaStatus(cudaGraphicsGLRegisterBuffer(&cuda_pbo_resource, gl_PBO,
+		cudaGraphicsMapFlagsWriteDiscard), "register");
+
+	//Setup screen covering triangles into a VBO
 	float vertices[] = {
-	 -1.0f,  -1.0f, // Vertex 1 (X, Y)
-	 -1.0f, 1.0f, // Vertex 2 (X, Y)
-	 1.0f, -1.0f,  // Vertex 3 (X, Y)
+	 -1.0f,  -1.0f, 
+	 -1.0f, 1.0f, 
+	 1.0f, -1.0f,
 	 1.0f, 1.0f
 	};
 	GLuint vbo;
-	glGenBuffers(1, &vbo); // Generate 1 buffer
+	glGenBuffers(1, &vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
 
 
-	//Compile vertexShader for geodesics
+	//Compile vertexShader
 	std::string vertexShaderText = readFile("../Resources/Shaders/VertexShader.vert");
 	const char* vertexPointer = vertexShaderText.c_str();
 	GLuint vertexShader;
@@ -462,7 +469,7 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 	glShaderSource(vertexShader, 1, &vertexPointer, NULL);
 	glCompileShader(vertexShader);
 
-	//Compile fragment shader for geodesics
+	//Compile fragment shader
 	std::string fragShaderText = readFile("../Resources/Shaders/FragmentShader.frag");
 	const char* fragPointer = fragShaderText.c_str();
 	GLuint fragmentShader;
@@ -471,23 +478,25 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 	glCompileShader(fragmentShader);
 
 
-	//Create shader program for geodesics
+	//Create shader program
 	GLuint shaderProgram;
 	shaderProgram = glCreateProgram();
-
 	glAttachShader(shaderProgram, vertexShader);
 	glAttachShader(shaderProgram, fragmentShader);
 	glLinkProgram(shaderProgram);
 	glUseProgram(shaderProgram);
 
+	//Setup placeholder for the number of bytes return 
+	size_t num_bytes;
+
+	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0); // << default texture object
 
 	while(q < param.nrOfFrames + startframe && !glfwWindowShouldClose(viewer->get_window())) {
-		checkCudaStatus(cudaGraphicsGLRegisterBuffer(&cuda_pbo_resource, gl_PBO,
-			cudaGraphicsMapFlagsWriteDiscard),"register");
-
+		
+		//Map the PBO to cuda and set the outputimage pointer to that location
 		checkCudaStatus( cudaGraphicsMapResources(1, &cuda_pbo_resource, 0),"map_resource");
-		size_t num_bytes;
 		checkCudaStatus(cudaGraphicsResourceGetMappedPointer((void**)&dev_outputImage, &num_bytes, cuda_pbo_resource),"get_pointer");
+		
 
 		float speed = 1.f / cameraUsed[0];
 		
@@ -643,59 +652,34 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 		cudaGraphicsUnmapResources(1, &cuda_pbo_resource, 0);
 
 
-		checkCudaErrors();
+		//checkCudaErrors();
 
 		q++;
 
 		glClearColor(0.0f, 1.0f, 1.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		//glBindTexture(GL_TEXTURE_2D, gl_Tex);
-		//glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.N, image.M, GL_RGBA, GL_UNSIGNED_BYTE, ((char*)0));
+		//Copy the PBO to the texture
+		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, gl_PBO);
+		glBindTexture(GL_TEXTURE_2D, gl_Tex);
+		GL_CHECK(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.M, image.N, GL_BGRA, GL_UNSIGNED_BYTE, 0)); // copy from pbo to texture
+		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+		glBindTexture(GL_TEXTURE_2D, 0);
 
-		//glBindVertexArray(VAO);
-        //glBindBuffer(GL_ARRAY_BUFFER, VBO);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, gl_Tex);
 
+		glUniform1i(1, param.windowWidth);
+		glUniform1i(2, param.windowHeight);
 
-		unsigned int texture;
-		glGenTextures(1, &texture);
-		glBindTexture(GL_TEXTURE_2D, texture);
-		// set the texture wrapping/filtering options (on the currently bound texture object)
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		// load and generate the texture
-		int width, height, nrChannels;
-		unsigned char* data = stbi_load("C:\\Users\\Mika\\source\\repos\\InteractiveBlackHoleVisualization\\Results\\Grid_1_to_10_Spin_0.982_Rad_50_Inc_0.4pi_0.png", &width, &height, &nrChannels, 0);
-		if (data)
-		{
-			GL_CHECK(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data));
-			glGenerateMipmap(GL_TEXTURE_2D);
-		}
-		else
-		{
-			std::cout << "Failed to load texture" << std::endl;
-		}
-		stbi_image_free(data);
-
-
-		//GL_CHECK(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.M, image.N, 0, GL_RGBA, GL_FLOAT, celestialSky.summedCelestialSky));
-		//glGenerateMipmap(GL_TEXTURE_2D);
-
-		
-
+		glUniformMatrix4fv(3, 1, false, glm::value_ptr(viewer->inv_project_matrix));
+		glUniform3fv(4, 1, glm::value_ptr(viewer->m_CameraDirection));
 
 		GLint posAttrib = glGetAttribLocation(shaderProgram, "position");
 		glVertexAttribPointer(posAttrib, 2, GL_FLOAT, GL_FALSE, 0, 0);
-
 		glEnableVertexAttribArray(posAttrib);
 
-		//glActiveTexture(GL_TEXTURE0);
-		//glBindTexture(GL_TEXTURE_2D, gl_Tex);
-		glActiveTexture(GL_TEXTURE0); // activate the texture unit first before binding texture
-		glBindTexture(GL_TEXTURE_2D, texture);
-		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+		GL_CHECK(glDrawArrays(GL_TRIANGLE_STRIP, 0, 4));
 
 
 
@@ -787,7 +771,23 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 	cv::imwrite(param.getInterpolatedGridResultFileName(grid_value, q, "_interpolated_grid"), gridInterUchar, image.compressionParams);
 	
 	while (!glfwWindowShouldClose(viewer->get_window())) {
-		//glfwSwapBuffers(viewer->get_window());
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, gl_Tex);
+
+		glUniform1i(1, param.windowWidth);
+		glUniform1i(2, param.windowHeight);
+
+		glUniformMatrix4fv(3, 1, false, glm::value_ptr(viewer->inv_project_matrix));
+		glUniform3fv(4, 1, glm::value_ptr(viewer->m_CameraDirection));
+
+		GLint posAttrib = glGetAttribLocation(shaderProgram, "position");
+		glVertexAttribPointer(posAttrib, 2, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(posAttrib);
+
+		GL_CHECK(glDrawArrays(GL_TRIANGLE_STRIP, 0, 4));
+		
+		glfwSwapBuffers(viewer->get_window());
 		glfwPollEvents();
 	};
 
@@ -802,8 +802,12 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 ViewCamera* CUDA::glfw_setup(int screen_width, int screen_height) {
 	glfwInit();
 	GLFWwindow* window = glfwCreateWindow(screen_width, screen_height, "LearnOpenGL", NULL, NULL);
-	ViewCamera* camera = new ViewCamera(window);
+	ViewCamera* camera = new ViewCamera(window, { 0,PI1_2,PI },screen_width,screen_height, 10);
 
+	glfwSetWindowUserPointer(window, camera);
+
+	glfwSetCursorPosCallback(window, mouse_cursor_callback);
+	glfwSetMouseButtonCallback(window, mouse_button_callback);
 
 	if (window == NULL)
 	{
@@ -830,8 +834,6 @@ ViewCamera* CUDA::glfw_setup(int screen_width, int screen_height) {
 	glClearColor(0, 0, 0, 1);
 	glClear(GL_COLOR_BUFFER_BIT);
 	glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
-	//Setup initial screen
-	//glfwSwapBuffers(window);
 
 	return camera;
 }
