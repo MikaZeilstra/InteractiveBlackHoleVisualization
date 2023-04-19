@@ -43,13 +43,13 @@ void CheckOpenGLError(const char* stmt, const char* fname, int line)
 #endif
 
 
-
+/*
 #define copyHostToDevice(dev_pointer, host_pointer, size, txt) { std::string errtxt = ("Host to Device copy Error " + std::string(txt)); \
 																 checkCudaStatus(cudaMemcpy(dev_pointer, host_pointer, size, cudaMemcpyHostToDevice), errtxt.c_str()); }
 
 #define copyDeviceToHost(host_pointer, dev_pointer, size, txt) { std::string errtxt = ("Host to Device copy Error " + std::string(txt)); \
 																 checkCudaStatus(cudaMemcpy(host_pointer,dev_pointer , size, cudaMemcpyDeviceToHost), errtxt.c_str()); }
-
+																 */
 #define copyHostToDeviceAsync(dev_pointer, host_pointer, size, txt) { std::string errtxt = ("Host to Device copy Error " + std::string(txt)); \
 																 checkCudaStatus(cudaMemcpyAsync(dev_pointer, host_pointer, size, cudaMemcpyHostToDevice,stream), errtxt.c_str()); }
 
@@ -59,6 +59,7 @@ void CheckOpenGLError(const char* stmt, const char* fname, int line)
 #define allocate(dev_pointer, size, txt);			  { std::string errtxt = ("Allocation Error " + std::string(txt)); \
 														checkCudaStatus(cudaMalloc((void**)&dev_pointer, size), errtxt.c_str()); }
 
+/*
 #define callKernel(txt, kernel, blocks, threads, ...);{ cudaEventRecord(start);							\
 														kernel <<<blocks, threads>>>(__VA_ARGS__);		\
 														cudaEventRecord(stop);							\
@@ -66,14 +67,22 @@ void CheckOpenGLError(const char* stmt, const char* fname, int line)
 														cudaEventElapsedTime(&milliseconds, start, stop); \
 														std::cout << milliseconds << " ms\t " << txt << std::endl; \
 													  }
-
-#define callKernelAsync(txt, kernel, blocks, threads,shared_mem_size, ...);{ cudaEventRecord(start);							\
+													  */
+#ifdef _DEBUG
+	#define callKernelAsync(txt, kernel, blocks, threads,shared_mem_size, ...);{ cudaEventRecord(start,stream);							\
 														kernel <<<blocks, threads,shared_mem_size,stream>>>(__VA_ARGS__);		\
-														cudaEventRecord(stop);							\
+														cudaEventRecord(stop,stream);							\
 														cudaEventSynchronize(stop);						\
 														cudaEventElapsedTime(&milliseconds, start, stop); \
 														std::cout << milliseconds << " ms\t " << txt << std::endl; \
 													  }
+#else
+	#define callKernelAsync(txt, kernel, blocks, threads,shared_mem_size, ...);{ 							\
+														kernel <<<blocks, threads,shared_mem_size,stream>>>(__VA_ARGS__);		\
+													  }
+#endif // DEBUG
+
+
 
 CUstream stream;
 cudaEvent_t start, stop;
@@ -247,11 +256,10 @@ template <class T> void CUDA::integrateGrid(const T rV, const T thetaV, const T 
 
 
 
-	copyHostToDevice(pRvs_device, pRV.data(), pRV.size() * sizeof(T), "pRs");
-	copyHostToDevice(bs_device, bV.data(), bV.size() * sizeof(T), "bs");
-	copyHostToDevice(qs_device, qV.data(), qV.size() * sizeof(T), "qs");
-	copyHostToDevice(pThetas_device, pThetaV.data(), pThetaV.size() * sizeof(T), "pThetaVs");
-	checkCudaErrors();
+	copyHostToDeviceAsync(pRvs_device, pRV.data(), pRV.size() * sizeof(T), "pRs");
+	copyHostToDeviceAsync(bs_device, bV.data(), bV.size() * sizeof(T), "bs");
+	copyHostToDeviceAsync(qs_device, qV.data(), qV.size() * sizeof(T), "qs");
+	copyHostToDeviceAsync(pThetas_device, pThetaV.data(), pThetaV.size() * sizeof(T), "pThetaVs");
 
 
 	int threads_per_block = 32;
@@ -259,15 +267,15 @@ template <class T> void CUDA::integrateGrid(const T rV, const T thetaV, const T 
 	int block_size = ceil(pRV.size() / (float)threads_per_block);
 
 	//We can reinterpret_cast since T is either double or float and we reserve space for the larger double type
-	callKernel("integrate GPU", metric::integrate_kernel<T>, block_size, threads_per_block,
+	callKernelAsync("integrate GPU", metric::integrate_kernel<T>, block_size, threads_per_block, 0,
 		rV, thetaV, phiV, reinterpret_cast<T*>(pRvs_device), reinterpret_cast<T*>(bs_device), reinterpret_cast<T*>(qs_device), reinterpret_cast<T*>(pThetas_device), pRV.size());
 
-	copyDeviceToHost(bV.data(), bs_device, bV.size() * sizeof(T), "found theta");
-	copyDeviceToHost(qV.data(), qs_device, qV.size() * sizeof(T), "found phi");
-	copyDeviceToHost(pThetaV.data(), pThetas_device, pThetaV.size() * sizeof(T), "found r");
-	copyDeviceToHost(pRV.data(), pRvs_device, pRV.size() * sizeof(T), "found r");
-	checkCudaErrors();
-
+	copyDeviceToHostAsync(bV.data(), bs_device, bV.size() * sizeof(T), "found theta");
+	copyDeviceToHostAsync(qV.data(), qs_device, qV.size() * sizeof(T), "found phi");
+	copyDeviceToHostAsync(pThetaV.data(), pThetas_device, pThetaV.size() * sizeof(T), "found r");
+	copyDeviceToHostAsync(pRV.data(), pRvs_device, pRV.size() * sizeof(T), "found r");
+	
+	cudaStreamSynchronize(stream);
 }
 
 
@@ -338,20 +346,20 @@ void CUDA::memoryAllocationAndCopy(const Grids& grids, const Image& image, const
 
 	std::cout << "Copying variables into CUDA memory..." << std::endl;
 
-	copyHostToDevice(dev_cameras, grids.camParam, 10 * grids.G * sizeof(float), "cameras");
-	copyHostToDevice(dev_viewer, image.viewer, rastSize * sizeof(float2), "viewer");
+	copyHostToDeviceAsync(dev_cameras, grids.camParam, 10 * grids.G * sizeof(float), "cameras");
+	copyHostToDeviceAsync(dev_viewer, image.viewer, rastSize * sizeof(float2), "viewer");
 
-	copyHostToDevice(dev_blackHoleBorder0, bhproc.bhBorder, (bhproc.angleNum + 1) * 2 * sizeof(float2), "blackHoleBorder0");
+	copyHostToDeviceAsync(dev_blackHoleBorder0, bhproc.bhBorder, (bhproc.angleNum + 1) * 2 * sizeof(float2), "blackHoleBorder0");
 
-	copyHostToDevice(dev_starTree, stars.tree, treeSize * sizeof(int), "starTree");
-	copyHostToDevice(dev_starPositions, stars.stars, stars.starSize * 2 * sizeof(float), "starPositions");
-	copyHostToDevice(dev_starMagnitudes, stars.magnitude, stars.starSize * 2 * sizeof(float), "starMagnitudes");
-	copyHostToDevice(dev_diffraction, starvis.diffraction, starvis.diffSize * starvis.diffSize * sizeof(uchar3), "diffraction");
+	copyHostToDeviceAsync(dev_starTree, stars.tree, treeSize * sizeof(int), "starTree");
+	copyHostToDeviceAsync(dev_starPositions, stars.stars, stars.starSize * 2 * sizeof(float), "starPositions");
+	copyHostToDeviceAsync(dev_starMagnitudes, stars.magnitude, stars.starSize * 2 * sizeof(float), "starMagnitudes");
+	copyHostToDeviceAsync(dev_diffraction, starvis.diffraction, starvis.diffSize * starvis.diffSize * sizeof(uchar3), "diffraction");
 
-	copyHostToDevice(dev_summedCelestialSky, celestialSky.summedCelestialSky, celestSize * sizeof(float4), "summedCelestialSky");
-	copyHostToDevice(dev_accretionDiskTexture, accretionTexture.summed.data(), accretionTexture.height * accretionTexture.width * sizeof(float3), "accretionTexture");
+	copyHostToDeviceAsync(dev_summedCelestialSky, celestialSky.summedCelestialSky, celestSize * sizeof(float4), "summedCelestialSky");
+	copyHostToDeviceAsync(dev_accretionDiskTexture, accretionTexture.summed.data(), accretionTexture.height * accretionTexture.width * sizeof(float3), "accretionTexture");
 
-	checkCudaErrors();
+	cudaStreamSynchronize(stream);
 
 	//copyHostToDevice(dev_hit, grids.hit, grids.G * imageSize * sizeof(float2),"hit ");
 	std::cout << "Completed CUDA preparation." << std::endl << std::endl;
@@ -396,8 +404,7 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 	std::cout << "Running Kernels" << std::endl << std::endl;
 
 	if (grids.G == 1) {
-		copyHostToDevice(dev_grid, grids.grid_vectors[0].data(), grids.grid_vectors[0].size() * sizeof(float4), "grid");
-		checkCudaErrors();
+		copyHostToDeviceAsync(dev_grid, grids.grid_vectors[0].data(), grids.grid_vectors[0].size() * sizeof(float4), "grid");
 	}
 
 	float grid_value = 0.f;
@@ -491,8 +498,13 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 
 	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0); // << default texture object
 
+	std::chrono::steady_clock::time_point frame_start_time;
+
+
 	while(q < param.nrOfFrames + startframe && !glfwWindowShouldClose(viewer->get_window())) {
-		
+		frame_start_time = std::chrono::high_resolution_clock::now();
+
+
 		//Map the PBO to cuda and set the outputimage pointer to that location
 		checkCudaStatus( cudaGraphicsMapResources(1, &cuda_pbo_resource, 0),"map_resource");
 		checkCudaStatus(cudaGraphicsResourceGetMappedPointer((void**)&dev_outputImage, &num_bytes, cuda_pbo_resource),"get_pointer");
@@ -510,132 +522,126 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 			alpha = fmodf(grid_value, 1.f);
 			if (grid_nr != (int)grid_value) {
 				grid_nr = (int)grid_value;
-				copyHostToDevice(dev_grid, grids.grid_vectors[grid_nr].data(), grids.grid_vectors[grid_nr].size() * sizeof(float4), "grid");
-				checkCudaErrors();
-				copyHostToDevice(dev_grid_2, grids.grid_vectors[grid_nr+1].data(), grids.grid_vectors[grid_nr+1].size() * sizeof(float4), "grid");
-				checkCudaErrors();
-				callKernel("Find black-hole shadow center", findBhCenter, numBlocks_GN_GM_5_25, threadsPerBlock5_25,
+				copyHostToDeviceAsync(dev_grid, grids.grid_vectors[grid_nr].data(), grids.grid_vectors[grid_nr].size() * sizeof(float4), "grid");
+				//checkCudaErrors();
+				copyHostToDeviceAsync(dev_grid_2, grids.grid_vectors[grid_nr+1].data(), grids.grid_vectors[grid_nr+1].size() * sizeof(float4), "grid");
+				
+				callKernelAsync("Find black-hole shadow center", findBhCenter, numBlocks_GN_GM_5_25, threadsPerBlock5_25,0,
 					grids.GM, grids.GN1, dev_grid, dev_blackHoleBorder0);
-				checkCudaErrors();
-				callKernel("Find black-hole shadow border", findBhBorders, numBlocks_bordersize, threadsPerBlock_32,
+
+				callKernelAsync("Find black-hole shadow border", findBhBorders, numBlocks_bordersize, threadsPerBlock_32,0,
 					grids.GM, grids.GN1, dev_grid, bhproc.angleNum, dev_blackHoleBorder0);
-				checkCudaErrors();
-				callKernel("Smoothed shadow border 1/4", smoothBorder, numBlocks_bordersize, threadsPerBlock_32,
+				callKernelAsync("Smoothed shadow border 1/4", smoothBorder, numBlocks_bordersize, threadsPerBlock_32,0,
 					dev_blackHoleBorder0, dev_blackHoleBorder1, bhproc.angleNum);
-				checkCudaErrors();
-				callKernel("Smoothed shadow border 2/4", smoothBorder, numBlocks_bordersize, threadsPerBlock_32,
+				callKernelAsync("Smoothed shadow border 2/4", smoothBorder, numBlocks_bordersize, threadsPerBlock_32,0,
 					dev_blackHoleBorder1, dev_blackHoleBorder0, bhproc.angleNum);
-				checkCudaErrors();
-				callKernel("Smoothed shadow border 3/4", smoothBorder, numBlocks_bordersize, threadsPerBlock_32,
+				callKernelAsync("Smoothed shadow border 3/4", smoothBorder, numBlocks_bordersize, threadsPerBlock_32,0,
 					dev_blackHoleBorder0, dev_blackHoleBorder1, bhproc.angleNum);
-				checkCudaErrors();
-				callKernel("Smoothed shadow border 4/4", smoothBorder, numBlocks_bordersize, threadsPerBlock_32,
+				callKernelAsync("Smoothed shadow border 4/4", smoothBorder, numBlocks_bordersize, threadsPerBlock_32,0,
 					dev_blackHoleBorder1, dev_blackHoleBorder0, bhproc.angleNum);
-				checkCudaErrors();
 				//displayborders << <dev_angleNum * 2 / tpb + 1, tpb >> >(angleNum, dev_bhBorder, dev_img, image.M);
 			}
-			callKernel("Update Camera", camUpdate, 1, 8, alpha, grid_nr, dev_cameras, dev_camera0);
-			checkCudaErrors();
+			callKernelAsync("Update Camera", camUpdate,0, 1, 8, alpha, grid_nr, dev_cameras, dev_camera0);
 
 
-			checkCudaStatus(cudaMemcpy(&cameraUsed[0], dev_camera0, 10 * sizeof(float), cudaMemcpyDeviceToHost), "cudaMemcpy failed! Dev to Host Cam");
+			cudaMemcpyAsync(&cameraUsed[0], dev_camera0, 10 * sizeof(float), cudaMemcpyDeviceToHost, stream);
 
 			grid_value += .5f;
 		}
-		cudaEventRecord(start);
-		callKernel("Interpolated grid", pixInterpolation, numBlocks_N1_M1_5_25, threadsPerBlock5_25,
+		//cudaEventRecord(start);
+
+		callKernelAsync("Interpolated grid", pixInterpolation,numBlocks_N1_M1_5_25, threadsPerBlock5_25, 0,
 			dev_viewer, image.M, image.N, grids.G, dev_interpolatedGrid, dev_grid, grids.GM, grids.GN1,
 			hor, ver, dev_gridGap, grids.level, dev_blackHoleBorder0, bhproc.angleNum, alpha);
-		checkCudaErrors();
 
-		callKernel("Constructed black-hole shadow mask", findBlackPixels, numBlocks_N_M_5_25, threadsPerBlock5_25,
+
+		callKernelAsync("Constructed black-hole shadow mask", findBlackPixels, numBlocks_N_M_5_25, threadsPerBlock5_25, 0,
 			dev_interpolatedGrid, image.M, image.N, dev_blackHoleMask);
-		checkCudaErrors();
 
-		callKernel("Constructed disk mask", makeDiskCheck, numBlocks_N_M_5_25, threadsPerBlock5_25,
+
+		callKernelAsync("Constructed disk mask", makeDiskCheck, numBlocks_N_M_5_25, threadsPerBlock5_25, 0,
 			dev_interpolatedGrid, dev_diskMask, image.M, image.N);
-		checkCudaErrors();
+
 
 		
-		callKernel("Calculated solid angles", findArea, numBlocks_N_M_5_25, threadsPerBlock5_25,
+		callKernelAsync("Calculated solid angles", findArea, numBlocks_N_M_5_25, threadsPerBlock5_25, 0,
 			dev_interpolatedGrid, image.M, image.N, dev_solidAngles0,dev_camera0, param.accretionDiskMaxRadius, dev_diskMask);
-		checkCudaErrors();
 
 		
-		callKernel("Smoothed solid angles horizontally", smoothAreaH, numBlocks_N_M_5_25, threadsPerBlock5_25,
+		
+
+		
+		callKernelAsync("Smoothed solid angles horizontally", smoothAreaH, numBlocks_N_M_5_25, threadsPerBlock5_25,0,
 			dev_solidAngles1, dev_solidAngles0, dev_blackHoleMask, dev_gridGap, image.M, image.N, dev_diskMask);
+#ifdef _DEBUG
 		checkCudaErrors();
+#endif // _DEBUG
 
 
-		callKernel("Smoothed solid angles vertically", smoothAreaV, numBlocks_N_M_5_25, threadsPerBlock5_25,
+
+		callKernelAsync("Smoothed solid angles vertically", smoothAreaV, numBlocks_N_M_5_25, threadsPerBlock5_25, 0,
 			dev_solidAngles0, dev_solidAngles1, dev_blackHoleMask, dev_gridGap, image.M, image.N, dev_diskMask);
-		checkCudaErrors();
+		
+		
 		
 
 
 		if (star) {
-			callKernel("Cleared star cache", clearArrays, numBlocks_starsize, threadsPerBlock_32,
+			callKernelAsync("Cleared star cache", clearArrays, numBlocks_starsize, threadsPerBlock_32,0,
 				dev_nrOfImagesPerStar, dev_starCache, q, starvis.trailnum, stars.starSize);
-			checkCudaErrors();
 
-			callKernel("Calculated gradient field for star trails", makeGradField, numBlocks_N1_M1_4_4, threadsPerBlock4_4,
+			callKernelAsync("Calculated gradient field for star trails", makeGradField, numBlocks_N1_M1_4_4, threadsPerBlock4_4,0,
 				dev_interpolatedGrid, image.M, image.N, dev_gradient);
-			checkCudaErrors();
 
-			callKernel("Distorted star map", distortStarMap, numBlocks_N_M_4_4, threadsPerBlock4_4,
+			callKernelAsync("Distorted star map", distortStarMap, numBlocks_N_M_4_4, threadsPerBlock4_4,0,
 				dev_starLight0, dev_interpolatedGrid, dev_blackHoleMask, dev_starPositions, dev_starTree, stars.starSize,
 				dev_camera0, dev_starMagnitudes, stars.treeLevel,
 				image.M, image.N, starvis.gaussian, camera_phi_offset, dev_treeSearch, starvis.searchNr, dev_starCache, dev_nrOfImagesPerStar,
 				dev_starTrails, starvis.trailnum, dev_gradient, q, dev_viewer, param.useRedshift, param.useLensing, dev_solidAngles0);
-			checkCudaErrors();
 
-			callKernel("Summed all star light", sumStarLight, numBlocks_N_M_1_24, threadsPerBlock1_24,
+
+			callKernelAsync("Summed all star light", sumStarLight, numBlocks_N_M_1_24, threadsPerBlock1_24,0,
 				dev_starLight0, dev_starTrails, dev_starLight1, starvis.gaussian, image.M, image.N, starvis.diffusionFilter);
-			checkCudaErrors();
 
-			callKernel("Added diffraction", addDiffraction, numBlocks_N_M_4_4, threadsPerBlock4_4,
+
+			callKernelAsync("Added diffraction", addDiffraction, numBlocks_N_M_4_4, threadsPerBlock4_4,0,
 				dev_starLight1, image.M, image.N, dev_diffraction, starvis.diffSize);
-			checkCudaErrors();
+
 
 			if (!map) {
-				callKernel("Created pixels from star light", makePix, numBlocks_N_M_5_25, threadsPerBlock5_25,
+				callKernelAsync("Created pixels from star light", makePix, numBlocks_N_M_5_25, threadsPerBlock5_25,0,
 					dev_starLight1, dev_outputImage, image.M, image.N);
-				checkCudaErrors();
 
 			}
 		}
 
 		if (map) {
-			callKernel("Distorted celestial sky image", distortEnvironmentMap, numBlocks_N_M_4_4, threadsPerBlock4_4,
+			callKernelAsync("Distorted celestial sky image", distortEnvironmentMap, numBlocks_N_M_4_4, threadsPerBlock4_4,0,
 				dev_interpolatedGrid, dev_outputImage, dev_blackHoleMask, celestialSky.imsize, image.M, image.N, camera_phi_offset,
 				dev_summedCelestialSky, dev_cameras, dev_solidAngles0, dev_viewer, param.useRedshift, param.useLensing, dev_diskMask);
-			checkCudaErrors();
 
 		}
 
 		if (star && map) {
-			callKernel("Created pixels from star light", makePix, numBlocks_N_M_5_25, threadsPerBlock5_25,
+			callKernelAsync("Created pixels from star light", makePix, numBlocks_N_M_5_25, threadsPerBlock5_25,0,
 				dev_starLight1, dev_starImage, image.M, image.N);
-			checkCudaErrors();
 
-			callKernel("Added distorted star and celestial sky image", addStarsAndBackground, numBlocks_N_M_5_25, threadsPerBlock5_25,
+			callKernelAsync("Added distorted star and celestial sky image", addStarsAndBackground, numBlocks_N_M_5_25, threadsPerBlock5_25,0,
 				dev_starImage, dev_outputImage, dev_outputImage, image.M);
 		}
 		std::cout << std::endl;
 
 		if (param.useAccretionDisk) {
 			if (!param.useAccretionDiskTexture) {
-				callKernel("Calculate temperature LUT", createTemperatureTable, numBlocks_tempLUT, threadsPerBlock_32,
+				callKernelAsync("Calculate temperature LUT", createTemperatureTable, numBlocks_tempLUT, threadsPerBlock_32,0,
 					param.accretionTemperatureLUTSize, temperatureLUT_device, (param.accretionDiskMaxRadius - 3) / (param.accretionTemperatureLUTSize - 1), param.blackholeMass, param.blackholeAccretion);
-				checkCudaErrors();
 
-				callKernel("Add accretion Disk", addAccretionDisk, numBlocks_N_M_4_4, threadsPerBlock4_4,
+				callKernelAsync("Add accretion Disk", addAccretionDisk, numBlocks_N_M_4_4, threadsPerBlock4_4,0,
 					dev_interpolatedGrid, dev_outputImage, temperatureLUT_device, (param.accretionDiskMaxRadius / param.accretionTemperatureLUTSize), param.accretionTemperatureLUTSize,
 					dev_blackHoleMask, image.M, image.N, dev_cameras, dev_solidAngles0, dev_viewer, param.useLensing, dev_diskMask);
-				checkCudaErrors();
 			}
 			else {
-				callKernel("Add accretion Disk Texture", addAccretionDiskTexture, numBlocks_N_M_4_4, threadsPerBlock4_4,
+				callKernelAsync("Add accretion Disk Texture", addAccretionDiskTexture, numBlocks_N_M_4_4, threadsPerBlock4_4,0,
 					dev_interpolatedGrid, image.M, dev_blackHoleMask, dev_outputImage, dev_accretionDiskTexture, param.accretionDiskMaxRadius,
 					accretionDiskTexture.width, accretionDiskTexture.height, dev_cameras, dev_solidAngles0, dev_viewer, param.useLensing, dev_diskMask
 				)
@@ -644,13 +650,19 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 
 		
 
-		checkCudaStatus(cudaMemcpy(&image.result[0], dev_outputImage, image.N * image.M * 4 * sizeof(uchar), cudaMemcpyDeviceToHost), "cudaMemcpy failed! Dev to Host");
-		checkCudaStatus(cudaMemcpy(grid.data(), dev_grid, (grids.GN1) * (grids.GM) * sizeof(float4), cudaMemcpyDeviceToHost), "cudaMemcpy failed! Dev to Host");
-		checkCudaStatus(cudaMemcpy(area.data(), dev_solidAngles0, (image.N) * (image.M) * sizeof(float), cudaMemcpyDeviceToHost), "cudaMemcpy failed! Dev to Host");
-		checkCudaStatus(cudaMemcpy(interpolated_grid.data(), dev_interpolatedGrid, (image.N + 1) * (image.M + 1) * sizeof(float4), cudaMemcpyDeviceToHost), "cudaMemcpy failed! Dev to Host");
+		cudaMemcpyAsync(&image.result[0], dev_outputImage, image.N* image.M * 4 * sizeof(uchar), cudaMemcpyDeviceToHost,stream);
+		cudaMemcpyAsync(grid.data(), dev_grid, (grids.GN1)* (grids.GM) * sizeof(float4), cudaMemcpyDeviceToHost, stream);
+		cudaMemcpyAsync(area.data(), dev_solidAngles0, (image.N)* (image.M) * sizeof(float), cudaMemcpyDeviceToHost, stream);
+		cudaMemcpyAsync(interpolated_grid.data(), dev_interpolatedGrid, (image.N + 1)* (image.M + 1) * sizeof(float4), cudaMemcpyDeviceToHost, stream);
 		
-		cudaGraphicsUnmapResources(1, &cuda_pbo_resource, 0);
+		cudaStreamSynchronize(stream);
 
+
+
+
+		cudaGraphicsUnmapResources(1, &cuda_pbo_resource, 0);
+		
+		
 
 		//checkCudaErrors();
 
@@ -672,8 +684,9 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 		glUniform1i(1, param.windowWidth);
 		glUniform1i(2, param.windowHeight);
 
-		glUniformMatrix4fv(3, 1, false, glm::value_ptr(viewer->inv_project_matrix));
+		glUniform1f(3, viewer->m_CameraFov);
 		glUniform3fv(4, 1, glm::value_ptr(viewer->m_CameraDirection));
+		glUniform3fv(5, 1, glm::value_ptr(viewer->m_UpDirection));
 
 		GLint posAttrib = glGetAttribLocation(shaderProgram, "position");
 		glVertexAttribPointer(posAttrib, 2, GL_FLOAT, GL_FALSE, 0, 0);
@@ -688,8 +701,12 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 		glfwPollEvents();
 
 		checkCudaErrors();
+		
+		std::cout << "frame_duration " <<
+			std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - frame_start_time).count() << "ms!" <<
+			std::endl << std::endl;
 	}
-
+	 
 	//Save last output to file
 
 	// Copy output vector from GPU buffer to host memory.
@@ -753,7 +770,7 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 		//depth[i].y = interpolated_grid[i].w / -30;
 		interpolated_grid[i].w = 1;
 		if (i % (image.M) < image.M && i < image.M * image.N) {
-			depth[i].x = abs(area[i - (i / image.M)] / 10e-6);
+			depth[i].x = abs(area[i - (i / image.M)] / 1e-7);
 		}
 
 	}
@@ -778,8 +795,9 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 		glUniform1i(1, param.windowWidth);
 		glUniform1i(2, param.windowHeight);
 
-		glUniformMatrix4fv(3, 1, false, glm::value_ptr(viewer->inv_project_matrix));
+		glUniform1f(3, viewer->m_CameraFov);
 		glUniform3fv(4, 1, glm::value_ptr(viewer->m_CameraDirection));
+		glUniform3fv(5, 1, glm::value_ptr(viewer->m_UpDirection));
 
 		GLint posAttrib = glGetAttribLocation(shaderProgram, "position");
 		glVertexAttribPointer(posAttrib, 2, GL_FLOAT, GL_FALSE, 0, 0);
@@ -801,11 +819,11 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 
 ViewCamera* CUDA::glfw_setup(int screen_width, int screen_height) {
 	glfwInit();
-	GLFWwindow* window = glfwCreateWindow(screen_width, screen_height, "LearnOpenGL", NULL, NULL);
-	ViewCamera* camera = new ViewCamera(window, { 0,PI1_2,PI },screen_width,screen_height, 10);
+	GLFWwindow* window = glfwCreateWindow(screen_width, screen_height, "Black-hole visualization", NULL, NULL);
+	ViewCamera* camera = new ViewCamera(window, { -1,0,0 }, { 0,0,1 }, screen_width, screen_height, 70);
 
 	glfwSetWindowUserPointer(window, camera);
-
+	glfwSetKeyCallback(window, key_callback);
 	glfwSetCursorPosCallback(window, mouse_cursor_callback);
 	glfwSetMouseButtonCallback(window, mouse_button_callback);
 

@@ -21,6 +21,9 @@ __global__ void pixInterpolation(const float2* viewthing, const int M, const int
 	if (i < N1 && j < M1) {
 		float theta = viewthing[i * M1 + j].x + ver;
 		float phi = fmodf(viewthing[i * M1 + j].y + hor + PI2, PI2);
+
+
+
 		if (Gr > 1) {
 			float4 A, B;
 			float2 center = { .5f * bhBorder[0].x + .5f * bhBorder[0].y, .5f * bhBorder[1].x + .5f * bhBorder[1].y };

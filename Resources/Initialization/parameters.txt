@@ -6,8 +6,8 @@ windowWidth = 1920
 windowHeight = 1080
 
 //Intermediate texture size in pixels
-texWidth = 1920
-texHeight = 1080
+texWidth = 4096
+texHeight = 2160
 
 // Viewer settings
 viewAngle = 0.5 //*PI
@@ -35,7 +35,7 @@ accretionDiskTexture = "rainbow.png"
 saveGeodesics = false
 
 // Image location.
-celestialSkyImg = "black.png"
+celestialSkyImg = "rainbow.png"
 // Star file location.
 starCatalogue = "sterren.txt"
 // Star binary tree depth

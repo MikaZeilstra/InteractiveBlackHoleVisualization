@@ -70,6 +70,7 @@ __global__ void addAccretionDisk(const float4* thphi, uchar4* out, double*temper
 	// Only compute if pixel is not black hole and i j is in image
 	float4 color = { 0.f, 0.f, 0.f };
 
+	
 
 	if (i < N && j < M) {
 		bool r_check = false;
@@ -120,6 +121,11 @@ __global__ void addAccretionDisk(const float4* thphi, uchar4* out, double*temper
 				max_intensity = temperature_LUT[(int)(((max_temp - TEMP_SPLIT) / TEMP_STEP_LARGE) + 99)].w;
 			}
 
+
+			if (j == 1851 && i == 859) {
+				j;
+			}
+
 			float H, S, P;
 			RGBtoHSP(color.x, color.y , color.z , H, S, P);
 			float intensity_factor = fminf(color.w / max_intensity,1.f);
@@ -128,7 +134,7 @@ __global__ void addAccretionDisk(const float4* thphi, uchar4* out, double*temper
 			findLensingRedshift(M, ind, camParam, viewthing, frac, redshft, solidangle[ijc]);
 			if (lensingOn) P *= frac;
 
-			P *= intensity_factor;
+ 			P *= intensity_factor;
 
 			HSPtoRGB(H, S, fminf(1.f, P), color.x, color.y, color.z);
 
