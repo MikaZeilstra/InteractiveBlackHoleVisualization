@@ -576,9 +576,6 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 #ifdef _DEBUG
 		checkCudaErrors();
 #endif // _DEBUG
-
-
-
 		callKernelAsync("Smoothed solid angles vertically", smoothAreaV, numBlocks_N_M_5_25, threadsPerBlock5_25, 0,
 			dev_solidAngles0, dev_solidAngles1, dev_blackHoleMask, dev_gridGap, image.M, image.N, dev_diskMask);
 		

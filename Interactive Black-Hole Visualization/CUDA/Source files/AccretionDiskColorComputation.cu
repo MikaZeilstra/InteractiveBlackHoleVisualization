@@ -121,11 +121,6 @@ __global__ void addAccretionDisk(const float4* thphi, uchar4* out, double*temper
 				max_intensity = temperature_LUT[(int)(((max_temp - TEMP_SPLIT) / TEMP_STEP_LARGE) + 99)].w;
 			}
 
-
-			if (j == 1851 && i == 859) {
-				j;
-			}
-
 			float H, S, P;
 			RGBtoHSP(color.x, color.y , color.z , H, S, P);
 			float intensity_factor = fminf(color.w / max_intensity,1.f);

@@ -124,7 +124,7 @@ __global__ void findArea(const float4* thphi, const int M, const int N, float* a
 			float3 cross2 = vector_ops::cross(e3, e4);
 			float a2 = sqrtf(vector_ops::dot(cross2, cross2)) /2;
 
-			if (a2 == 0 || (a1+a2)/a1 < 1.01 || (a1 + a2) / a2 < 1.01) {
+			if (a2 == 0 || (a1+a2)/a1 < 1.1 || (a1 + a2) / a2 < 1.1) {
 				area[ijc] = -1;
 				return;
 			}
@@ -190,19 +190,23 @@ __global__ void smoothAreaH(float* areaSmooth, float* area, const unsigned char*
 
 			if (!bh[i * M + ((j + h + M) % M)] && ((diskMask[i * M + ((j + h + M) % M)] == 0) == disk_mask_ijc) && area[i * M + ((j + h + M) % M)] != -1) {
 				float ar = area[i * M + ((j + h + M) % M)];
-				sum += ar * expf(-((h) * (h)) / (HORIZONTAL_GAUSSIAN_BLUR_SIGMA * fs));
-				weight += expf(-((h) * (h)) / (HORIZONTAL_GAUSSIAN_BLUR_SIGMA * fs));
+				sum += ar * expf(-(h * h) / (HORIZONTAL_GAUSSIAN_BLUR_SIGMA * fs));
+				weight += expf(-(h * h) / (HORIZONTAL_GAUSSIAN_BLUR_SIGMA * fs));
 			}
 		}
 
 		
 
-		if (weight == 0) {
+		if (weight < 1e-3) {
 			weight = 1;
 			sum = -1;
 		}
 		
 		float ar = sum / weight;
+		if (ar < 5e-8) {
+			ar = -1;
+		}
+
 
 		areaSmooth[ijc] = ar;
 		//areaSmooth[ijc] = area[ijc];
@@ -237,12 +241,17 @@ __global__ void smoothAreaV(float* areaSmooth, float* area, const unsigned char*
 			}
 		}
 
-		if (weight == 0) {
+		if (weight < 1e-3) {
 			weight == 1;
 			sum = INFINITY;
 		}
 
-		areaSmooth[ijc] = sum / weight;
+		float ar = sum / weight;
+		if (ar < 5e-8) {
+			ar = INFINITY;
+		}
+
+		areaSmooth[ijc] = ar;
 		//areaSmooth[ijc] = area[ijc];
 	}
 }
