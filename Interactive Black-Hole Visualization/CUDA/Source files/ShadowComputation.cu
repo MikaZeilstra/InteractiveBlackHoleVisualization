@@ -16,7 +16,7 @@ __device__ __forceinline__ float atomicMaxFloat(float* addr, float value) {
 	return old;
 }
 
-__global__ void findBhCenter(const int GM, const int GN, const float4* grid, float2* bhBorder) {
+__global__ void findBhCenter(const int GM, const int GN, const float2* grid, float2* bhBorder) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 
@@ -31,7 +31,7 @@ __global__ void findBhCenter(const int GM, const int GN, const float4* grid, flo
 	}
 }
 
-__global__ void findBhBorders(const int GM, const int GN, const float4* grid, const int angleNum, float2* bhBorder) {
+__global__ void findBhBorders(const int GM, const int GN, const float2* grid, const int angleNum, float2* bhBorder) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 
 	if (i < angleNum * 2) {
@@ -43,8 +43,8 @@ __global__ void findBhBorders(const int GM, const int GN, const float4* grid, co
 		pt = { pt.x / (float)PI2 * GM, pt.y / (float)PI2 * GM };
 		int2 gridpt = { int(pt.x), int(pt.y) };
 
-		float4 gridB = { -2, -2 };
-		float4 gridA = { -2, -2 };
+		float2 gridB = { -2, -2 };
+		float2 gridA = { -2, -2 };
 
 		while (!(gridA.x > 0 && isnan(gridB.x))) {
 			gridB = gridA;

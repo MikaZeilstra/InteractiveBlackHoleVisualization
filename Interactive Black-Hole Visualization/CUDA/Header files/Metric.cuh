@@ -51,19 +51,19 @@ namespace metric {
 	template <class T> __device__ __host__ void derivs(volatile T* var, volatile T* varOut, T b, T q);
 
 	template <class T> __global__ void integrate_kernel(const T rV, const T thetaV, const T phiV, T* pRV,
-		T* bV, T* qV, T* pThetaV, int size);
+		T* bV, T* qV, T* pThetaV,T*disk_r,T*disk_phi, int size);
 
 	template __global__ void integrate_kernel<double>(const double rV, const double thetaV, const double phiV, double* pRV,
-		double* bV, double* qV, double* pThetaV, int size);
+		double* bV, double* qV, double* pThetaV, double* disk_r, double* disk_phi, int size);
 	template __global__ void integrate_kernel<float>(const float rV, const float thetaV, const float phiV, float* pRV,
-		float* bV, float* qV, float* pThetaV, int size);
+		float* bV, float* qV, float* pThetaV, float* disk_r, float* disk_phi, int size);
 
 	template <class T> __device__ __host__ void rkckIntegrate1(const T rV, const T thetaV, const T phiV, T* pRV,
-		T* bV, T* qV, T* pThetaV, bool savePath, float3* pathSave);
+		T* bV, T* qV, T* pThetaV, T* disk_r, T* disk_phi, bool savePath, float3* pathSave);
 	template __device__ __host__ void rkckIntegrate1<double>(const double rV, const double thetaV, const double phiV, double* pRV,
-		double* bV, double* qV, double* pThetaV, bool savePath, float3* pathSave);
+		double* bV, double* qV, double* disk_r, double* disk_phi, double* pThetaV, bool savePath, float3* pathSave);
 	template __device__ __host__ void rkckIntegrate1<float>(const float rV, const float thetaV, const float phiV, float* pRV,
-		float* bV, float* qV, float* pThetaV, bool savePath, float3* pathSave);
+		float* bV, float* qV, float* disk_r, float* disk_phi, float* pThetaV, bool savePath, float3* pathSave);
 
 
 	template <class T> __device__ __host__ void stepUntilDisk(volatile T* var, volatile  T* dvdz, T& z, T& h,

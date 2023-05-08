@@ -30,23 +30,25 @@ __device__ float getDeterminant(const float3& center,const float3& v1, const flo
 /// <param name="N"></param>
 /// <param name="area"></param>
 /// <returns></returns>
-__global__ void findArea(const float4* thphi, const int M, const int N, float* area, float* cam, float max_accretion_radius, const unsigned char* diskMask) {
+__global__ void findArea(const float4* thphi, const float4* thphi_disk, const int M, const int N, float* area, float* cam, float max_accretion_radius, const unsigned char* diskMask) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 	int ind = i * M1 + j;
 	
+	float4 disk_vertices[4] = {thphi_disk[ind],thphi_disk[ind + 1],thphi_disk[ind + M1],thphi_disk[ind + M1 + 1]};
 
-	float4 vertices[4] = { thphi[ind],thphi[ind + 1],thphi[ind + M1],thphi[ind + M1 + 1] };
-
-
-
+	bool use_sky_calculation = (isnan(disk_vertices[0].x) || isnan(disk_vertices[1].x) || isnan(disk_vertices[2].x) || isnan(disk_vertices[3].x));
 	//Check if any pixel is on the accretion disk
-	if (i < N && j < M && !diskMask[ijc]) {
+	if (i < N && j < M && use_sky_calculation) {
 		bool picheck = false;
 		float t[4];
 		float p[4];
 		retrievePixelCorners(thphi, t, p, ind, M, picheck, 0.0f);
 
+		//If we are in the black hole the area becomes -1;
+		if (ind == -1) {
+			area[ijc] = -1;
+		}
 
 		float th1[3] = { t[0], t[1], t[2] };
 		float ph1[3] = { p[0], p[1], p[2] };
@@ -76,39 +78,25 @@ __global__ void findArea(const float4* thphi, const int M, const int N, float* a
 		int celestial_vertices[3];
 		int n_accretion_vertices = 0;
 
-	
-
-
-		//Check how many vertices are acctually on the disk
-		for (int k = 0; k < 4; k++) {
-			if (vertices[k].z > INFINITY_CHECK) {
-				celestial_vertices[k - n_accretion_vertices] = k;
-			}
-			else {
-				accretion_vertices[n_accretion_vertices] = k;
-				n_accretion_vertices++;
-			}
-		}
-
 		//If we have four correct vertices we can simply calculate the area 
-		if (n_accretion_vertices == 4) {
+
 			float3 cartesian_vertices[4];
 			float distance = 0;
 
 			for (int k = 0; k < 4; k++) {
 				cartesian_vertices[k] = {
-					vertices[k].z * cos(vertices[k].y),
-					vertices[k].z * sin(vertices[k].y),
+					disk_vertices[k].x * cos(disk_vertices[k].y),
+					disk_vertices[k].x * sin(disk_vertices[k].y),
 					0
 				};
-				distance += 0.25f *  vertices[k].w;
+				distance += 0.25f * disk_vertices[k].w;
 			}
 
 			
 
 			
 			//Calculate area of triangle 1
-			float3 e1 = cartesian_vertices[1] - cartesian_vertices[0];
+  			float3 e1 = cartesian_vertices[1] - cartesian_vertices[0];
 			float3 e2 = cartesian_vertices[2] - cartesian_vertices[0];
 			float3 cross1 = vector_ops::cross(e1, e2);
 			float a1 = sqrtf(vector_ops::dot(cross1, cross1))/2;
@@ -145,12 +133,6 @@ __global__ void findArea(const float4* thphi, const int M, const int N, float* a
 			float alpha = 2 * atanf(x / 2);
 			float sphere_area = alpha * alpha / PI;
 			area[ijc] = sphere_area;
-		}
-		else {
-			area[ijc] = -1;
-		}
-
-		
 
 	}
 }

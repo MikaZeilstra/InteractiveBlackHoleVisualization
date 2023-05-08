@@ -77,23 +77,23 @@ __global__ void addAccretionDisk(const float4* thphi, uchar4* out, double*temper
 		float4 corners[4] = {thphi[ind] ,thphi[ind + 1] , thphi[ind + M1] ,thphi[ind + M1 + 1]};
 		
 
-		if (bh[ijc] == 0 && diskMask[ijc]) {
+		if (diskMask[ijc] == 4) {
 			
 			float4 avg_thp = { 0,0,0,0 };
 			int disk_count = 0;
 			for (int k = 0; k < 4; k++) {
-				if (corners[k].z < INFINITY_CHECK) {
+				if (!isnan(corners[k].x)) {
 					avg_thp = avg_thp + corners[k];
 					disk_count++;
 				}
 			}
 			avg_thp = (1.0f / (float)disk_count) * avg_thp;
 
-			double temp = lookUpTemperature(temperature_table, temperature_table_step_size, temperature_table_size, fmaxf(avg_thp.z / 2,MIN_STABLE_ORBIT/2));
+			double temp = lookUpTemperature(temperature_table, temperature_table_step_size, temperature_table_size, fmaxf(avg_thp.x / 2,MIN_STABLE_ORBIT/2));
 			double max_temp = lookUpTemperature(temperature_table, temperature_table_step_size, temperature_table_size, 4.8);
 
-			float grav_redshift = metric::calculate_gravitational_redshift<float>(avg_thp.z, avg_thp.z * avg_thp.z);
-			float doppler_redshift = avg_thp.x;
+			float grav_redshift = metric::calculate_gravitational_redshift<float>(avg_thp.x, avg_thp.x * avg_thp.x);
+			float doppler_redshift = avg_thp.z;
 
 			float redshift = doppler_redshift * grav_redshift;
 
@@ -133,15 +133,16 @@ __global__ void addAccretionDisk(const float4* thphi, uchar4* out, double*temper
 
 			HSPtoRGB(H, S, fminf(1.f, P), color.x, color.y, color.z);
 
-			color = {
+			float4 out_color = {
 				fminf(color.x, 1.0f),
 				fminf(color.y, 1.0f),
-				fminf(color.z, 1.0f)
+				fminf(color.z, 1.0f),
+				0
 			};
 
 
 			//Out image in BGR format while table is RGB
-			out[ijc] = { (unsigned char)(color.z*255), (unsigned char)(color.y*255), (unsigned char)(color.x * 255),255 };
+			out[ijc] = { (unsigned char)(out_color.z*255), (unsigned char)(out_color.y*255), (unsigned char)(out_color.x * 255),255 };
 			//out[ijc] = { 255,255,0,255 };
 
 
@@ -187,23 +188,23 @@ __global__ void addAccretionDiskTexture(const float4* thphi, const int M, const 
 		int good_point_ind = -1;
 		float min_r = INFINITY;
 		for (int k = 0; k < 4; k++) {
-			if (corners[k].z < min_r) {
-				min_r = corners[k].z;
+			if (corners[k].x < min_r) {
+				min_r = corners[k].x;
 				good_point_ind = k;
 			}
 		}
 
 		//Check if we are at the lower or higher edge of the disk
-		bool lower_edge = corners[good_point_ind].z < (maxAccretionRadius / 2);
+		bool lower_edge = corners[good_point_ind].x < (maxAccretionRadius / 2);
 
 
 		int2 tex_coord[4] = {};
 		//Calculate texture coordinates of the pixel corners
 		for (int k = 0; k < 4; k++) {
-			if (fabsf(corners[good_point_ind].z - corners[k].z) < 10) {
+			if (fabsf(corners[good_point_ind].x - corners[k].x) < 10) {
 				tex_coord[k] = {
 					((int)(((corners[k].y / PI2) * (tex_width - 1)) + tex_width) % tex_width),
-					(int) (fmaxf(fminf((corners[k].z - MIN_STABLE_ORBIT) / (maxAccretionRadius - MIN_STABLE_ORBIT), 1.0f), 0.0f) * (tex_height - 1))
+					(int) (fmaxf(fminf((corners[k].x - MIN_STABLE_ORBIT) / (maxAccretionRadius - MIN_STABLE_ORBIT), 1.0f), 0.0f) * (tex_height - 1))
 				};
 			}
 			else {
@@ -292,34 +293,36 @@ __global__ void addAccretionDiskTexture(const float4* thphi, const int M, const 
 		}
 
 		color = (1 / ((float)pix_sum)) * color;
-		color = {
+		float4 out_color = {
 			fminf(1.0f,color.x),
 			fminf(1.0f,color.y),
-			fminf(1.0f,color.z)
+			fminf(1.0f,color.z),
+			1
 		};
 
 	
 
 		float H, S, P;
 		if (lensingOn) {
-			RGBtoHSP(color.z, color.y, color.x , H, S, P);
+			RGBtoHSP(out_color.z, out_color.y, out_color.x , H, S, P);
 
 
 			float redshft = 1;
 			float frac = 1;
 			findLensingRedshift(M, ind, camParam, viewthing, frac, redshft, solidangle[ijc]);
 			if (lensingOn) P *= frac;
-			HSPtoRGB(H, S, min(1.f, P), color.z, color.y, color.x);
+			HSPtoRGB(H, S, min(1.f, P), out_color.z, out_color.y, out_color.x);
 		}
 
 
-		color = {
+		out_color = {
 				fminf(color.x,1.0f),
 				fminf(color.y,1.0f),
-				fminf(color.z,1.0f)
+				fminf(color.z,1.0f),
+				1
 		};
 
- 		out[ijc] = {(unsigned char)(color.x * 255),(unsigned char)(color.y * 255),(unsigned char)(color.z * 255), 255};
+ 		out[ijc] = {(unsigned char)(out_color.x * 255),(unsigned char)(out_color.y * 255),(unsigned char)(out_color.z * 255), 255};
 	}
 }
 
@@ -331,7 +334,6 @@ __global__ void makeDiskCheck(const float4* thphi, unsigned char* disk, const in
 	if (i < N && j < M) {
 		bool r_check = false;
 		float4 corners[4] = { thphi[ind] ,thphi[ind + 1] , thphi[ind + M1] ,thphi[ind + M1 + 1] };
-		r_check = (corners[0].z < INFINITY_CHECK) || (corners[1].z < INFINITY_CHECK) || (corners[2].z < INFINITY_CHECK) || (corners[3].z < INFINITY_CHECK);
-		disk[ijc] = r_check ? 1 : 0;
+		disk[ijc] = !isnan(corners[0].x) + !isnan(corners[1].x) + !isnan(corners[2].x) + !isnan(corners[3].x);
 	}
 }

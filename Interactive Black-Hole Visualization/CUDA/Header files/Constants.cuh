@@ -1,9 +1,6 @@
 #pragma once
 #include "cuda_runtime.h"
 
-#define R_CHANGE_THRESHOLD 3
-#define W_SURFACE_DISCRIMINANT 5
-
 #define TILE_W 4
 #define TILE_H 4
 
@@ -34,7 +31,5 @@
 
 #define SQRT3 1.73205080757
 #define SQRT6 2.44948974278
-
-#define CUDART_NAN_F            __int_as_float(0x7fffffff)
 
 #define PI_CHECK_FACTOR 0.1

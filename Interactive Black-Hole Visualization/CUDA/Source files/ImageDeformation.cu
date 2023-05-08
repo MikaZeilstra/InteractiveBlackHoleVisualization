@@ -15,7 +15,7 @@ __global__ void distortEnvironmentMap(const float4* thphi, uchar4* out, const un
 	if (i < N && j < M) {
 
 
-		if (!bh[ijc] && !dev_diskMask[ijc]) {
+		if (!bh[ijc]) {
 
 
 			volatile float t[4], p[4];

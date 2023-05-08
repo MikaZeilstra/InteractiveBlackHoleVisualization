@@ -253,12 +253,8 @@ namespace metric {
 	//Wraps the theta and phi coordinates back to their respective domains [0,PI] and [0,2PI) respectively returns wheter phi has been reduced back from larger than Pi.
 	template <class T>  __device__ __host__ bool wrapPhiToPi(T & phiW) {
 		bool ret = false;
-
+		phiW += PI2;
 		phiW = fmodf(phiW, PI2);
-		if (phiW < 0) {
-			phiW += PI2;
-		}
-
 		return ret;
 	}
 
@@ -352,6 +348,11 @@ namespace metric {
 		T h = INITIAL_STEP_SIZE * sgn(INTEGRATION_MAX);
 		T z_prev = 0;
 		
+		bool hit_disk = false;
+		T disk_r = nanf("");
+		T disk_phi = nanf("");
+		T disk_redshift = 0;
+		T disk_distance = 0;
 
 		for (int i = 0; i < NUMBER_OF_EQUATIONS; i++) var[i] = varStart[i];
 
@@ -379,29 +380,35 @@ namespace metric {
 
 			//If the traveled distance is large enough we can approximate space-time as flat and use these coordinates as the result
 			if (z <= INTEGRATION_MAX) {
-				varStart[r_index] = INFINITY;
-				varStart[3] = INTEGRATION_MAX;
+				varStart[phi_index] = var[phi_index];
+				varStart[theta_index] = var[theta_index];
+				varStart[r_index] = disk_redshift;
+				varStart[3] = disk_r;
+				varStart[4] = disk_phi;
+				varStart[5] = disk_distance;
 				return;
 			}
 
 			//If we want the accretion disk and the theta has crossed the 1/2pi plane we return accretion disk colors
-			if (BH_USE_ACCRETION_DISK && (thetaVar > PI1_2 != last_theta)) {
+			if (BH_USE_ACCRETION_DISK && (thetaVar > PI1_2 != last_theta) && !hit_disk) {
 				float factor = (thetaVar - PI1_2) / (thetaVar - varStart[theta_index]);
 				T r = (1 - factor) * rVar + factor * varStart[r_index];
 
 				if (r > MIN_STABLE_ORBIT && r < BH_MAX_ACCRETION_RADIUS) {
+				
+					//Save location
+					T var_disk_tmp[NUMBER_OF_EQUATIONS];
+					T z_disk_tmp = z;
+					for (int i = 0; i < NUMBER_OF_EQUATIONS; i++) var_disk_tmp[i] = var[i];
+
 					//Reset vars to previous positions
 					for (int i = 0; i < NUMBER_OF_EQUATIONS; i++) var[i] = varStart[i];
 					z = z_prev;
 					stepUntilDisk(var, dvdz, z, h, varScal, b, q, varErr, varTemp, aks, varTmpInt, varStart);
-					
 					r = varStart[r_index];
 					 
 					//Calculate derivatives at disk position
 					metric::derivs(varStart, dvdz, b, q);
-
-
-					T doppler_redshift = 0;
 					 
 					//Calculate doppler redshift
 					//Accretion disk particle moves in {0,1,0} direction so cosine is simply normalized phi direction
@@ -409,17 +416,16 @@ namespace metric {
 
 					T norm = vector_ops::dot(lightdir, lightdir);
 					T cos_incident_angle = rsqrt(norm) * lightdir.z;
-
 					T orbit_speed = metric::calcSpeed<T>(r, PI1_2);
-					doppler_redshift = (1 + orbit_speed * cos_incident_angle) / sqrt(1 - sq(orbit_speed));					
-
-					
 					
 
-					//Store the doppler redshift in the theta channel since its constant anyway.
-					varStart[theta_index] = doppler_redshift;
-					varStart[3] = z;
-					return;
+					disk_redshift = (1 + orbit_speed * cos_incident_angle) / sqrt(1 - sq(orbit_speed));					
+					disk_distance = z;
+
+					disk_r = varStart[r_index];
+					disk_phi = varStart[phi_index];
+					
+					hit_disk = true;
 				}							
 			}
 			
@@ -432,8 +438,11 @@ namespace metric {
 		//If we take too many steps or reached a too low step count we assume the ray hits the black hole
 		varStart[theta_index] = nanf("");
 		varStart[phi_index] = nanf("");
-		varStart[r_index] = 0;
-		varStart[3] = z;
+
+		varStart[r_index] = disk_redshift;
+		varStart[3] = disk_r;
+		varStart[4] = disk_phi;
+		varStart[5] = disk_distance;
 	};
 
 
@@ -491,31 +500,33 @@ namespace metric {
 
 
 	template <class T> __device__ __host__ void rkckIntegrate1(const T rV, const T thetaV, const T phiV, T* pRV,
-		T* bV, T* qV, T* pThetaV, bool shouldSavePath, float3* pathSave) {
+		T* bV, T* qV, T* pThetaV, T* disk_r, T* disk_phi, bool shouldSavePath, float3* pathSave) {
 
-		volatile T varStart[] = { rV, thetaV, phiV, *pRV, *pThetaV };
+		volatile T varStart[] = { rV, thetaV, phiV, *pRV, *pThetaV,0 };
 
 		odeint1(varStart, *bV, *qV, shouldSavePath, pathSave);
 
 		*bV = varStart[theta_index];
 		*qV = varStart[phi_index];
-		*pThetaV = varStart[r_index];
-		*pRV = varStart[3];
+		*pThetaV = varStart[r_index]; //Disk redshift
+		*pRV = varStart[5]; //Disk distance
+		*disk_r = varStart[3];
+		*disk_phi = varStart[4];
 
-		if (!isnan(varStart[theta_index]) && varStart[r_index] > INFINITY_CHECK) {
+		if (!isnan(varStart[theta_index])) {
 			wrapToPi(*bV, *qV);
 		}
-		else if (!isnan(varStart[theta_index])) {
-			wrapPhiToPi(*qV);
+		if (!isnan(varStart[3])) {
+			wrapPhiToPi(*disk_phi);
 		}
 	}
 
 	template <class T> __global__ void integrate_kernel(const T rV, const T thetaV, const T phiV, T* pRV,
-		T* bV, T* qV, T* pThetaV, int size) {
+		T* bV, T* qV, T* pThetaV, T* disk_r, T* disk_phi, int size) {
 		int index = blockDim.x * blockIdx.x + threadIdx.x;
 
 		if (index < size) {
-			rkckIntegrate1(rV, thetaV, phiV, &pRV[index], &bV[index], &qV[index], &pThetaV[index],false,nullptr);
+			rkckIntegrate1(rV, thetaV, phiV, &pRV[index], &bV[index], &qV[index], &pThetaV[index],&disk_r[index],&disk_phi[index], false, nullptr);
 		}
 	};
 }

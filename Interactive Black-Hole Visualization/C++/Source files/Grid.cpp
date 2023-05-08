@@ -21,6 +21,7 @@
 #include "../../CUDA/Header files/Vector_operations.cuh"
 
 #define PRECCELEST 0.015
+#define DISK_PRECCELEST_RELAXATION 3
 #define ERROR 0.001//1e-6
 #define MIN_GPU_INTEGRATION 1000
 #define BLACK_HOLE_MAX_DIAGNAL 1e-10
@@ -29,7 +30,7 @@
 
 
 
-bool Grid::check2PIcross(const std::vector<float4>& spl, float factor) {
+bool Grid::check2PIcross(const std::vector<float2>& spl, float factor) {
 	for (int i = 0; i < spl.size(); i++) {
 		if (spl[i]_phi > PI2 * (1. - 1. / factor))
 			return true;
@@ -37,7 +38,7 @@ bool Grid::check2PIcross(const std::vector<float4>& spl, float factor) {
 	return false;
 };
 
-bool Grid::correct2PIcross(std::vector<float4>& spl, float factor) {
+bool Grid::correct2PIcross(std::vector<float2>& spl, float factor) {
 		bool check = false;
 		for (int i = 0; i < spl.size(); i++) {
 			if (spl[i]_phi < PI2 * (1. / factor)) {
@@ -85,18 +86,17 @@ void Grid::fixTvertices(std::pair<uint64_t, int> block) {
 	uint32_t l = (j + gap) % M;
 
 	//If the change in radius is small enough between the vertices they are one the same surface fix the possible T vertices
-	if (abs(CamToCel[ij].z - CamToCel[k_j].z) > R_CHANGE_THRESHOLD) {
+
 		checkAdjacentBlock(ij, k_j, level, 1, gap);
-	}
-	if (abs(CamToCel[ij].z - CamToCel[i_l].z) > R_CHANGE_THRESHOLD) {
+
+
 		checkAdjacentBlock(ij, i_l, level, 0, gap);
-	}
-	if (abs(CamToCel[i_l].z - CamToCel[k_l].z) > R_CHANGE_THRESHOLD) {
+
+
 		checkAdjacentBlock(i_l, k_l, level, 1, gap);
-	}
-	if (abs(CamToCel[k_j].z - CamToCel[k_l].z) > R_CHANGE_THRESHOLD) {
+
+
 		checkAdjacentBlock(k_j, k_l, level, 0, gap);
-	}
 }
 	
 /// <summary>
@@ -138,10 +138,11 @@ void Grid::checkAdjacentBlock(uint64_t ij, uint64_t ij2, int level, int udlr, in
 
 		bool succes = false;
 		if (find(ijprev) && find(ijnext)) {
-			std::vector<float4> check = { CamToCel[ijprev], CamToCel[ij], CamToCel[ij2], CamToCel[ijnext] };
+			std::vector<float2> check = { CamToCel[ijprev], CamToCel[ij], CamToCel[ij2], CamToCel[ijnext] };
 			if (CamToCel[ijprev].x != -1 && CamToCel[ijnext].x != -1
-				&& abs(CamToCel[ijprev].z- CamToCel[ij].z) < R_CHANGE_THRESHOLD
-				&& abs(CamToCel[ijnext].z - CamToCel[ij2].z) < R_CHANGE_THRESHOLD) {
+				//&& abs(CamToCel[ijprev].z- CamToCel[ij].z) < R_CHANGE_THRESHOLD
+				//&& abs(CamToCel[ijnext].z - CamToCel[ij2].z) < R_CHANGE_THRESHOLD
+				) {
 				succes = true;
 				if (half) check[3].x = PI - check[3].x;
 				if (check2PIcross(check, 5.)) correct2PIcross(check, 5.);
@@ -149,9 +150,10 @@ void Grid::checkAdjacentBlock(uint64_t ij, uint64_t ij2, int level, int udlr, in
 			}
 		}
 		if (!succes) {
-			std::vector<float4> check = { CamToCel[ij], CamToCel[ij2] };
+			std::vector<float2> check = { CamToCel[ij], CamToCel[ij2] };
 			if (check2PIcross(check, 5.)) correct2PIcross(check, 5.);
 			CamToCel[i_j] = 1. / 2. * (check[1] + check[0]);
+		
 		}
 		if (level + 1 == MAXLEVEL) return;
 		checkAdjacentBlock(ij, i_j, level + 1, udlr, gap / 2);
@@ -163,7 +165,7 @@ bool Grid::find(uint64_t ij) {
 	return CamToCel.find(ij) != CamToCel.end();
 }
 
-float4 const Grid::hermite(double aValue, float4 const& aX0, float4 const& aX1, float4 const& aX2, float4 const& aX3, double aTension, double aBias) {
+float2 const Grid::hermite(double aValue, float2 const& aX0, float2 const& aX1, float2 const& aX2, float2 const& aX3, double aTension, double aBias) {
 	/* Source:
 	* http://paulbourke.net/miscellaneous/interpolation/
 	*/
@@ -175,8 +177,8 @@ float4 const Grid::hermite(double aValue, float4 const& aX0, float4 const& aX1, 
 	double const aa = (double(1) + aBias) * (double(1) - aTension) / double(2);
 	double const bb = (double(1) - aBias) * (double(1) - aTension) / double(2);
 
-	float4 const m0 = aa * (aX1 - aX0) + bb * (aX2 - aX1);
-	float4 const m1 = aa * (aX2 - aX1) + bb * (aX3 - aX2);
+	float2 const m0 = aa * (aX1 - aX0) + bb * (aX2 - aX1);
+	float2 const m1 = aa * (aX2 - aX1) + bb * (aX3 - aX2);
 
 	double const u0 = double(2) * v3 - double(3) * v2 + double(1);
 	double const u1 = v3 - double(2) * v2 + v;
@@ -328,9 +330,10 @@ void Grid::integrateFirst(const int gap) {
 /// <param name="thetavals">The computed theta values (celestial sky).</param>
 /// <param name="phivals">The computed phi values (celestial sky).</param>
 void Grid::fillGridCam(const std::vector<uint64_t>& ijvals, const size_t s, std::vector<double>& thetavals,
-	std::vector<double>& phivals, std::vector<double>& r,std::vector<double>& distance_to_point, std::vector<int>& step) {
+	std::vector<double>& phivals, std::vector<double>& disk_redshift, std::vector<double>& disk_distance_to_point, std::vector<double>& disk_r, std::vector<double>& disk_phis, std::vector<int>& step) {
 	for (int k = 0; k < s; k++) {
-		CamToCel[ijvals[k]] = make_float4(thetavals[k], phivals[k],r[k], distance_to_point[k]);
+		CamToCel[ijvals[k]] = make_float2(thetavals[k], phivals[k]);
+		CamToDisk[ijvals[k]] = make_float4(disk_r[k], disk_phis[k], disk_redshift[k], disk_distance_to_point[k]);
 		uint64_t ij = ijvals[k];
 		steps[i_32 * M + j_32] = step[k];
 	}
@@ -363,7 +366,7 @@ std::vector<T> Grid::apply_permutation(
 /// <param name="ijvec">The ijvec.</param>
 void Grid::integrateCameraCoordinates(std::vector<uint64_t>& ijvec) {
 	size_t s = ijvec.size();
-	std::vector<double> theta(s), phi(s), r(s), distances(s);
+	std::vector<double> theta(s), phi(s), disk_redshift(s), disk_distances(s), disk_rs(s), disk_phis(s);
 
 	std::vector<int> step(s);
 	for (int q = 0; q < s; q++) {
@@ -381,12 +384,9 @@ void Grid::integrateCameraCoordinates(std::vector<uint64_t>& ijvec) {
 	
 
 	auto start_time = std::chrono::high_resolution_clock::now();
-	integration_wrapper(theta, phi,r, distances, s, step);
-	fillGridCam(ijvec, s, theta, phi, r,distances, step);
+	integration_wrapper(theta, phi, disk_redshift, disk_distances,disk_rs,disk_phis, s, step);
+	fillGridCam(ijvec, s, theta, phi, disk_redshift, disk_distances, disk_rs, disk_phis, step);
 	auto end_time = std::chrono::high_resolution_clock::now();
-	//int count = 0;
-	//for (int q = 0; q < s; q++) if (step[q] != 0) count++;
-	//std::cout << "CPU: " << count << "rays in " << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() << "ms!" << std::endl << std::endl;
 }
 
 /// <summary>
@@ -404,22 +404,26 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 	if (level < param->gridMinLevel) return true;
 
 	//Check if the points are well alligned
-	float4 topLeft = CamToCel[i_j];
-	float4 topRight = CamToCel[k_j];
-	float4 bottomLeft = CamToCel[i_l];
-	float4 bottomRight = CamToCel[k_l];
+	float2 topLeft = CamToCel[i_j];
+	float2 topRight = CamToCel[k_j];
+	float2 bottomLeft = CamToCel[i_l];
+	float2 bottomRight = CamToCel[k_l];
 
-	float4 topLeft_2d = { topLeft.x,topLeft.y };
-	float4 topRight_2d = { topRight.x,topRight.y };
-	float4 bottomLeft_2d = { bottomLeft.x,bottomLeft.y };
-	float4 bottomRight_2d = { bottomRight.x,bottomRight.y };
+	float4 disk_topLeft = CamToDisk[i_j];
+	float4 disk_topRight = CamToDisk[k_j];
+	float4 disk_bottomLeft = CamToDisk[i_l];
+	float4 disk_bottomRight = CamToDisk[k_l];
 
-	bool topLeft_finite = topLeft.z < INFINITY_CHECK;
 
-	//If all r coordinates are not either finite or infinite we need to refine (Edge of accretion disk)
-	if (!((topLeft_finite == (topRight.z < INFINITY_CHECK)) && (topLeft_finite == (bottomLeft.z < INFINITY_CHECK)) && (topLeft_finite == ( bottomRight.z < INFINITY_CHECK)))) {
+
+	
+	bool topLeft_on_disk = !isnan(disk_topLeft.x);
+
+	//If all r coordinates are not either on accretion disk or off the accretion disk we need to refine (Edge of accretion disk)
+	if (!((topLeft_on_disk == !isnan(disk_topRight.x)) && (topLeft_on_disk == !isnan(disk_bottomLeft.x)) && (topLeft_on_disk == !isnan(disk_bottomRight.x)))) {
 		return true;
 	}
+
 
 	//If all vertices are not either in the blackhole or out we need to refine
 	// Nan indicates 1 of the vertices was part of the black hole, meaning we want better resolution unless they were all BH.
@@ -427,39 +431,39 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 	if (!((topLeftNan == isnan(topRight.x)) && (topLeftNan == isnan(bottomLeft.x)) && (topLeftNan == isnan(bottomRight.x)))) {
 		return true;
 	}
+	else if (topLeftNan) {
+		return false;
+	}
+
+	float diag = vector_ops::dot((topLeft - bottomRight), (topLeft - bottomRight));
+	bottomRight.y += PI2;
+	diag = std::min(diag, vector_ops::dot((topLeft - bottomRight), (topLeft - bottomRight)));
+
+
+	float diag2 = vector_ops::dot((topRight - bottomLeft), (topRight - bottomLeft));
+	bottomRight.y += PI2;
+	diag2 = std::min(diag2, vector_ops::dot((topRight - bottomLeft), (topRight - bottomLeft)));
+
+	// If the maximum diagonal is not less than required precision split the block
+
+	if (diag > PRECCELEST || diag2 > PRECCELEST) return true;
+
 
 	//If we are one the accretion disk diagonal is in phi and r coordinates otherwise it is in phi and theta coordinates
-	if (topLeft_finite) {
-		float diag = abs(topLeft.y - bottomRight.y);
+	if (topLeft_on_disk) {
+		float diag = abs(disk_topLeft.y - disk_bottomRight.y);
 		bottomRight.y += PI2;
-		diag = std::min(diag,abs(topLeft.y - bottomRight.y));
+		diag = std::min(diag,abs(disk_topLeft.y - disk_bottomRight.y));
 
-		float diag2 = abs(topRight.y - bottomLeft.y);
+		float diag2 = abs(disk_topRight.y - disk_bottomLeft.y);
 		bottomRight.y += PI2;
-		diag2 = std::min(diag2, (float)abs(topRight.y - bottomLeft.y));
+		diag2 = std::min(diag2, (float)abs(disk_topRight.y - disk_bottomLeft.y));
 
 		// If phi change is too large refine
-		if (diag > PRECCELEST || diag2 > PRECCELEST) return true;
-
-		// If the change in the radius is too large we need to refine
-		if (abs(bottomRight.z - topLeft.z) > (param->accretionDiskMaxRadius / cam->r) * R_CHANGE_THRESHOLD ||
-			abs(topRight.z - bottomLeft.z) > (param->accretionDiskMaxRadius / cam->r) * R_CHANGE_THRESHOLD) {
-			return true;
-		}
+		if (diag > PRECCELEST * DISK_PRECCELEST_RELAXATION || diag2 > PRECCELEST * DISK_PRECCELEST_RELAXATION) return true;
 	}
 	else {
-		float diag = vector_ops::dot((topLeft_2d - bottomRight_2d),(topLeft_2d - bottomRight_2d));
-		bottomRight.y += PI2;
-		diag = std::min(diag, vector_ops::dot((topLeft_2d - bottomRight_2d),(topLeft_2d - bottomRight_2d)));
 
-
-		float diag2 = vector_ops::dot((topRight_2d - bottomLeft_2d),(topRight_2d - bottomLeft_2d));
-		bottomRight.y += PI2;
-		diag2 = std::min(diag2, vector_ops::dot((topRight_2d - bottomLeft_2d),(topRight_2d - bottomLeft_2d)));
-
-		// If the maximum diagonal is not less than required precision split the block
-
-		if ( diag > PRECCELEST || diag2 > PRECCELEST) return true;
 	}
 
 	
@@ -481,7 +485,8 @@ void Grid::fillVector(std::vector<uint64_t>& toIntIJ, uint32_t i, uint32_t j) {
 	auto iter = CamToCel.find(i_j);
 	if (iter == CamToCel.end()) {
 		toIntIJ.push_back(i_j);
-		CamToCel[i_j] = float4{ -10, -10, -10,-10 };
+		CamToCel[i_j] = float2{ -10, -10};
+		CamToDisk[i_j] = float4{ -10,-10,-10,-10 };
 	}
 }
 
@@ -539,17 +544,24 @@ void Grid::adaptiveBlockIntegration(int level) {
 /// </summary>
 /// <param name="theta">The theta positions.</param>
 /// <param name="phi">The phi positions.</param>
+/// /// <param name="disk_redshift">redshift of the disk if hit.must be at least size n </param>
+/// /// <param name="disk_distances">distance to disk if hit. must be at least size n</param>
+/// /// <param name="disk_r">The r positions if on the disk otherwise nan. must be at least size n</param>
+/// /// <param name="disk_phi">The phi postions if on the disk if it was hit otherwise nan.  must be at least size n</param>
 /// <param name="n">The size of the vectors.</param>
-void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& phi, std::vector<double>& r, std::vector<double>& distances, const int n, std::vector<int>& step) {
+void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& phi, std::vector<double>& disk_redshift, std::vector<double>& disk_distances, std::vector<double>& disk_r, std::vector<double>& disk_phi, const int n, std::vector<int>& step) {
 	double thetaS = cam->theta;
 	double phiS = cam->phi;
 	double rS = cam->r;
 	double sp = cam->speed;
 
-	std::vector<double>pRs;
-	std::vector<double>bs;
-	std::vector<double>qs;
-	std::vector<double>pThetas;
+	//std::vector<double>pRs;
+	//std::vector<double>bs;
+	//std::vector<double>qs;
+	//std::vector<double>pThetas;
+
+	//std::vector<double>disk_r;
+	//std::vector<double>disk_phi;
 	
 	std::vector<float>paths;
 
@@ -557,15 +569,20 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 		paths = std::vector<float>(n * 3 * (MAXSTP / STEP_SAVE_INTERVAL));
 	}
 
+	/*
 	pRs.reserve(n);
 	bs.reserve(n);
 	qs.reserve(n);
 	pThetas.reserve(n);
 	
 
+	disk_r.resize(n);
+	disk_phi.resize(n);
+	*/
+
 #pragma loop(hint_parallel(8))
 #pragma loop(ivdep)
-	for (int i = 0; i <     n; i++) {
+	for (int i = 0; i < n; i++) {
 		
 
 		double xCam = sin(theta[i]) * cos(phi[i]);
@@ -592,21 +609,17 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 
 
 
-		pRs.push_back(pR);
-		bs.push_back(b);
-		qs.push_back(q);
-		pThetas.push_back(pTheta);
+		disk_distances[i] = pR;
+		theta[i] = b;
+		phi[i] = q;
+		disk_redshift[i] = pTheta;
 	}
 
 
 	if (n < MIN_GPU_INTEGRATION) {
 	#pragma loop(hint_parallel(8))
 		for (int i = 0; i < n; i++) {
-			metric::rkckIntegrate1<double>(rS, thetaS, phiS, &pRs[i], &bs[i], &qs[i], &pThetas[i],param->savePaths, reinterpret_cast<float3*>( & (paths.data()[i * 3 * (MAXSTP / STEP_SAVE_INTERVAL)])));
-			theta[i] = bs[i];
-			phi[i] = qs[i];
-			r[i] = pThetas[i];
-			distances[i] = pRs[i];
+			metric::rkckIntegrate1<double>(rS, thetaS, phiS, &disk_distances[i], &theta[i], &phi[i], &disk_redshift[i], &disk_r[i],&disk_phi[i], param->savePaths, reinterpret_cast<float3*>( & (paths.data()[i * 3 * (MAXSTP / STEP_SAVE_INTERVAL)])));
 
 			
 		}
@@ -616,15 +629,7 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 		
 	}
 	else {
-		CUDA::integrateGrid<double>(rS, thetaS, phiS, pRs, bs, qs, pThetas);
-#pragma loop(hint_parallel(8))
-		for (int i = 0; i < n; i++) {
-
-			theta[i] = bs[i];
-			phi[i] = qs[i];
-			r[i] = pThetas[i];
-			distances[i] = pRs[i];
-		}
+		CUDA::integrateGrid<double>(rS, thetaS, phiS, disk_distances, theta, phi, disk_redshift,disk_r,disk_phi);
 	}
 
 	
@@ -656,7 +661,8 @@ Grid::Grid(const int maxLevelPrec, const int startLevel, const bool angle, const
 	STARTM = (2 - equafactor) * 2 * (STARTN - 1);
 	steps = std::vector<int>(M * N);
 
-	grid_vector = std::vector<float4>(M * N, make_float4(-2, -2, -2, -2));
+	grid_vector = std::vector<float2>(M * N, make_float2(-2,  -2));
+	disk_grid_vector = std::vector<float4>(M * N, make_float4(-2, -2, -2, -2));
 
 	auto start = std::chrono::high_resolution_clock::now();
 	raytrace();
@@ -696,14 +702,16 @@ void Grid::saveGeodesics(Parameters& param) {
 
 void Grid::saveAsGpuHash() {
 	//TODO FIX SYMMETRY EXPLOIT
-	for (const std::pair<uint64_t, float4>& entry : CamToCel) {
+	for (const std::pair<uint64_t, float2>& entry : CamToCel) {
 		uint32_t el1 = entry.first >> 32;
 		uint32_t el2 = entry.first;
-		
-	
+		grid_vector[el1 * M + el2] = { (float)entry.second.x,(float)entry.second.y};
+	}
 
-
-		grid_vector[el1 * M + el2] = { (float)entry.second.x,(float)entry.second.y,(float)entry.second.z,(float)entry.second.w };
+	for (const std::pair<uint64_t, float4>& entry : CamToDisk) {
+		uint32_t el1 = entry.first >> 32;
+		uint32_t el2 = entry.first;
+		disk_grid_vector[el1 * M + el2] = { (float)entry.second.x,(float)entry.second.y, (float) entry.second.z, (float) entry.second.w};
 	}
 
 }

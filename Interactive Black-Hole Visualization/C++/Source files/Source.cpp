@@ -31,7 +31,7 @@ void gridLevelCount(Grid& grid, int maxlevel) {
 		check[block.second]++;
 	for (int p = 1; p < maxlevel + 1; p++)
 		std::cout << "lvl " << p << " blocks: " << check[p] << std::endl;
-	std::cout << std::endl << "Total rays: " << grid.CamToCel.size() << std::endl << std::endl;
+	//std::cout << std::endl << "Total rays: " << grid.CamToCel.size() << std::endl << std::endl;
 }
 
 /// <summary>

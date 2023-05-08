@@ -1,6 +1,18 @@
 #pragma once
 #include <cuda_runtime.h>
 
+inline __host__ __device__  float4 operator/ (uchar4 a, float b) {
+	return make_float4(a.x / b, a.y /b, a.z /b , a.w / b);
+}
+
+inline __host__ __device__  float2 operator+ (float2 a, float2 b) {
+	return make_float2(a.x + b.x, a.y + b.y);
+}
+
+inline __host__ __device__  float2 operator- (float2 a, float2 b) {
+	return make_float2(a.x - b.x, a.y - b.y);
+}
+
 inline __host__ __device__ float2 operator*(float b, float2 a)
 {
 	return make_float2(b * (float)a.x, b * (float)a.y);
@@ -42,6 +54,10 @@ inline __host__ __device__ float4 operator+(float4 a, float4 b)
 
 
 namespace vector_ops {
+	inline __host__ __device__  float dot(float2 a, float2 b) {
+		return a.x * b.x + a.y * b.y;
+	}
+
 	inline __host__ __device__  float dot(float3 a, float3 b) {
 		return a.x * b.x + a.y * b.y + a.z * b.z;
 	}

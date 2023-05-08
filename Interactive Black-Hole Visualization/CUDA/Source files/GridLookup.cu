@@ -31,30 +31,7 @@ __device__ bool piCheck(volatile float* p, float factor) {
 	return check;
 }
 
-__device__ bool piCheck(volatile float3* p, float factor) {
-	float factor1 = PI2 * (1.f - factor);
-	bool check = false;
-#pragma unroll
-	for (int q = 0; q < 4; q++) {
-		if (p[q].y > factor1) {
-			check = true;
-			break;
-		}
-	}
-	if (!check) return false;
-	check = false;
-	float factor2 = PI2 * factor;
-#pragma unroll
-	for (int q = 0; q < 4; q++) {
-		if (p[q].y < factor2) {
-			p[q].y += PI2;
-			check = true;
-		}
-	}
-	return check;
-}
-
-__device__ bool piCheck(volatile float4* p, float factor) {
+template <class T> __device__ bool piCheck(volatile T* p, float factor) {
 	float factor1 = PI2 * (1.f - factor);
 	bool check = false;
 #pragma unroll
@@ -79,7 +56,7 @@ __device__ bool piCheck(volatile float4* p, float factor) {
 
 
 
-__device__ void findBlock(const float theta, const float phi, const int g, const float4* grid,
+template <class T> __device__ void findBlock(const float theta, const float phi, const int g, const T* grid,
 	const int GM, const int GN, int& i, int& j, int& gap, const int level) {
 
 	for (int s = 0; s < level + 1; s++) {
@@ -103,7 +80,7 @@ __device__ void findBlock(const float theta, const float phi, const int g, const
 /// <param name="p">The phi values to check.</param>
 /// <param name="factor">The factor to check if a point is close to the border.</param>
 /// <returns></returns>
-__device__ bool piCheckTot(float4* tp, float factor, int size) {
+template <class T> __device__ bool piCheckTot(T* tp, float factor, int size) {
 	float factor1 = PI2 * (1.f - factor);
 	bool check = false;
 	for (int q = 0; q < size; q++) {
@@ -124,26 +101,6 @@ __device__ bool piCheckTot(float4* tp, float factor, int size) {
 	return check;
 }
 
-__device__ bool piCheckTot(float3* tp, float factor, int size) {
-	float factor1 = PI2 * (1.f - factor);
-	bool check = false;
-	for (int q = 0; q < size; q++) {
-		if (tp[q].y > factor1) {
-			check = true;
-			break;
-		}
-	}
-	if (!check) return false;
-	check = false;
-	float factor2 = PI2 * factor;
-	for (int q = 0; q < size; q++) {
-		if (tp[q].y < factor2) {
-			tp[q].y += PI2;
-			check = true;
-		}
-	}
-	return check;
-}
 
 // Set values for projected pixel corners & update phi values in case of 2pi crossing.
 // If the corners cross into the accretion disk we set them to a known good value
