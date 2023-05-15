@@ -30,55 +30,59 @@ __device__ float getDeterminant(const float3& center,const float3& v1, const flo
 /// <param name="N"></param>
 /// <param name="area"></param>
 /// <returns></returns>
-__global__ void findArea(const float4* thphi, const float4* thphi_disk, const int M, const int N, float* area, float* cam, float max_accretion_radius, const unsigned char* diskMask) {
+__global__ void findArea(const float2* thphi, const float2* thphi_disk, const int M, const int N, float* area, float* cam, float max_accretion_radius, const unsigned char* diskMask, float3* incident_dirs) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 	int ind = i * M1 + j;
 	
-	float4 disk_vertices[4] = {thphi_disk[ind],thphi_disk[ind + 1],thphi_disk[ind + M1],thphi_disk[ind + M1 + 1]};
+	float2 disk_vertices[4] = {thphi_disk[ind],thphi_disk[ind + 1],thphi_disk[ind + M1],thphi_disk[ind + M1 + 1]};
 
-	bool use_sky_calculation = (isnan(disk_vertices[0].x) || isnan(disk_vertices[1].x) || isnan(disk_vertices[2].x) || isnan(disk_vertices[3].x));
+
 	//Check if any pixel is on the accretion disk
-	if (i < N && j < M && use_sky_calculation) {
-		bool picheck = false;
-		float t[4];
-		float p[4];
-		retrievePixelCorners(thphi, t, p, ind, M, picheck, 0.0f);
+	if (i < N && j < M) {
+		if (diskMask[ijc] != 4) {
+			bool picheck = false;
+			float t[4];
+			float p[4];
+			retrievePixelCorners(thphi, t, p, ind, M, picheck, 0.0f);
 
-		//If we are in the black hole the area becomes -1;
-		if (ind == -1) {
-			area[ijc] = -1;
-		}
+			//If we are in the black hole the area becomes -1;
+			if (ind == -1) {
+				area[ijc] = -1;
+			}
 
-		float th1[3] = { t[0], t[1], t[2] };
-		float ph1[3] = { p[0], p[1], p[2] };
-		float th2[3] = { t[0], t[2], t[3] };
-		float ph2[3] = { p[0], p[2], p[3] };
-		float a1 = calcAreax(th1, ph1);
-		float a2 = calcAreax(th2, ph2);
-		if (a1 == 0 || a2 == 0) {
-			area[ijc] = -1;
+			float th1[3] = { t[0], t[1], t[2] };
+			float ph1[3] = { p[0], p[1], p[2] };
+			float th2[3] = { t[0], t[2], t[3] };
+			float ph2[3] = { p[0], p[2], p[3] };
+			float a1 = calcAreax(th1, ph1);
+			float a2 = calcAreax(th2, ph2);
+			if (a1 == 0 || a2 == 0) {
+				area[ijc] = -1;
+			}
+			else {
+				area[ijc] = INFINITY;
+				area[ijc] = a1 + a2;
+			}
 		}
 		else {
-			area[ijc] = a1 + a2;
-		}
-		
-	}
-	//If any pixel is on the accretion disk we cant simply calculate the "Naive" solidangle since it might be zero for example when the disk is at phi = pi.
-	//Therefore we calculate the area the pixel acctually covers and compare it to the area it should cover 
-	// We save the area normalized as if it was 1 away from the pinhole camera which we can simply calculate using right angled triangles as shown below 
-	//  p_a |\
-	//		| \
-	//		|  |\
-	//		|__|_\
-	//		
-	//		(r-1)	1
-	else if (i < N && j < M) {
-		int accretion_vertices[4];
-		int celestial_vertices[3];
-		int n_accretion_vertices = 0;
+			//If any pixel is on the accretion disk we cant simply calculate the "Naive" solidangle since it might be zero for example when the disk is at phi = pi.
+			//Therefore we calculate the area the pixel acctually covers and compare it to the area it should cover 
+			// We save the area normalized as if it was 1 away from the pinhole camera which we can simply calculate using right angled triangles as shown below 
+			//  p_a |\
+			//		| \
+			//		|  |\
+			//		|__|_\
+			//		
+			//		(r-1)	1
 
-		//If we have four correct vertices we can simply calculate the area 
+			int accretion_vertices[4];
+			int celestial_vertices[3];
+			int n_accretion_vertices = 0;
+
+			float3 disk_incidents[4] = { incident_dirs[ind],incident_dirs[ind + 1],incident_dirs[ind + M1],incident_dirs[ind + M1 + 1] };
+
+			//If we have four correct vertices we can simply calculate the area 
 
 			float3 cartesian_vertices[4];
 			float distance = 0;
@@ -89,17 +93,17 @@ __global__ void findArea(const float4* thphi, const float4* thphi_disk, const in
 					disk_vertices[k].x * sin(disk_vertices[k].y),
 					0
 				};
-				distance += 0.25f * disk_vertices[k].w;
+				distance += 0.25f * sqrt(vector_ops::sq_norm(disk_incidents[k]));
 			}
 
-			
 
-			
+
+
 			//Calculate area of triangle 1
-  			float3 e1 = cartesian_vertices[1] - cartesian_vertices[0];
+			float3 e1 = cartesian_vertices[1] - cartesian_vertices[0];
 			float3 e2 = cartesian_vertices[2] - cartesian_vertices[0];
 			float3 cross1 = vector_ops::cross(e1, e2);
-			float a1 = sqrtf(vector_ops::dot(cross1, cross1))/2;
+			float a1 = sqrtf(vector_ops::dot(cross1, cross1)) / 2;
 
 			if (a1 == 0) {
 				area[ijc] = -1;
@@ -110,16 +114,16 @@ __global__ void findArea(const float4* thphi, const float4* thphi_disk, const in
 			float3 e3 = cartesian_vertices[1] - cartesian_vertices[3];
 			float3 e4 = cartesian_vertices[2] - cartesian_vertices[3];
 			float3 cross2 = vector_ops::cross(e3, e4);
-			float a2 = sqrtf(vector_ops::dot(cross2, cross2)) /2;
+			float a2 = sqrtf(vector_ops::dot(cross2, cross2)) / 2;
 
-			if (a2 == 0 || (a1+a2)/a1 < 1.1 || (a1 + a2) / a2 < 1.1) {
+			if (a2 == 0 || (a1 + a2) / a1 < 1.1 || (a1 + a2) / a2 < 1.1) {
 				area[ijc] = -1;
 				return;
 			}
 
 			//Normalize area as tangent square to unit-sphere around camera
-			float normalized_area = (a1+a2) / (distance * distance);
-			
+			float normalized_area = (a1 + a2) / (distance * distance);
+
 
 
 			//calcute solid angle by getting the area of the circle inside the pyramid of the tangent square and the camera position see 1d projection below
@@ -133,8 +137,11 @@ __global__ void findArea(const float4* thphi, const float4* thphi_disk, const in
 			float alpha = 2 * atanf(x / 2);
 			float sphere_area = alpha * alpha / PI;
 			area[ijc] = sphere_area;
-
+		}
+		
+		
 	}
+
 }
 
 __device__ int radius_arg_min(float4* vertices) {
@@ -159,7 +166,7 @@ __global__ void smoothAreaH(float* areaSmooth, float* area, const unsigned char*
 		
 
 		if (bh[ijc] == 1) return;
-		bool disk_mask_ijc = diskMask[ijc] == 0;
+		bool disk_mask_ijc = diskMask[ijc] == 4;
 
 		int fs = max(max(gap[i * M1 + j], gap[i * M1 + M1 + j]), max(gap[i * M1 + j + 1], gap[i * M1 + M1 + j + 1]));
 		fs = fs * 4   ;
@@ -170,7 +177,7 @@ __global__ void smoothAreaH(float* areaSmooth, float* area, const unsigned char*
 		for (int h = -fs; h <= fs; h++) {
 
 
-			if (!bh[i * M + ((j + h + M) % M)] && ((diskMask[i * M + ((j + h + M) % M)] == 0) == disk_mask_ijc) && area[i * M + ((j + h + M) % M)] != -1) {
+			if (!bh[i * M + ((j + h + M) % M)] && ((diskMask[i * M + ((j + h + M) % M)] == 4) == disk_mask_ijc) && area[i * M + ((j + h + M) % M)] != -1) {
 				float ar = area[i * M + ((j + h + M) % M)];
 				sum += ar * expf(-(h * h) / (HORIZONTAL_GAUSSIAN_BLUR_SIGMA * fs));
 				weight += expf(-(h * h) / (HORIZONTAL_GAUSSIAN_BLUR_SIGMA * fs));
@@ -203,7 +210,7 @@ __global__ void smoothAreaV(float* areaSmooth, float* area, const unsigned char*
 
 	if (i < N && j < M) {
 		if (bh[ijc] == 1) return;
-		bool disk_mask_ijc = diskMask[ijc] == 0;
+		bool disk_mask_ijc = diskMask[ijc] == 4;
 
 		int fs = max(max(gap[i * M1 + j], gap[i * M1 + M1 + j]), max(gap[i * M1 + j + 1], gap[i * M1 + M1 + j + 1]));
 		fs = fs * 4;
@@ -213,10 +220,7 @@ __global__ void smoothAreaV(float* areaSmooth, float* area, const unsigned char*
 
 
 		for (int h = -fs; h <= fs; h++) {
-			if (bh[((i+h+N) %N) * M + j] == 0 && ((diskMask[((i + h + N) % N) * M + j]==0) == disk_mask_ijc) && area[((i + h + N) % N) * M + j] != -1) {
-				if (j == 1851 && i == 859) {
-					j;
-				}
+			if (bh[((i+h+N) %N) * M + j] == 0 && ((diskMask[((i + h + N) % N) * M + j]==4) == disk_mask_ijc) && area[((i + h + N) % N) * M + j] != -1) {
 				float ar = area[((i + h + N) % N) * M + j];
 				sum += ar * expf(-(h * h) / (VERTICAL_GAUSSIAN_BLUR_SIGMA * fs));
 				weight += expf(-(h * h) / (VERTICAL_GAUSSIAN_BLUR_SIGMA*fs) );

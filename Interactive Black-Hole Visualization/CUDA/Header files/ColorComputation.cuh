@@ -4,7 +4,7 @@
 
 
 
-__global__ void findArea(const float4* thphi, const float4* thphi_disk, const int M, const int N, float* area, float* cam, float max_accretion_radius, const unsigned char* diskMask);
+__global__ void findArea(const float2* thphi, const float2* thphi_disk, const int M, const int N, float* area, float* cam, float max_accretion_radius, const unsigned char* diskMask, float3* incident_dirs);
 __global__ void smoothAreaH(float* areaSmooth, float* area, const unsigned char* bh, const int* gap, const int M, const int N, const unsigned char* diskMask);
 __global__ void smoothAreaV(float* areaSmooth, float* area, const unsigned char* bh, const int* gap, const int M, const int N, const unsigned char* diskMask);
 

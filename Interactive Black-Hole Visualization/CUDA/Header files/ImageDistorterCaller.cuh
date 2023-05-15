@@ -133,6 +133,7 @@ namespace CUDA {
 			for (int g = 0; g < G; g++) {
 				grid_vectors.push_back(grids[g].grid_vector);
 				grid_disk_vectors.push_back(grids[g].disk_grid_vector);
+				grid_incident_vectors.push_back(grids[g].disk_incident_vector);
 			}
 			camParams.resize(10 * G);
 			for (int g = 0; g < G; g++) {
@@ -150,7 +151,8 @@ namespace CUDA {
 		}
 		std::vector<float> camParams;
 		std::vector<std::vector<float2>>grid_vectors;
-		std::vector<std::vector<float4>>grid_disk_vectors;
+		std::vector<std::vector<float2>>grid_disk_vectors;
+		std::vector<std::vector<float3>>grid_incident_vectors;
 		int GM;
 		int GN;
 		int GN1;
@@ -219,9 +221,9 @@ namespace CUDA {
 		const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis, const Texture& accretionDiskTexture, const Parameters& param);
 
 	template <class T> void integrateGrid(const T rV, const T thetaV, const T phiV, std::vector <T>& pRV,
-		std::vector <T>& bV, std::vector <T>& qV, std::vector <T>& pThetaV, std::vector <T>& disk_r,std::vector <T>& disk_phi);
+		std::vector <T>& bV, std::vector <T>& qV, std::vector <T>& pThetaV, float3* disk_incident);
 	template void integrateGrid<double>(const double rV, const double thetaV, const double phiV, std::vector <double>& pRV,
-		std::vector <double>& bV, std::vector <double>& qV, std::vector <double>& pThetaV, std::vector <double>& disk_r, std::vector <double>& disk_phi);
+		std::vector <double>& bV, std::vector <double>& qV, std::vector <double>& pThetaV, float3* disk_incident);
 
 	ViewCamera* glfw_setup(int screen_width, int screen_height);
 

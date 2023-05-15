@@ -93,12 +93,17 @@ float milliseconds = 0.f;
 float2* dev_grid = 0;
 float2* dev_grid_2 = 0;
 
-float4* dev_disk_grid = 0;
-float4* dev_disk_grid_2 = 0;
+float2* dev_disk_grid = 0;
+float2* dev_disk_grid_2 = 0;
 
-static float4* dev_interpolatedGrid = 0;
+float3* dev_incident_grid = 0;
+float4* dev_incident_grid_2 = 0;
 
-static float4* dev_interpolatedDiskGrid = 0;
+static float2* dev_interpolatedGrid = 0;
+
+static float2* dev_interpolatedDiskGrid = 0;
+
+static float3* dev_interpolatedIncidentGrid = 0;
 
 int* dev_gridGap = 0;
 static float* dev_cameras = 0;
@@ -134,8 +139,8 @@ double* pRvs_device;
 double* bs_device;
 double* qs_device;
 double* pThetas_device;
-double* disk_r_device;
-double* disk_phi_device;
+float3* disk_incident_device;
+
 
 
 double* temperatureLUT_device;
@@ -145,9 +150,11 @@ cudaError_t CUDA::cleanup() {
 
 	cudaFree(dev_grid);
 	cudaFree(dev_disk_grid);
+	cudaFree(dev_incident_grid);
 
 	cudaFree(dev_interpolatedGrid);
 	cudaFree(dev_interpolatedDiskGrid);
+	cudaFree(dev_interpolatedIncidentGrid);
 
 	cudaFree(dev_gridGap);
 
@@ -183,8 +190,8 @@ cudaError_t CUDA::cleanup() {
 	cudaFree(bs_device);
 	cudaFree(qs_device);
 	cudaFree(pThetas_device);
-	cudaFree(disk_r_device);
-	cudaFree(disk_phi_device);
+	cudaFree(disk_incident_device);
+
 
 	cudaFree(temperatureLUT_device);
 	cudaFree(dev_accretionDiskTexture);
@@ -249,15 +256,12 @@ void CUDA::allocateGridMemory(size_t size) {
 	allocate(bs_device, sizeof(double) * size, "b param");
 	allocate(qs_device, sizeof(double) * size, "q param");
 	allocate(pThetas_device, sizeof(double) * size, "Momentum theta");
-	allocate(disk_r_device, sizeof(double) * size, "Thetas");
-	allocate(disk_phi_device, sizeof(double) * size, "phis");
+	allocate(disk_incident_device, sizeof(float3) * size, "Thetas");
 	checkCudaErrors();
 };
 
 template <class T> void CUDA::integrateGrid(const T rV, const T thetaV, const T phiV, std::vector <T>& pRV,
-	std::vector <T>& bV, std::vector <T>& qV, std::vector <T>& pThetaV, std::vector <T>& disk_r, std::vector <T>& disk_phi){
-
-
+	std::vector <T>& bV, std::vector <T>& qV, std::vector <T>& pThetaV, float3* disk_incident){
 
 	copyHostToDeviceAsync(pRvs_device, pRV.data(), pRV.size() * sizeof(T), "pRs");
 	copyHostToDeviceAsync(bs_device, bV.data(), bV.size() * sizeof(T), "bs");
@@ -271,14 +275,13 @@ template <class T> void CUDA::integrateGrid(const T rV, const T thetaV, const T 
 
 	//We can reinterpret_cast since T is either double or float and we reserve space for the larger double type
 	callKernelAsync("integrate GPU", metric::integrate_kernel<T>, block_size, threads_per_block, 0,
-		rV, thetaV, phiV, reinterpret_cast<T*>(pRvs_device), reinterpret_cast<T*>(bs_device), reinterpret_cast<T*>(qs_device), reinterpret_cast<T*>(pThetas_device), reinterpret_cast<T*>(disk_r_device), reinterpret_cast<T*>(disk_phi_device), pRV.size());
+		rV, thetaV, phiV, reinterpret_cast<T*>(pRvs_device), reinterpret_cast<T*>(bs_device), reinterpret_cast<T*>(qs_device), reinterpret_cast<T*>(pThetas_device), reinterpret_cast<float3*>(disk_incident_device), pRV.size());
 
 	copyDeviceToHostAsync(bV.data(), bs_device, bV.size() * sizeof(T), "found theta");
 	copyDeviceToHostAsync(qV.data(), qs_device, qV.size() * sizeof(T), "found phi");
-	copyDeviceToHostAsync(pThetaV.data(), pThetas_device, pThetaV.size() * sizeof(T), "found r");
-	copyDeviceToHostAsync(pRV.data(), pRvs_device, pRV.size() * sizeof(T), "found r");
-	copyDeviceToHostAsync(disk_r.data(), disk_r_device, pThetaV.size() * sizeof(T), "found r");
-	copyDeviceToHostAsync(disk_phi.data(), disk_phi_device, pRV.size() * sizeof(T), "found r");
+	copyDeviceToHostAsync(pThetaV.data(), pThetas_device, pThetaV.size() * sizeof(T), "found disk r");
+	copyDeviceToHostAsync(pRV.data(), pRvs_device, pRV.size() * sizeof(T), "found disk phi");
+	copyDeviceToHostAsync(disk_incident, disk_incident_device, pThetaV.size() * sizeof(float3), "found incident");
 
 	
 	cudaStreamSynchronize(stream);
@@ -313,12 +316,15 @@ void CUDA::memoryAllocationAndCopy(const Grids& grids, const Image& image, const
 	allocate(dev_grid, gridnum * gridsize * sizeof(float2), "grid");
 	dev_grid_2 = &dev_grid[gridsize];
 
-	allocate(dev_disk_grid, gridnum * gridsize * sizeof(float4), "grid");
+	allocate(dev_disk_grid, gridnum * gridsize * sizeof(float2), "grid");
 	dev_disk_grid_2 = &dev_disk_grid[gridsize];
 
-	allocate(dev_interpolatedGrid, rastSize * sizeof(float4), "interpolatedGrid");
+	allocate(dev_incident_grid, rastSize * sizeof(float3), "interpolatedGrid");
+	dev_incident_grid_2 = &dev_incident_grid_2[gridsize];
 
+	allocate(dev_interpolatedGrid, rastSize * sizeof(float2), "interpolatedGrid");
 	allocate(dev_interpolatedDiskGrid, rastSize * sizeof(float4), "interpolatedGrid");
+	allocate(dev_interpolatedIncidentGrid, rastSize * sizeof(float3), "interpolatedGrid");
 
 	allocate(dev_gridGap, rastSize * sizeof(int), "gridGap");
 
@@ -417,7 +423,8 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 
 	if (grids.G == 1) {
 		copyHostToDeviceAsync(dev_grid, grids.grid_vectors[0].data(), grids.grid_vectors[0].size() * sizeof(float2), "grid");
-		copyHostToDeviceAsync(dev_disk_grid, grids.grid_disk_vectors[0].data(), grids.grid_disk_vectors[0].size() * sizeof(float4), "grid");
+		copyHostToDeviceAsync(dev_disk_grid, grids.grid_disk_vectors[0].data(), grids.grid_disk_vectors[0].size() * sizeof(float2), "grid");
+		copyHostToDeviceAsync(dev_incident_grid, grids.grid_incident_vectors[0].data(), grids.grid_incident_vectors[0].size() * sizeof(float3), "grid");
 	}
 
 	float grid_value = 0.f;
@@ -426,13 +433,6 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 	int startframe = 0;
 
 	int q = startframe;
-	
-	std::vector<float2> grid((grids.GM) * (grids.GN1));
-	std::vector<float4> disk_grid((grids.GM) * (grids.GN1));
-	std::vector<float4> depth((image.N + 1) * (image.M + 1), { 0,0,0,1 });
-	std::vector<float4> interpolated_grid((image.N + 1) * (image.M + 1));
-	std::vector<float4> interpolated_disk_grid((image.N + 1) * (image.M + 1));
-	std::vector<float> area((image.N) * (image.M));
 
 	ViewCamera* viewer = glfw_setup(param.windowWidth, param.windowHeight);
 
@@ -538,12 +538,13 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 			if (grid_nr != (int)grid_value) {
 				grid_nr = (int)grid_value;
 				copyHostToDeviceAsync(dev_grid, grids.grid_vectors[grid_nr].data(), grids.grid_vectors[grid_nr].size() * sizeof(float2), "grid");
-				copyHostToDeviceAsync(dev_disk_grid, grids.grid_disk_vectors[grid_nr].data(), grids.grid_disk_vectors[grid_nr].size() * sizeof(float4), "disk_grid_2");
+				copyHostToDeviceAsync(dev_disk_grid, grids.grid_disk_vectors[grid_nr].data(), grids.grid_disk_vectors[grid_nr].size() * sizeof(float2), "disk_grid_2");
+				copyHostToDeviceAsync(dev_incident_grid, grids.grid_incident_vectors[grid_nr].data(), grids.grid_incident_vectors[grid_nr].size() * sizeof(float3), "disk_incident_2");
 
 				//checkCudaErrors();
 				copyHostToDeviceAsync(dev_grid_2, grids.grid_vectors[grid_nr+1].data(), grids.grid_vectors[grid_nr+1].size() * sizeof(float2), "grid");
 				copyHostToDeviceAsync(dev_disk_grid_2, grids.grid_disk_vectors[grid_nr + 1].data(), grids.grid_disk_vectors[grid_nr + 1].size() * sizeof(float2), "disk_grid_2");
-
+				copyHostToDeviceAsync(dev_incident_grid_2, grids.grid_incident_vectors[grid_nr+1].data(), grids.grid_incident_vectors[grid_nr+1].size() * sizeof(float3), "disk_incident_2");
 				
 				callKernelAsync("Find black-hole shadow center", findBhCenter, numBlocks_GN_GM_5_25, threadsPerBlock5_25,0,
 					grids.GM, grids.GN1, dev_grid, dev_blackHoleBorder0);
@@ -575,8 +576,9 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 
 		
 		callKernelAsync("Interpolated disk grid", disk_pixInterpolation, numBlocks_N1_M1_5_25, threadsPerBlock5_25, 0,
-			dev_viewer, image.M, image.N, grids.G, dev_interpolatedDiskGrid, dev_disk_grid, grids.GM, grids.GN1,
+			dev_viewer, image.M, image.N, grids.G, dev_interpolatedDiskGrid, dev_interpolatedIncidentGrid, dev_disk_grid,  dev_incident_grid,  grids.GM, grids.GN1,
 			hor, ver, dev_gridGap, grids.level, dev_blackHoleBorder0, bhproc.angleNum, alpha);
+
 		
 
 		callKernelAsync("Constructed black-hole shadow mask", findBlackPixels, numBlocks_N_M_5_25, threadsPerBlock5_25, 0,
@@ -589,9 +591,9 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 
 		
 		callKernelAsync("Calculated solid angles", findArea, numBlocks_N_M_5_25, threadsPerBlock5_25, 0,
-			dev_interpolatedGrid,dev_interpolatedDiskGrid, image.M, image.N, dev_solidAngles0,dev_camera0, param.accretionDiskMaxRadius, dev_diskMask);
+			dev_interpolatedGrid,dev_interpolatedDiskGrid, image.M, image.N, dev_solidAngles0,dev_camera0, param.accretionDiskMaxRadius, dev_diskMask, dev_interpolatedIncidentGrid);
 		
-
+		
 		callKernelAsync("Smoothed solid angles horizontally", smoothAreaH, numBlocks_N_M_5_25, threadsPerBlock5_25,0,
 			dev_solidAngles1, dev_solidAngles0, dev_blackHoleMask, dev_gridGap, image.M, image.N, dev_diskMask);
 #ifdef _DEBUG
@@ -655,12 +657,12 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 					param.accretionTemperatureLUTSize, temperatureLUT_device, (param.accretionDiskMaxRadius - 3) / (param.accretionTemperatureLUTSize - 1), param.blackholeMass, param.blackholeAccretion);
 
 				callKernelAsync("Add accretion Disk", addAccretionDisk, numBlocks_N_M_4_4, threadsPerBlock4_4,0,
-					dev_interpolatedDiskGrid, dev_outputImage, temperatureLUT_device, (param.accretionDiskMaxRadius / param.accretionTemperatureLUTSize), param.accretionTemperatureLUTSize,
+					dev_interpolatedDiskGrid, dev_interpolatedIncidentGrid, dev_outputImage, temperatureLUT_device, (param.accretionDiskMaxRadius / param.accretionTemperatureLUTSize), param.accretionTemperatureLUTSize,
 					dev_blackHoleMask, image.M, image.N, dev_cameras, dev_solidAngles0, dev_viewer, param.useLensing, dev_diskMask);
 			}
 			else {
 				callKernelAsync("Add accretion Disk Texture", addAccretionDiskTexture, numBlocks_N_M_4_4, threadsPerBlock4_4,0,
-					dev_interpolatedGrid, image.M, dev_blackHoleMask, dev_outputImage, dev_accretionDiskTexture, param.accretionDiskMaxRadius,
+					dev_interpolatedDiskGrid, image.M, dev_blackHoleMask, dev_outputImage, dev_accretionDiskTexture, param.accretionDiskMaxRadius,
 					accretionDiskTexture.width, accretionDiskTexture.height, dev_cameras, dev_solidAngles0, dev_viewer, param.useLensing, dev_diskMask
 				)
 			}
@@ -718,13 +720,20 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 	//Save last output to file
 
 	// Copy output vector from GPU buffer to host memory.
+	std::vector<float2> grid((grids.GM)* (grids.GN1));
+	std::vector<float2> disk_grid((grids.GM)* (grids.GN1));
+	std::vector<float4> depth((image.N + 1)* (image.M + 1), { 0,0,0,1 });
+	std::vector<float2> interpolated_grid((image.N + 1)* (image.M + 1));
+	std::vector<float2> interpolated_disk_grid((image.N + 1)* (image.M + 1));
+	std::vector<float> area((image.N)* (image.M));
+
 
 	cudaMemcpyAsync(&image.result[0], dev_outputImage, image.N* image.M * 4 * sizeof(uchar), cudaMemcpyDeviceToHost, stream);
 	cudaMemcpyAsync(grid.data(), dev_grid, (grids.GN1)* (grids.GM) * sizeof(float2), cudaMemcpyDeviceToHost, stream);
-	cudaMemcpyAsync(disk_grid.data(), dev_disk_grid, (grids.GN1)* (grids.GM) * sizeof(float4), cudaMemcpyDeviceToHost, stream);
+	cudaMemcpyAsync(disk_grid.data(), dev_disk_grid, (grids.GN1)* (grids.GM) * sizeof(float2), cudaMemcpyDeviceToHost, stream);
 	cudaMemcpyAsync(area.data(), dev_solidAngles0, (image.N)* (image.M) * sizeof(float), cudaMemcpyDeviceToHost, stream);
-	cudaMemcpyAsync(interpolated_grid.data(), dev_interpolatedGrid, (image.N + 1)* (image.M + 1) * sizeof(float4), cudaMemcpyDeviceToHost, stream);
-	cudaMemcpyAsync(interpolated_disk_grid.data(), dev_interpolatedDiskGrid, (image.N + 1)* (image.M + 1) * sizeof(float4), cudaMemcpyDeviceToHost, stream);
+	cudaMemcpyAsync(interpolated_grid.data(), dev_interpolatedGrid, (image.N + 1)* (image.M + 1) * sizeof(float2), cudaMemcpyDeviceToHost, stream);
+	cudaMemcpyAsync(interpolated_disk_grid.data(), dev_interpolatedDiskGrid, (image.N + 1)* (image.M + 1) * sizeof(float2), cudaMemcpyDeviceToHost, stream);
 
 
 	cv::Mat img = cv::Mat(image.N, image.M, CV_8UC4, (void*)&image.result[0]);
@@ -742,23 +751,22 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 		}
 	}
 
+	std::vector<float4> disk_grid_image(disk_grid.size());
 	for (int i = 0; i < disk_grid.size(); i++) {
 		if (disk_grid[i].x > -2.0) {
 			if (!isnan(disk_grid[i].x)) {
-				disk_grid[i].x = disk_grid[i].x / param.accretionDiskMaxRadius;
-				disk_grid[i].y = (disk_grid[i].y / PI2);
-				disk_grid[i].z;
-				disk_grid[i].w = 1;
+				disk_grid_image[i].x = disk_grid[i].x / param.accretionDiskMaxRadius;
+				disk_grid_image[i].y = (disk_grid[i].y / PI2);
+				disk_grid_image[i].w = 1;
 			} else {
-				disk_grid[i].x = 0;
-				disk_grid[i].y = 0;
-				disk_grid[i].z = 0;
-				disk_grid[i].w = 1;
+				disk_grid_image[i].x = 0;
+				disk_grid_image[i].y = 0;
+				disk_grid_image[i].w = 1;
 			} 
 
 		}
 		else {
-			disk_grid[i] = { 0,0,0,1 };
+			disk_grid_image[i] = { 0,0,0,1 };
 		}
 	}
 
@@ -768,7 +776,7 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 	gridmat.convertTo(gridUchar, CV_8UC4, 255.0);
 	cv::imwrite(param.getGridResultFileName(grid_value, q, "_grid"), gridUchar, image.compressionParams);
 
-	cv::Mat disk_gridmat = cv::Mat((grids.GN1), (grids.GM), CV_32FC4, (void*)disk_grid.data());
+	cv::Mat disk_gridmat = cv::Mat((grids.GN1), (grids.GM), CV_32FC4, (void*)disk_grid_image.data());
 	cv::Mat disk_gridUchar;
 	disk_gridmat.convertTo(disk_gridUchar, CV_8UC4, 255.0);
 	cv::imwrite(param.getGridResultFileName(grid_value, q, "_grid_disk"), disk_gridUchar, image.compressionParams);
@@ -781,22 +789,11 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 	
 
 
-		
+	std::vector<float4> interpolated_grid_image(interpolated_grid.size());
 	for (int i = 0; i < interpolated_grid.size(); i++) {
-		interpolated_grid[i].x = (interpolated_grid[i].x / PI);
-		interpolated_grid[i].y = (interpolated_grid[i].y / PI2);
-
-		if (interpolated_grid[i].z == INFINITY) {
-			interpolated_grid[i].z = 0;
-		}
-		else {
-			interpolated_grid[i].z = interpolated_grid[i].z / (grids.gridStart + q * (param.camRadiusChange ? grids.gridStep : 0));
-		}
-		depth[i].y = interpolated_disk_grid[i].w / -100;
-		interpolated_grid[i].w = 1;
-		if (i % (image.M) < image.M && i < image.M * image.N) {
-			depth[i].x = abs(area[i - (i / image.M)] / 1e-5);
-		}
+		interpolated_grid_image[i].x = (interpolated_grid[i].x / PI);
+		interpolated_grid_image[i].y = (interpolated_grid[i].y / PI2);
+		interpolated_grid_image[i].w = 1;
 
 	}
 
@@ -805,29 +802,28 @@ void CUDA::runKernels(const Grids& grids, const Image& image, const CelestialSky
 	depthmat.convertTo(depthUchar, CV_8U, 255.0);
 	cv::imwrite(param.getInterpolatedGridResultFileName(grid_value, q, "_depth"), depthUchar, image.compressionParams);
 
-	for (int i = 0; i < interpolated_disk_grid.size(); i++) {
 
+	std::vector<float4> interpolated_disk_grid_image(interpolated_disk_grid.size());
+	for (int i = 0; i < interpolated_disk_grid.size(); i++) {
 		if (!isnan(interpolated_disk_grid[i].x)) {
-			interpolated_disk_grid[i].x = interpolated_disk_grid[i].x / param.accretionDiskMaxRadius;
-			interpolated_disk_grid[i].y = (interpolated_disk_grid[i].y / PI2);
-			interpolated_disk_grid[i].z;
-			interpolated_disk_grid[i].w = 1;
+			interpolated_disk_grid_image[i].x = interpolated_disk_grid[i].x / param.accretionDiskMaxRadius;
+			interpolated_disk_grid_image[i].y = (interpolated_disk_grid[i].y / PI2);
+			interpolated_disk_grid_image[i].w = 1;
 		}
 		else {
-			interpolated_disk_grid[i].x = 0;
-			interpolated_disk_grid[i].y = 0;
-			interpolated_disk_grid[i].z = 1;
-			interpolated_disk_grid[i].w = 1;
+			interpolated_disk_grid_image[i].x = 0;
+			interpolated_disk_grid_image[i].y = 0;
+			interpolated_disk_grid_image[i].w = 1;
 		}
 
 	}
 
-	cv::Mat gridIntermat = cv::Mat((image.N + 1), (image.M + 1), CV_32FC4, (void*)interpolated_grid.data());
+	cv::Mat gridIntermat = cv::Mat((image.N + 1), (image.M + 1), CV_32FC4, (void*)interpolated_disk_grid_image.data());
 	cv::Mat gridInterUchar;
 	gridIntermat.convertTo(gridInterUchar, CV_8UC4, 255.0);
 	cv::imwrite(param.getInterpolatedGridResultFileName(grid_value, q, "_interpolated_grid"), gridInterUchar, image.compressionParams);
 
-	cv::Mat gridIntermat_disk = cv::Mat((image.N + 1), (image.M + 1), CV_32FC4, (void*)interpolated_disk_grid.data());
+	cv::Mat gridIntermat_disk = cv::Mat((image.N + 1), (image.M + 1), CV_32FC4, (void*)interpolated_disk_grid_image.data());
 	cv::Mat gridInterUchar_disk;
 	gridIntermat_disk.convertTo(gridInterUchar_disk, CV_8UC4, 255.0);
 	cv::imwrite(param.getInterpolatedGridResultFileName(grid_value, q, "_interpolated_grid_disk"), gridInterUchar_disk, image.compressionParams);

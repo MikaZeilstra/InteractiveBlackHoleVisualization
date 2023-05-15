@@ -334,7 +334,7 @@ namespace metric {
 		return (0 < val) - (val < 0);
 	}
 
-	template <class T> __device__ __host__ static void odeint1(volatile T* varStart, const T b, const T q, bool shouldSavePath, float3* pathSave) {
+	template <class T> __device__ __host__ static void odeint1(volatile T* varStart, const T b, const T q,float3* disk_incident, bool shouldSavePath, float3* pathSave) {
 		volatile T varScal[5];
 		volatile T var[5];
 		volatile T dvdz[5];
@@ -351,8 +351,8 @@ namespace metric {
 		bool hit_disk = false;
 		T disk_r = nanf("");
 		T disk_phi = nanf("");
-		T disk_redshift = 0;
-		T disk_distance = 0;
+
+		float3 disk_incident_r = { nanf(""),nanf(""), nanf("") };
 
 		for (int i = 0; i < NUMBER_OF_EQUATIONS; i++) var[i] = varStart[i];
 
@@ -382,10 +382,9 @@ namespace metric {
 			if (z <= INTEGRATION_MAX) {
 				varStart[phi_index] = var[phi_index];
 				varStart[theta_index] = var[theta_index];
-				varStart[r_index] = disk_redshift;
-				varStart[3] = disk_r;
-				varStart[4] = disk_phi;
-				varStart[5] = disk_distance;
+				varStart[r_index] = disk_r;
+				varStart[3] = disk_phi;
+				*disk_incident = disk_incident_r;
 				return;
 			}
 
@@ -415,12 +414,14 @@ namespace metric {
 					float3 lightdir = { dvdz[r_index], dvdz[theta_index],  dvdz[phi_index] };
 
 					T norm = vector_ops::dot(lightdir, lightdir);
-					T cos_incident_angle = rsqrt(norm) * lightdir.z;
-					T orbit_speed = metric::calcSpeed<T>(r, PI1_2);
-					
 
-					disk_redshift = (1 + orbit_speed * cos_incident_angle) / sqrt(1 - sq(orbit_speed));					
-					disk_distance = z;
+					//Normalize incident light direction and scale it with the distance traversed for later use
+					disk_incident_r = (rsqrt(norm)  * z * lightdir);
+
+
+					//T orbit_speed = metric::calcSpeed<T>(r, PI1_2);
+					//disk_redshift = (1 + orbit_speed * cos_incident_angle) / sqrt(1 - sq(orbit_speed));					
+					//disk_distance = z;
 
 					disk_r = varStart[r_index];
 					disk_phi = varStart[phi_index];
@@ -439,10 +440,10 @@ namespace metric {
 		varStart[theta_index] = nanf("");
 		varStart[phi_index] = nanf("");
 
-		varStart[r_index] = disk_redshift;
-		varStart[3] = disk_r;
-		varStart[4] = disk_phi;
-		varStart[5] = disk_distance;
+		varStart[r_index] = disk_r;
+		varStart[3] = disk_phi;
+
+		*disk_incident = disk_incident_r;
 	};
 
 
@@ -500,33 +501,32 @@ namespace metric {
 
 
 	template <class T> __device__ __host__ void rkckIntegrate1(const T rV, const T thetaV, const T phiV, T* pRV,
-		T* bV, T* qV, T* pThetaV, T* disk_r, T* disk_phi, bool shouldSavePath, float3* pathSave) {
+		T* bV, T* qV, T* pThetaV, float3* disk_incident, bool shouldSavePath, float3* pathSave) {
 
 		volatile T varStart[] = { rV, thetaV, phiV, *pRV, *pThetaV,0 };
 
-		odeint1(varStart, *bV, *qV, shouldSavePath, pathSave);
+		odeint1(varStart, *bV, *qV, disk_incident, shouldSavePath, pathSave);
 
 		*bV = varStart[theta_index];
 		*qV = varStart[phi_index];
-		*pThetaV = varStart[r_index]; //Disk redshift
-		*pRV = varStart[5]; //Disk distance
-		*disk_r = varStart[3];
-		*disk_phi = varStart[4];
+		*pRV = varStart[r_index]; //Disk R
+		*pThetaV = varStart[3]; //Disk phi
+	
 
 		if (!isnan(varStart[theta_index])) {
 			wrapToPi(*bV, *qV);
 		}
 		if (!isnan(varStart[3])) {
-			wrapPhiToPi(*disk_phi);
+			wrapPhiToPi(*pThetaV);
 		}
 	}
 
 	template <class T> __global__ void integrate_kernel(const T rV, const T thetaV, const T phiV, T* pRV,
-		T* bV, T* qV, T* pThetaV, T* disk_r, T* disk_phi, int size) {
+		T* bV, T* qV, T* pThetaV, float3* disk_incident, int size) {
 		int index = blockDim.x * blockIdx.x + threadIdx.x;
 
 		if (index < size) {
-			rkckIntegrate1(rV, thetaV, phiV, &pRV[index], &bV[index], &qV[index], &pThetaV[index],&disk_r[index],&disk_phi[index], false, nullptr);
+			rkckIntegrate1(rV, thetaV, phiV, &pRV[index], &bV[index], &qV[index], &pThetaV[index], &disk_incident[index], false, nullptr);
 		}
 	};
 }

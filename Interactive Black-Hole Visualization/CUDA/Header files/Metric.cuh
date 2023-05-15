@@ -41,8 +41,9 @@ namespace metric {
 	template <class T> __host__ void setMetricParameters(T afactor, T accretionRadius, bool useDisk);
 	template __host__ void setMetricParameters<double>(double afactor, double accretionRadius, bool useDisk);
 
-	template <class T> __host__ T calcSpeed(T r, T theta);
-	template __host__ double calcSpeed < double > (double r, double theta);
+	template <class T> __device__ __host__ T calcSpeed(T r, T theta);
+	template __device__ __host__ double calcSpeed < double > (double r, double theta);
+	template __device__ __host__ float calcSpeed < float >(float r, float theta);
 
 	template <class T> extern __host__ bool checkCelest(T pRV, T rV, T thetaV, T bV, T qV);
 	template __host__ bool checkCelest<double>(double pRV, double rV, double thetaV, double bV, double qV);
@@ -51,19 +52,19 @@ namespace metric {
 	template <class T> __device__ __host__ void derivs(volatile T* var, volatile T* varOut, T b, T q);
 
 	template <class T> __global__ void integrate_kernel(const T rV, const T thetaV, const T phiV, T* pRV,
-		T* bV, T* qV, T* pThetaV,T*disk_r,T*disk_phi, int size);
+		T* bV, T* qV, T* pThetaV,float3* disk_incident, int size);
 
 	template __global__ void integrate_kernel<double>(const double rV, const double thetaV, const double phiV, double* pRV,
-		double* bV, double* qV, double* pThetaV, double* disk_r, double* disk_phi, int size);
+		double* bV, double* qV, double* pThetaV, float3* disk_incident, int size);
 	template __global__ void integrate_kernel<float>(const float rV, const float thetaV, const float phiV, float* pRV,
-		float* bV, float* qV, float* pThetaV, float* disk_r, float* disk_phi, int size);
+		float* bV, float* qV, float* pThetaV, float3* disk_incident, int size);
 
 	template <class T> __device__ __host__ void rkckIntegrate1(const T rV, const T thetaV, const T phiV, T* pRV,
-		T* bV, T* qV, T* pThetaV, T* disk_r, T* disk_phi, bool savePath, float3* pathSave);
+		T* bV, T* qV, T* pThetaV, float3* disk_incident, bool savePath, float3* pathSave);
 	template __device__ __host__ void rkckIntegrate1<double>(const double rV, const double thetaV, const double phiV, double* pRV,
-		double* bV, double* qV, double* disk_r, double* disk_phi, double* pThetaV, bool savePath, float3* pathSave);
+		double* bV, double* qV, double* pThetaV, float3* disk_incident,  bool savePath, float3* pathSave);
 	template __device__ __host__ void rkckIntegrate1<float>(const float rV, const float thetaV, const float phiV, float* pRV,
-		float* bV, float* qV, float* disk_r, float* disk_phi, float* pThetaV, bool savePath, float3* pathSave);
+		float* bV, float* qV, float* pThetaV, float3* disk_incident,  bool savePath, float3* pathSave);
 
 
 	template <class T> __device__ __host__ void stepUntilDisk(volatile T* var, volatile  T* dvdz, T& z, T& h,

@@ -1,6 +1,6 @@
 #include "../Header files/ImageDeformation.cuh"
 
-__global__ void distortEnvironmentMap(const float4* thphi, uchar4* out, const unsigned char* bh, const int2 imsize,
+__global__ void distortEnvironmentMap(const float2* thphi, uchar4* out, const unsigned char* bh, const int2 imsize,
 										const int M, const int N, float camera_phi_offset, float4* sumTable, const float* camParam,
 										const float* solidangle, float2* viewthing, bool redshiftOn, bool lensingOn, const unsigned char* dev_diskMask) {
 	
@@ -15,7 +15,7 @@ __global__ void distortEnvironmentMap(const float4* thphi, uchar4* out, const un
 	if (i < N && j < M) {
 
 
-		if (!bh[ijc]) {
+		if (!bh[ijc] && dev_diskMask[ijc] != 4) {
 
 
 			volatile float t[4], p[4];

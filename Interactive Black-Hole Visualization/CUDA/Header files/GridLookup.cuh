@@ -8,9 +8,6 @@
 /// <param name="factor">The factor to check if a point is close to the border.</param>
 /// <returns></returns>
 
-template <class T> __device__ bool piCheck(volatile T* p, float factor);
-template  __device__ bool piCheck(volatile float2* p, float factor);
-template  __device__ bool piCheck(volatile float4* p, float factor);
 __device__ bool piCheck(volatile float* p, float factor);
 /// <summary>
 /// Checks and corrects phi values for 2-pi crossings.
@@ -18,12 +15,11 @@ __device__ bool piCheck(volatile float* p, float factor);
 /// <param name="p">The phi values to check.</param>
 /// <param name="factor">The factor to check if a point is close to the border.</param>
 /// <returns></returns>
-template <class T> __device__  bool  piCheckTot(T* tp, float factor, int size);
-template  __device__  bool  piCheckTot(float2* tp, float factor, int size);
-template  __device__  bool  piCheckTot(float4* tp, float factor, int size);
+template <class T, bool CheckPi> __device__  void  piCheckTot(T* tp, float factor, int size);
+
 
 // Set values for projected pixel corners & update phi values in case of 2pi crossing.
-__device__ void retrievePixelCorners(const float4* thphi, float* t, float* p, int& ind, const int M, bool& picheck, float offset);
+__device__ void retrievePixelCorners(const float2* thphi, float* t, float* p, int& ind, const int M, bool& picheck, float offset);
 
 // __device__ void wrapToPi(float& thetaW, float& phiW);
 
@@ -37,6 +33,8 @@ __device__ float3 hashLookup(int2 key, const float3* hashTable, const int2* hash
 template <class T> __device__ void findBlock(const float theta, const float phi, const int g, const T* grid,
 	const int GM, const int GN, int& i, int& j, int& gap, const int level);
 template __device__ void findBlock(const float theta, const float phi, const int g, const float2* grid,
+	const int GM, const int GN, int& i, int& j, int& gap, const int level);
+template __device__ void findBlock(const float theta, const float phi, const int g, const float3* grid,
 	const int GM, const int GN, int& i, int& j, int& gap, const int level);
 template __device__ void findBlock(const float theta, const float phi, const int g, const float4* grid,
 	const int GM, const int GN, int& i, int& j, int& gap, const int level);

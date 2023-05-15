@@ -54,6 +54,9 @@ inline __host__ __device__ float4 operator+(float4 a, float4 b)
 
 
 namespace vector_ops {
+	
+
+
 	inline __host__ __device__  float dot(float2 a, float2 b) {
 		return a.x * b.x + a.y * b.y;
 	}
@@ -68,5 +71,9 @@ namespace vector_ops {
 
 	inline __host__ __device__ float3 cross(float3 a, float3 b) {
 		return make_float3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
+	}
+
+	inline __host__ __device__ float sq_norm(float3 a) {
+		return dot(a, a);
 	}
 }

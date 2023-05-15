@@ -62,7 +62,7 @@ __global__ void createTemperatureTable(const int size,double* table, const float
 	}
 }
 
-__global__ void addAccretionDisk(const float4* thphi, uchar4* out, double*temperature_table,const float temperature_table_step_size, const int temperature_table_size, const unsigned char* bh, const int M, const int N,
+__global__ void addAccretionDisk(const float2* thphi, const float3* disk_incident, uchar4* out, double*temperature_table,const float temperature_table_step_size, const int temperature_table_size, const unsigned char* bh, const int M, const int N,
 	const float* camParam, const float* solidangle, float2* viewthing, bool lensingOn, const unsigned char* diskMask) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
@@ -74,26 +74,31 @@ __global__ void addAccretionDisk(const float4* thphi, uchar4* out, double*temper
 
 	if (i < N && j < M) {
 		bool r_check = false;
-		float4 corners[4] = {thphi[ind] ,thphi[ind + 1] , thphi[ind + M1] ,thphi[ind + M1 + 1]};
+		float2 corners[4] = {thphi[ind] ,thphi[ind + 1] , thphi[ind + M1] ,thphi[ind + M1 + 1]};
 		
 
 		if (diskMask[ijc] == 4) {
-			
-			float4 avg_thp = { 0,0,0,0 };
-			int disk_count = 0;
+			float3 disk_incidents[4] = {disk_incident[ind] ,disk_incident[ind + 1] , disk_incident[ind + M1] ,disk_incident[ind + M1 + 1]};
+
+
+			float2 avg_thp = { 0,0 };
+			float3 avg_incident = { 0,0,0 };
 			for (int k = 0; k < 4; k++) {
-				if (!isnan(corners[k].x)) {
 					avg_thp = avg_thp + corners[k];
-					disk_count++;
-				}
+					avg_incident = avg_incident + disk_incidents[k];
 			}
-			avg_thp = (1.0f / (float)disk_count) * avg_thp;
+			avg_thp = 0.25 * avg_thp;
+			avg_incident = 0.25 * avg_incident;
 
 			double temp = lookUpTemperature(temperature_table, temperature_table_step_size, temperature_table_size, fmaxf(avg_thp.x / 2,MIN_STABLE_ORBIT/2));
 			double max_temp = lookUpTemperature(temperature_table, temperature_table_step_size, temperature_table_size, 4.8);
 
+
 			float grav_redshift = metric::calculate_gravitational_redshift<float>(avg_thp.x, avg_thp.x * avg_thp.x);
-			float doppler_redshift = avg_thp.z;
+
+			float3 norm_incident = rsqrt(vector_ops::sq_norm(avg_incident)) * avg_incident;
+			float orbit_speed = metric::calcSpeed(avg_thp.x, (float)PI1_2);
+			float doppler_redshift = (1 + orbit_speed * vector_ops::dot(norm_incident, { 0,0,1 }))/ sqrt(1 - (orbit_speed * orbit_speed));
 
 			float redshift = doppler_redshift * grav_redshift;
 
@@ -166,7 +171,7 @@ __device__ int2 coord_min(int2* coords) {
 	};
 }
 
-__global__ void addAccretionDiskTexture(const float4* thphi, const int M, const unsigned char* bh, uchar4* out, float3* summed_texture, float  maxAccretionRadius, int tex_width, int tex_height,
+__global__ void addAccretionDiskTexture(const float2* thphi, const int M, const unsigned char* bh, uchar4* out, float3* summed_texture, float  maxAccretionRadius, int tex_width, int tex_height,
 	const float* camParam, const float* solidangle, float2* viewthing, bool lensingOn, const unsigned char* diskMask) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
@@ -175,44 +180,23 @@ __global__ void addAccretionDiskTexture(const float4* thphi, const int M, const 
 
 	float3 color = { 0.f, 0.f, 0.f };
 	
-	if (bh[ijc] == 0 && diskMask[ijc]) {
+	if (bh[ijc] == 0 && diskMask[ijc] == 4) {
 		//Get the coordinates of the disk
-		float4 corners[4] = {
+		float2 corners[4] = {
 			thphi[ind],
 			thphi[ind + 1],
 			thphi[ind + M1],
 			thphi[ind + M1 + 1]
 		};
 
-		//Find a point on the disk we can set faulty points to
-		int good_point_ind = -1;
-		float min_r = INFINITY;
-		for (int k = 0; k < 4; k++) {
-			if (corners[k].x < min_r) {
-				min_r = corners[k].x;
-				good_point_ind = k;
-			}
-		}
-
-		//Check if we are at the lower or higher edge of the disk
-		bool lower_edge = corners[good_point_ind].x < (maxAccretionRadius / 2);
-
 
 		int2 tex_coord[4] = {};
 		//Calculate texture coordinates of the pixel corners
 		for (int k = 0; k < 4; k++) {
-			if (fabsf(corners[good_point_ind].x - corners[k].x) < 10) {
-				tex_coord[k] = {
-					((int)(((corners[k].y / PI2) * (tex_width - 1)) + tex_width) % tex_width),
-					(int) (fmaxf(fminf((corners[k].x - MIN_STABLE_ORBIT) / (maxAccretionRadius - MIN_STABLE_ORBIT), 1.0f), 0.0f) * (tex_height - 1))
-				};
-			}
-			else {
-				tex_coord[k] = {
-					((int)(((corners[good_point_ind].y / PI2) * (tex_width - 1)) + tex_width) % tex_width),
-					lower_edge ? 0 : (tex_width - 1)
-				};
-			}
+			tex_coord[k] = {
+				((int)(((corners[k].y / PI2) * (tex_width - 1)) + tex_width) % tex_width),
+				(int)(fmaxf(fminf((corners[k].x - MIN_STABLE_ORBIT) / (maxAccretionRadius - MIN_STABLE_ORBIT), 1.0f), 0.0f) * (tex_height - 1))
+			};
 		}
 		
 		int2 max_coord = coord_max(tex_coord);
@@ -228,9 +212,6 @@ __global__ void addAccretionDiskTexture(const float4* thphi, const int M, const 
 			}
 	
 		}
-
-
-		
 
 		if (max_coord.y == min_coord.y) {
 			if (max_coord.y != tex_height - 1) {
@@ -326,14 +307,14 @@ __global__ void addAccretionDiskTexture(const float4* thphi, const int M, const 
 	}
 }
 
-__global__ void makeDiskCheck(const float4* thphi, unsigned char* disk, const int M, const int N) {
+__global__ void makeDiskCheck(const float2* thphi, unsigned char* disk, const int M, const int N) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 	int ind = i * M1 + j;
 
 	if (i < N && j < M) {
 		bool r_check = false;
-		float4 corners[4] = { thphi[ind] ,thphi[ind + 1] , thphi[ind + M1] ,thphi[ind + M1 + 1] };
+		float2 corners[4] = { thphi[ind] ,thphi[ind + 1] , thphi[ind + M1] ,thphi[ind + M1 + 1] };
 		disk[ijc] = !isnan(corners[0].x) + !isnan(corners[1].x) + !isnan(corners[2].x) + !isnan(corners[3].x);
 	}
 }

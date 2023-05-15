@@ -8,13 +8,14 @@
 
 #include <stdio.h>
 
+
 __global__ void camUpdate(const float alpha, const int g, const float* camParam, float* cam) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	if (i < 7) cam[i] = (1.f - alpha) * camParam[g * 7 + i] + alpha * camParam[(g + 1) * 7 + i];
 }
 
 
-__global__ void pixInterpolation(const float2* viewthing, const int M, const int N, const int Gr, float4* thphi, const float2* grid,
+__global__ void pixInterpolation(const float2* viewthing, const int M, const int N, const int Gr, float2* thphi, const float2* grid,
 	const int GM, const int GN, const float hor, const float ver, int* gapsave, int gridlvl,
 	const float2* bhBorder, const int angleNum, const float alpha) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
@@ -39,7 +40,7 @@ __global__ void pixInterpolation(const float2* viewthing, const int M, const int
 									   (1.f - alpha) * bhBorder[2 * angleSlot + 2].y + alpha * bhBorder[2 * angleSlot + 3].y };
 
 				if (centerdist <= (bhBorderNew.x - center.x) * (bhBorderNew.x - center.x) + (bhBorderNew.y - center.y) * (bhBorderNew.y - center.y)) {
-					thphi[i * M1 + j] = { -1, -1,0 };
+					thphi[i * M1 + j] = { -1, -1};
 					return;
 				}
 
@@ -53,30 +54,30 @@ __global__ void pixInterpolation(const float2* viewthing, const int M, const int
 				float thetaB = theta - thetaPerc * (bhBorderNew.x - bhBorder[2 * angleSlot + 3].x);
 				float phiB = phi - phiPerc * (bhBorderNew.y - bhBorder[2 * angleSlot + 3].y);
 
-				A = interpolatePix(thetaA, phiA, M, N, 0, gridlvl, grid, GM, GN, gapsave, i, j);
-				B = interpolatePix(thetaB, phiB, M, N, 1, gridlvl, grid, GM, GN, gapsave, i, j);
+				A = interpolatePix<float2, true>(thetaA, phiA, M, N, 0, gridlvl, grid, GM, GN, gapsave, i, j);
+				B = interpolatePix<float2, true>(thetaB, phiB, M, N, 1, gridlvl, grid, GM, GN, gapsave, i, j);
 			}
 			else {
-				A = interpolatePix(theta, phi, M, N, 0, gridlvl, grid, GM, GN, gapsave, i, j);
-				B = interpolatePix(theta, phi, M, N, 1, gridlvl, grid, GM, GN, gapsave, i, j);
+				A = interpolatePix<float2, true>(theta, phi, M, N, 0, gridlvl, grid, GM, GN, gapsave, i, j);
+				B = interpolatePix<float2, true>(theta, phi, M, N, 1, gridlvl, grid, GM, GN, gapsave, i, j);
 
 			}
-			if (A.x == -1 || B.x == -1) thphi[i * M1 + j] = { -1, -1,0 };
+			if (A.x == -1 || B.x == -1) thphi[i * M1 + j] = { -1, -1};
 			else {
 
 				if (A.y < .2f * PI2 && B.y > .8f * PI2) A.y += PI2;
 				if (B.y < .2f * PI2 && A.y > .8f * PI2) B.y += PI2;
-				thphi[i * M1 + j] = { (1.f - alpha) * A.x + alpha * B.x, fmodf((1.f - alpha) * A.y + alpha * B.y, PI2),  0,0 };
+				thphi[i * M1 + j] = { (1.f - alpha) * A.x + alpha * B.x, fmodf((1.f - alpha) * A.y + alpha * B.y, PI2)};
 			}
 		}
 		else {
-			float2 interpolated_tp = interpolatePix(theta, phi, M, N, 0, gridlvl, grid, GM, GN, gapsave, i, j);
-			thphi[i * M1 + j] = { interpolated_tp.x,interpolated_tp.y,0,0 };
+			float2 interpolated_tp = interpolatePix<float2,true>(theta, phi, M, N, 0, gridlvl, grid, GM, GN, gapsave, i, j);
+			thphi[i * M1 + j] = interpolated_tp;
 		}
 	}
 }
 
-__global__ void disk_pixInterpolation(const float2* viewthing, const int M, const int N, const int Gr, float4* disk_thphi, const float4* disk_grid,
+__global__ void disk_pixInterpolation(const float2* viewthing, const int M, const int N, const int Gr, float2* disk_thphi, float3* disk_incident, const float2* disk_grid, const float3* disk_incident_grid,
 	const int GM, const int GN, const float hor, const float ver, int* gapsave, int gridlvl,
 	const float2* bhBorder, const int angleNum, const float alpha) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
@@ -88,8 +89,10 @@ __global__ void disk_pixInterpolation(const float2* viewthing, const int M, cons
 		
 		}
 		else {
-			float4 interpolated_tp = interpolatePix(theta, phi, M, N, 0, gridlvl, disk_grid, GM, GN, gapsave, i, j);
+			float2 interpolated_tp = interpolatePix<float2, true>(theta, phi, M, N, 0, gridlvl, disk_grid, GM, GN, gapsave, i, j);
 			disk_thphi[i * M1 + j] = interpolated_tp;
+			float3 interpolated_incident = interpolatePix<float3, false>(theta, phi, M, N, 0, gridlvl, disk_incident_grid, GM, GN, gapsave, i, j);
+			disk_incident[i * M1 + j] = interpolated_incident;
 		}
 
 
@@ -97,7 +100,7 @@ __global__ void disk_pixInterpolation(const float2* viewthing, const int M, cons
 }
 
 
-template <class T> __device__ T interpolatePix(const float theta, const float phi, const int M, const int N, const int g, const int gridlvl,
+template <class T, bool CheckPi> __device__ T interpolatePix(const float theta, const float phi, const int M, const int N, const int g, const int gridlvl,
 	const T* grid, const int GM, const int GN, int* gapsave, const int i, const int j) {
 	int half = (phi < PI) ? 0 : 1;
 	int a = 0;
@@ -120,7 +123,7 @@ template <class T> __device__ T interpolatePix(const float theta, const float ph
 
 	
 
-	T thphiInter = interpolateSpline(a, b, gap, GM, GN, theta, phi, g, cornersCel, cornersCam, grid);
+	T thphiInter = interpolateSpline<T, CheckPi>(a, b, gap, GM, GN, theta, phi, g, cornersCel, cornersCam, grid);
 
 
 	return thphiInter;
@@ -232,19 +235,16 @@ __device__ void interpolate(float t0, float t1, float t2, float t3, float p0, fl
 /// <param name="percRight">fraction right from top left to bottom left line</param>
 /// <param name="cornersCel">Values at top left, top right, bottom left and bottom right corners respectively</param>
 /// <returns></returns>
-template <class T> __device__ T interpolateNeirestNeighbour(float percDown, float percRight, T* cornersCel) {
+template <class T, bool CheckPi> __device__ T interpolateNeirestNeighbour(float percDown, float percRight, T* cornersCel) {
 	T corners[4] = { cornersCel[0], cornersCel[1], cornersCel[2], cornersCel[3] };
 
-
-	piCheck(corners, PI_CHECK_FACTOR);
+	piCheckTot<T, CheckPi>(corners, PI_CHECK_FACTOR,4);
 	return corners[(int)(2 * roundf(percDown) + roundf(percRight))];
 }
 
-template <class T> __device__ T interpolateLinear(float percDown, float percRight, T* cornersCel) {
+template <class T, bool CheckPi> __device__ T interpolateLinear(float percDown, float percRight, T* cornersCel) {
 	T corners[4] = { cornersCel[0], cornersCel[1], cornersCel[2], cornersCel[3] };
-
-
-	piCheck(corners, PI_CHECK_FACTOR);
+	piCheckTot<T, CheckPi>(corners, PI_CHECK_FACTOR,4);
 
 	return (1 - percRight) * ((1 - percDown) * corners[0] + percDown * corners[2]) + percRight * ((1 - percDown) * corners[1] + percDown * corners[3]);
 }
@@ -273,7 +273,7 @@ template <class T> __device__ T hermite(float aValue, T& aX0, T& aX1, T& aX2, T&
 	return u0 * aX1 + u1 * m0 + u2 * m1 + u3 * aX2;
 }
 
-template <class T> __device__ T findPoint(const int i, const int j, const int GM, const int GN, const int g,
+template <class T, bool CheckPi> __device__ T findPoint(const int i, const int j, const int GM, const int GN, const int g,
 	const int offver, const int offhor, const int gap, const T* grid, int count, T& r_check) {
 	T gridpt = grid[GM * GN * g + i * GM + j];
 	if (gridpt.x == -2 && gridpt.y == -2) {
@@ -321,13 +321,13 @@ template <class T> __device__ T findPoint(const int i, const int j, const int GM
 				) {
 				T pt[4] = { ijprev, ij0, ij2, ijnext };
 				if (pt[0].x != -1 && pt[3].x != -1) {
-					piCheckTot(pt, PI_CHECK_FACTOR, 4);
+					piCheckTot<T, CheckPi>(pt, PI_CHECK_FACTOR, 4);
 					return hermite(0.5f, pt[0], pt[1], pt[2], pt[3], 0.f, 0.f);
 				}
 			}
 
 			T pt[2] = { ij2, ij0 };
-			piCheckTot(pt, PI_CHECK_FACTOR, 2);
+			piCheckTot<T, CheckPi>(pt, PI_CHECK_FACTOR, 2);
 			
 
 			return  .5f * pt[0] +  .5f * pt[1];
@@ -340,7 +340,7 @@ template <class T> __device__ T findPoint(const int i, const int j, const int GM
 	return gridpt;
 }
 
-template <class T> __device__ T interpolateHermite(const int i, const int j, const int gap, const int GM, const int GN, const float percDown, const float percRight,
+template <class T, bool CheckPi> __device__ T interpolateHermite(const int i, const int j, const int gap, const int GM, const int GN, const float percDown, const float percRight,
 	const int g, T* cornersCel, const T* grid, int count, T& r_check) {
 
 	
@@ -368,22 +368,22 @@ template <class T> __device__ T interpolateHermite(const int i, const int j, con
 		kplus1 = i;
 	}
 
-	cornersCel[4] = findPoint(i, jmin1, GM, GN, g, 0, -1, gap, grid, count,r_check);		//4 upleft
-	cornersCel[5] = findPoint(i, lplus1, GM, GN, g, 0, 1, gap, grid, count, r_check);		//5 upright
-	cornersCel[6] = findPoint(k, jmin1, GM, GN, g, 0, -1, gap, grid, count, r_check);		//6 downleft
-	cornersCel[7] = findPoint(k, lplus1, GM, GN, g, 0, 1, gap, grid, count, r_check);		//7 downright
-	cornersCel[8] = findPoint(imin1, jx, GM, GN, g, -1, 0, gap, grid, count, r_check);		//8 lefthigh
-	cornersCel[9] = findPoint(imin1, lx, GM, GN, g, -1, 0, gap, grid, count, r_check);		//9 righthigh
-	cornersCel[10] = findPoint(kplus1, jy, GM, GN, g, 1, 0, gap, grid, count, r_check);		//10 leftdown
-	cornersCel[11] = findPoint(kplus1, ly, GM, GN, g, 1, 0, gap, grid, count, r_check);		//11 rightdown
+	cornersCel[4] = findPoint<T,CheckPi>(i, jmin1, GM, GN, g, 0, -1, gap, grid, count,r_check);		//4 upleft
+	cornersCel[5] = findPoint<T, CheckPi>(i, lplus1, GM, GN, g, 0, 1, gap, grid, count, r_check);		//5 upright
+	cornersCel[6] = findPoint<T, CheckPi>(k, jmin1, GM, GN, g, 0, -1, gap, grid, count, r_check);		//6 downleft
+	cornersCel[7] = findPoint<T, CheckPi>(k, lplus1, GM, GN, g, 0, 1, gap, grid, count, r_check);		//7 downright
+	cornersCel[8] = findPoint<T, CheckPi>(imin1, jx, GM, GN, g, -1, 0, gap, grid, count, r_check);		//8 lefthigh
+	cornersCel[9] = findPoint<T, CheckPi>(imin1, lx, GM, GN, g, -1, 0, gap, grid, count, r_check);		//9 righthigh
+	cornersCel[10] = findPoint<T, CheckPi>(kplus1, jy, GM, GN, g, 1, 0, gap, grid, count, r_check);		//10 leftdown
+	cornersCel[11] = findPoint<T, CheckPi>(kplus1, ly, GM, GN, g, 1, 0, gap, grid, count, r_check);		//11 rightdown
 
 	//If any of the extra points are in the black hole return a linear interpolation (we know the inner points are correct)
 	//Or if the r coordinate differs too much meaning they are on different disk sections or in the background
 	for (int q = 4; q < 12; q++) {
-		if (isnan(cornersCel[q].x) || cornersCel[q].x == -1) return interpolateLinear( percDown, percRight, cornersCel);
+		if (isnan(cornersCel[q].x) || cornersCel[q].x == -1) return interpolateLinear<T, CheckPi>( percDown, percRight, cornersCel);
 	}
 
-	piCheckTot(cornersCel, PI_CHECK_FACTOR, 12);
+	piCheckTot<T, CheckPi>(cornersCel, PI_CHECK_FACTOR, 12);
 
 	T interpolateUp = hermite(percRight, cornersCel[4], cornersCel[0], cornersCel[1], cornersCel[5], 0.f, 0.f);
 	T interpolateDown = hermite(percRight, cornersCel[6], cornersCel[2], cornersCel[3], cornersCel[7], 0.f, 0.f);
@@ -393,7 +393,7 @@ template <class T> __device__ T interpolateHermite(const int i, const int j, con
 	return hermite(percDown, interpolateUpUp, interpolateUp, interpolateDown, interpolateDownDown, 0.f, 0.f);
 }
 
-template <class T> __device__ T interpolateSpline(const int i, const int j, const int gap, const int GM, const int GN, const float thetaCam, const float phiCam, const int g,
+template <class T, bool CheckPi> __device__ T interpolateSpline(const int i, const int j, const int gap, const int GM, const int GN, const float thetaCam, const float phiCam, const int g,
 	T* cornersCel, float* cornersCam, const T* grid) {
 
 	float thetaUp = cornersCam[0];
@@ -412,10 +412,8 @@ template <class T> __device__ T interpolateSpline(const int i, const int j, cons
 	for (int q = 0; q < 4; q++) {
 		if (isnan(cornersCel[q].x)) return{ nanf(""), nanf("")};
 	}
-	
-	
 
 
-	return interpolateHermite(i, j, gap, GM, GN, percDown, percRight, g, cornersCel, grid, 0, r_check);
+	return interpolateHermite<T, CheckPi>(i, j, gap, GM, GN, percDown, percRight, g, cornersCel, grid, 0, r_check);
 	//return interpolateLinear( percDown, percRight, cornersCel);
 }

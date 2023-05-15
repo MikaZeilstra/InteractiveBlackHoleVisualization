@@ -77,7 +77,7 @@ __device__ bool starInPolygon(const float* t, const float* p, float start, float
 }
 
 
-__global__ void makeGradField(const float4* thphi, const int M, const int N, float2* grad) {
+__global__ void makeGradField(const float2* thphi, const int M, const int N, float2* grad) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 	if (i < N1 && j < M1) {
@@ -248,7 +248,7 @@ __device__ void addTrails(const int starsToCheck, const int starSize, const int 
 	}
 }
 
-__global__ void distortStarMap(float3* starLight, const float4* thphi, const unsigned char* bh, const float* stars, const int* tree,
+__global__ void distortStarMap(float3* starLight, const float2* thphi, const unsigned char* bh, const float* stars, const int* tree,
 	const int starSize, const float* camParam, const float* magnitude, const int treeLevel,
 	const int M, const int N, const int step, float camera_phi_offset, int* search, int searchNr, int2* stCache,
 	int* stnums, float3* trail, int trailnum, float2* grad, const int framenumber, const float2* viewthing, bool redshiftOn, bool lensingOn, const float* area) {

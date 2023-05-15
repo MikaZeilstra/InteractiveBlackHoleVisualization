@@ -10,4 +10,4 @@ __global__ void displayborders(const int angleNum, float2* bhBorder, uchar4* out
 
 __global__ void smoothBorder(const float2* bhBorder, float2* bhBorder2, const int angleNum);
 
-__global__ void findBlackPixels(const float4* thphi, const int M, const int N, unsigned char* bh);
+__global__ void findBlackPixels(const float2* thphi, const int M, const int N, unsigned char* bh);

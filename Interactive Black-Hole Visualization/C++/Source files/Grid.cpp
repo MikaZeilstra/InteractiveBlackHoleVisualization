@@ -73,15 +73,14 @@ bool Grid::pointInPolygon(cv::Point2d& point, std::vector<cv::Point2d>& thphival
 /// Fixes the t-vertices in the grid.
 /// </summary>
 /// <param name="block">The block to check and fix.</param>
-void Grid::fixTvertices(std::pair<uint64_t, int> block) {
-	int level = block.second;
+void Grid::fixTvertices(uint64_t ij, int level) {
 	if (level == MAXLEVEL) return;
-	uint64_t ij = block.first;
-	if (isnan(CamToCel[ij]_phi)) return;
-
-	int gap = pow(2, MAXLEVEL - level);
 	uint32_t i = i_32;
 	uint32_t j = j_32;
+	if (isnan(grid_vector[i * M + j]_phi)) return;
+
+	int gap = pow(2, MAXLEVEL - level);
+
 	uint32_t k = i + gap;
 	uint32_t l = (j + gap) % M;
 
@@ -113,8 +112,11 @@ void Grid::fixTvertices(std::pair<uint64_t, int> block) {
 void Grid::checkAdjacentBlock(uint64_t ij, uint64_t ij2, int level, int udlr, int gap) {
 	uint32_t i = i_32 + udlr * gap / 2;
 	uint32_t j = j_32 + (1 - udlr) * gap / 2;
-	auto it = CamToCel.find(i_j);
-	if (it == CamToCel.end())
+
+	uint32_t i2 = (ij2 >> 32);
+	uint32_t j2 = ij;
+
+	if (grid_vector[i_32 * M + j_32].x != -2)
 		return;
 	else {
 		uint32_t jprev = (j_32 - (1 - udlr) * gap + M) % M;
@@ -137,32 +139,28 @@ void Grid::checkAdjacentBlock(uint64_t ij, uint64_t ij2, int level, int udlr, in
 		uint64_t ijnext = (uint64_t)inext << 32 | jnext;
 
 		bool succes = false;
-		if (find(ijprev) && find(ijnext)) {
-			std::vector<float2> check = { CamToCel[ijprev], CamToCel[ij], CamToCel[ij2], CamToCel[ijnext] };
-			if (CamToCel[ijprev].x != -1 && CamToCel[ijnext].x != -1
+		if ((grid_vector[iprev * M + jprev].x != -2) && (grid_vector[inext * M + jnext].x != -2)) {
+			std::vector<float2> check = { grid_vector[iprev * M + jprev], grid_vector[i_32 * M + j_32], grid_vector[i2 * M + j2], grid_vector[inext * M + jnext] };
+			if (!isnan(grid_vector[iprev * M + jprev].x) && !(isnan(grid_vector[inext * M + jnext].x))
 				//&& abs(CamToCel[ijprev].z- CamToCel[ij].z) < R_CHANGE_THRESHOLD
 				//&& abs(CamToCel[ijnext].z - CamToCel[ij2].z) < R_CHANGE_THRESHOLD
 				) {
 				succes = true;
 				if (half) check[3].x = PI - check[3].x;
 				if (check2PIcross(check, 5.)) correct2PIcross(check, 5.);
-				CamToCel[i_j] = hermite(0.5, check[0], check[1], check[2], check[3], 0., 0.);
+				grid_vector[i * M + j] = hermite(0.5, check[0], check[1], check[2], check[3], 0., 0.);
 			}
 		}
 		if (!succes) {
-			std::vector<float2> check = { CamToCel[ij], CamToCel[ij2] };
+			std::vector<float2> check = { grid_vector[i_32 * M + j_32], grid_vector[i2 * M + j2] };
 			if (check2PIcross(check, 5.)) correct2PIcross(check, 5.);
-			CamToCel[i_j] = 1. / 2. * (check[1] + check[0]);
+			grid_vector[i * M + j] = 1. / 2. * (check[1] + check[0]);
 		
 		}
 		if (level + 1 == MAXLEVEL) return;
 		checkAdjacentBlock(ij, i_j, level + 1, udlr, gap / 2);
 		checkAdjacentBlock(i_j, ij2, level + 1, udlr, gap / 2);
 	}
-}
-
-bool Grid::find(uint64_t ij) {
-	return CamToCel.find(ij) != CamToCel.end();
 }
 
 float2 const Grid::hermite(double aValue, float2 const& aX0, float2 const& aX1, float2 const& aX2, float2 const& aX3, double aTension, double aBias) {
@@ -206,7 +204,7 @@ void Grid::printGridCam(int level) {
 	int gap = (int)pow(2, MAXLEVEL - level);
 	for (uint32_t i = 0; i < N; i += gap) {
 		for (uint32_t j = 0; j < M; j += gap) {
-			double val = CamToCel[i_j]_theta;
+			double val = grid_vector[i * M + j]_theta;
 			if (val > 1e-10)
 				std::cout << std::setw(4) << val / PI;
 			else
@@ -218,7 +216,7 @@ void Grid::printGridCam(int level) {
 	std::cout << std::endl;
 	for (uint32_t i = 0; i < N; i += gap) {
 		for (uint32_t j = 0; j < M; j += gap) {
-			double val = CamToCel[i_j]_phi;
+			double val = grid_vector[i * M + j]_phi;
 			if (val > 1e-10)
 				std::cout << std::setw(4) << val / PI;
 			else
@@ -288,12 +286,12 @@ void Grid::raytrace() {
 	for (uint32_t j = 0; j < M; j += gap) {
 		uint32_t i, l, k;
 		i = l = k = 0;
-		CamToCel[i_j] = CamToCel[k_l];
+		grid_vector[i * M + j] = grid_vector[k * M + l];
 		steps[i * M + j] = steps[0];
 		checkblocks.insert(i_j);
 		if (equafactor) {
 			i = k = N - 1;
-			CamToCel[i_j] = CamToCel[k_l];
+			grid_vector[i * M + j] = grid_vector[k * M + l];
 			steps[i * M + j] = steps[0];
 
 		}
@@ -330,11 +328,14 @@ void Grid::integrateFirst(const int gap) {
 /// <param name="thetavals">The computed theta values (celestial sky).</param>
 /// <param name="phivals">The computed phi values (celestial sky).</param>
 void Grid::fillGridCam(const std::vector<uint64_t>& ijvals, const size_t s, std::vector<double>& thetavals,
-	std::vector<double>& phivals, std::vector<double>& disk_redshift, std::vector<double>& disk_distance_to_point, std::vector<double>& disk_r, std::vector<double>& disk_phis, std::vector<int>& step) {
+	std::vector<double>& phivals, std::vector<double>& disk_r, std::vector<double>& disk_phis, float3* disk_incidents, std::vector<int>& step) {
 	for (int k = 0; k < s; k++) {
-		CamToCel[ijvals[k]] = make_float2(thetavals[k], phivals[k]);
-		CamToDisk[ijvals[k]] = make_float4(disk_r[k], disk_phis[k], disk_redshift[k], disk_distance_to_point[k]);
 		uint64_t ij = ijvals[k];
+
+		grid_vector[i_32 * M + j_32] = make_float2(thetavals[k], phivals[k]);
+		disk_grid_vector[i_32 * M + j_32] = make_float2(disk_r[k], disk_phis[k]);
+		disk_incident_vector[i_32 * M + j_32] = disk_incidents[k];
+		
 		steps[i_32 * M + j_32] = step[k];
 	}
 }
@@ -366,7 +367,11 @@ std::vector<T> Grid::apply_permutation(
 /// <param name="ijvec">The ijvec.</param>
 void Grid::integrateCameraCoordinates(std::vector<uint64_t>& ijvec) {
 	size_t s = ijvec.size();
-	std::vector<double> theta(s), phi(s), disk_redshift(s), disk_distances(s), disk_rs(s), disk_phis(s);
+	std::vector<double> theta(s), phi(s), disk_rs(s), disk_phis(s);
+	//std::vector<float3> disk_incidents(s, make_float3(0,0,0));
+	float3* disk_incidents;
+	disk_incidents = reinterpret_cast<float3*>(malloc(s * sizeof(float3)));
+
 
 	std::vector<int> step(s);
 	for (int q = 0; q < s; q++) {
@@ -384,9 +389,11 @@ void Grid::integrateCameraCoordinates(std::vector<uint64_t>& ijvec) {
 	
 
 	auto start_time = std::chrono::high_resolution_clock::now();
-	integration_wrapper(theta, phi, disk_redshift, disk_distances,disk_rs,disk_phis, s, step);
-	fillGridCam(ijvec, s, theta, phi, disk_redshift, disk_distances, disk_rs, disk_phis, step);
+	integration_wrapper(theta, phi, disk_incidents, disk_rs,disk_phis, s, step);
+	fillGridCam(ijvec, s, theta, phi,  disk_rs, disk_phis,disk_incidents, step);
 	auto end_time = std::chrono::high_resolution_clock::now();
+
+	free(disk_incidents);
 }
 
 /// <summary>
@@ -404,15 +411,15 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 	if (level < param->gridMinLevel) return true;
 
 	//Check if the points are well alligned
-	float2 topLeft = CamToCel[i_j];
-	float2 topRight = CamToCel[k_j];
-	float2 bottomLeft = CamToCel[i_l];
-	float2 bottomRight = CamToCel[k_l];
+	float2 topLeft = grid_vector[i * M + j];
+	float2 topRight = grid_vector[k * M + j];
+	float2 bottomLeft = grid_vector[i * M + l];
+	float2 bottomRight = grid_vector[k * M + l];
 
-	float4 disk_topLeft = CamToDisk[i_j];
-	float4 disk_topRight = CamToDisk[k_j];
-	float4 disk_bottomLeft = CamToDisk[i_l];
-	float4 disk_bottomRight = CamToDisk[k_l];
+	float2 disk_topLeft = disk_grid_vector[i * M + j];
+	float2 disk_topRight = disk_grid_vector[k * M + j];
+	float2 disk_bottomLeft = disk_grid_vector[i * M + l ];
+	float2 disk_bottomRight = disk_grid_vector[k * M + l];
 
 
 
@@ -482,11 +489,11 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 /// <param name="i">The i key - to be translated to theta.</param>
 /// <param name="j">The j key - to be translated to phi.</param>
 void Grid::fillVector(std::vector<uint64_t>& toIntIJ, uint32_t i, uint32_t j) {
-	auto iter = CamToCel.find(i_j);
-	if (iter == CamToCel.end()) {
+	if (grid_vector[i * M + j].x == -2) {
 		toIntIJ.push_back(i_j);
-		CamToCel[i_j] = float2{ -10, -10};
-		CamToDisk[i_j] = float4{ -10,-10,-10,-10 };
+		grid_vector[i * M + j] = float2{ -10, -10};
+		disk_grid_vector[i * M + j] = float2{-10,-10};
+		disk_incident_vector[i * M + j] = float3{ -10,-10,-10 };
 	}
 }
 
@@ -549,7 +556,7 @@ void Grid::adaptiveBlockIntegration(int level) {
 /// /// <param name="disk_r">The r positions if on the disk otherwise nan. must be at least size n</param>
 /// /// <param name="disk_phi">The phi postions if on the disk if it was hit otherwise nan.  must be at least size n</param>
 /// <param name="n">The size of the vectors.</param>
-void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& phi, std::vector<double>& disk_redshift, std::vector<double>& disk_distances, std::vector<double>& disk_r, std::vector<double>& disk_phi, const int n, std::vector<int>& step) {
+void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& phi, float3* disk_incidents, std::vector<double>& disk_r, std::vector<double>& disk_phi, const int n, std::vector<int>& step) {
 	double thetaS = cam->theta;
 	double phiS = cam->phi;
 	double rS = cam->r;
@@ -609,17 +616,17 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 
 
 
-		disk_distances[i] = pR;
+		disk_r[i] = pR;
 		theta[i] = b;
 		phi[i] = q;
-		disk_redshift[i] = pTheta;
+		disk_phi[i] = pTheta;
 	}
 
 
 	if (n < MIN_GPU_INTEGRATION) {
 	#pragma loop(hint_parallel(8))
 		for (int i = 0; i < n; i++) {
-			metric::rkckIntegrate1<double>(rS, thetaS, phiS, &disk_distances[i], &theta[i], &phi[i], &disk_redshift[i], &disk_r[i],&disk_phi[i], param->savePaths, reinterpret_cast<float3*>( & (paths.data()[i * 3 * (MAXSTP / STEP_SAVE_INTERVAL)])));
+			metric::rkckIntegrate1<double>(rS, thetaS, phiS, &disk_r[i], &theta[i], &phi[i], &disk_phi[i], &disk_incidents[i], param->savePaths, reinterpret_cast<float3*>(&(paths.data()[i * 3 * (MAXSTP / STEP_SAVE_INTERVAL)])));
 
 			
 		}
@@ -629,10 +636,8 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 		
 	}
 	else {
-		CUDA::integrateGrid<double>(rS, thetaS, phiS, disk_distances, theta, phi, disk_redshift,disk_r,disk_phi);
-	}
-
-	
+		CUDA::integrateGrid<double>(rS, thetaS, phiS, disk_r, theta, phi, disk_phi,disk_incidents);
+	}	
 
 }
 
@@ -662,7 +667,9 @@ Grid::Grid(const int maxLevelPrec, const int startLevel, const bool angle, const
 	steps = std::vector<int>(M * N);
 
 	grid_vector = std::vector<float2>(M * N, make_float2(-2,  -2));
-	disk_grid_vector = std::vector<float4>(M * N, make_float4(-2, -2, -2, -2));
+	disk_grid_vector = std::vector<float2>(M * N, make_float2( -2, -2));
+	disk_incident_vector = std::vector<float3>(M * N, make_float3(-2, -2,-2 ));
+
 
 	auto start = std::chrono::high_resolution_clock::now();
 	raytrace();
@@ -675,7 +682,7 @@ Grid::Grid(const int maxLevelPrec, const int startLevel, const bool angle, const
 
 
 	for (auto block : blockLevels) {
-		fixTvertices(block);
+		fixTvertices(block.first, block.second);
 	}
 
 	start = std::chrono::high_resolution_clock::now();
@@ -701,18 +708,6 @@ void Grid::saveGeodesics(Parameters& param) {
 }
 
 void Grid::saveAsGpuHash() {
-	//TODO FIX SYMMETRY EXPLOIT
-	for (const std::pair<uint64_t, float2>& entry : CamToCel) {
-		uint32_t el1 = entry.first >> 32;
-		uint32_t el2 = entry.first;
-		grid_vector[el1 * M + el2] = { (float)entry.second.x,(float)entry.second.y};
-	}
-
-	for (const std::pair<uint64_t, float4>& entry : CamToDisk) {
-		uint32_t el1 = entry.first >> 32;
-		uint32_t el2 = entry.first;
-		disk_grid_vector[el1 * M + el2] = { (float)entry.second.x,(float)entry.second.y, (float) entry.second.z, (float) entry.second.w};
-	}
 
 }
 

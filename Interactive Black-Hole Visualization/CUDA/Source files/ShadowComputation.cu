@@ -84,7 +84,7 @@ __global__ void smoothBorder(const float2* bhBorder, float2* bhBorder2, const in
 	}
 }
 
-__global__ void findBlackPixels(const float4* thphi, const int M, const int N, unsigned char* bh) {
+__global__ void findBlackPixels(const float2* thphi, const int M, const int N, unsigned char* bh) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 	if (i < N && j < M) {
