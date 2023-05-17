@@ -132,8 +132,7 @@ void Grid::checkAdjacentBlock(uint64_t ij, uint64_t ij2, int level, int udlr, in
 		}
 		else if (inext > N - 1) {
 			inext = i_32;
-			if (equafactor) jnext = (j_32 + M / 2) % M;
-			else half = true;
+			jnext = (j_32 + M / 2) % M;
 		}
 		uint64_t ijprev = (uint64_t)iprev << 32 | jprev;
 		uint64_t ijnext = (uint64_t)inext << 32 | jnext;
@@ -273,12 +272,12 @@ void Grid::printGridCam(int level) {
 /// </summary>
 void Grid::raytrace() {
 	int gap = (int)pow(2, MAXLEVEL - STARTLVL);
-	int s = (1 + equafactor);
+	int s = 2;
 
 	std::vector<uint64_t> ijstart(s);
 
 	ijstart[0] = 0;
-	if (equafactor) ijstart[1] = (uint64_t)(N - 1) << 32;
+	ijstart[1] = (uint64_t)(N - 1) << 32;
 
 	if (print) std::cout << "Computing Level " << STARTLVL << "..." << std::endl;
 	integrateCameraCoordinates(ijstart);
@@ -289,12 +288,12 @@ void Grid::raytrace() {
 		grid_vector[i * M + j] = grid_vector[k * M + l];
 		steps[i * M + j] = steps[0];
 		checkblocks.insert(i_j);
-		if (equafactor) {
-			i = k = N - 1;
-			grid_vector[i * M + j] = grid_vector[k * M + l];
-			steps[i * M + j] = steps[0];
 
-		}
+		i = k = N - 1;
+		grid_vector[i * M + j] = grid_vector[k * M + l];
+		steps[i * M + j] = steps[0];
+
+
 	}
 
 	integrateFirst(gap);
@@ -308,7 +307,7 @@ void Grid::raytrace() {
 void Grid::integrateFirst(const int gap) {
 	std::vector<uint64_t> toIntIJ;
 
-	for (uint32_t i = gap; i < N - equafactor; i += gap) {
+	for (uint32_t i = gap; i < N - 1; i += gap) {
 		for (uint32_t j = 0; j < M; j += gap) {
 			toIntIJ.push_back(i_j);
 			if (i == N - 1);// && !equafactor);
@@ -381,7 +380,7 @@ void Grid::integrateCameraCoordinates(std::vector<uint64_t>& ijvec) {
 		j = j % M;
 		
 	
-		theta[q] = (double)i_32 / (N - 1) * PI / (2 - equafactor);
+		theta[q] = (double)i_32 / (N - 1) * PI;
 		phi[q] = (double)j_32 / M * PI2;
 		
 	}
@@ -652,18 +651,19 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 /// <param name="angle">If the camera is not on the symmetry axis.</param>
 /// <param name="camera">The camera.</param>
 /// <param name="bh">The black hole.</param>
-Grid::Grid(const int maxLevelPrec, const int startLevel, const bool angle, const Camera* camera, const BlackHole* bh, Parameters& _param) {
-	MAXLEVEL = maxLevelPrec;
-	STARTLVL = startLevel;
+Grid::Grid(const Camera* camera, const BlackHole* bh, Parameters& _param) {
+	param = &_param;
+	
+	MAXLEVEL = param->gridMaxLevel;
+	STARTLVL = param->gridMinLevel;
 	cam = camera;
 	black = bh;
-	equafactor = angle ? 1 : 0;
-	param = &_param;
+	
 
-	N = (uint32_t)round(pow(2, MAXLEVEL) / (2 - equafactor) + 1);
-	STARTN = (uint32_t)round(pow(2, startLevel) / (2 - equafactor) + 1);
-	M = (2 - equafactor) * 2 * (N - 1);
-	STARTM = (2 - equafactor) * 2 * (STARTN - 1);
+	N = param->grid_N;
+	STARTN = (uint32_t)round(pow(2, STARTLVL) + 1);
+	M = param->grid_M;
+	STARTM = 2 * (STARTN - 1);
 	steps = std::vector<int>(M * N);
 
 	grid_vector = std::vector<float2>(M * N, make_float2(-2,  -2));
@@ -689,7 +689,7 @@ Grid::Grid(const int maxLevelPrec, const int startLevel, const bool angle, const
 	std::cout << "fixed vertices in " <<
 		std::chrono::duration_cast<std::chrono::milliseconds>(start - end).count() << "ms!" <<
 		std::endl << std::endl;
-	if (startLevel != maxLevelPrec) saveAsGpuHash();
+	if (STARTLVL != MAXLEVEL) saveAsGpuHash();
 
 	end = std::chrono::high_resolution_clock::now();
 	std::cout << "hashed in " <<

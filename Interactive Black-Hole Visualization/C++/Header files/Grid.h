@@ -212,12 +212,6 @@ private:
 	#pragma endregion private
 
 public:
-
-	/// <summary>
-	/// 1 if rotation axis != camera axis, 0 otherwise
-	/// </summary>
-	int equafactor;
-
 	/// <summary>
 	/// N = max vertical rays, M = max horizontal rays.
 	/// </summary>
@@ -259,12 +253,10 @@ public:
 	/// <summary>
 	/// Initializes a new instance of the <see cref="Grid"/> class.
 	/// </summary>
-	/// <param name="maxLevelPrec">The maximum level for the grid.</param>
-	/// <param name="startLevel">The start level for the grid.</param>
-	/// <param name="angle">If the camera is not on the symmetry axis.</param>
 	/// <param name="camera">The camera.</param>
 	/// <param name="bh">The black hole.</param>
-	Grid(const int maxLevelPrec, const int startLevel, const bool angle, const Camera* camera, const BlackHole* bh, Parameters& param);
+	/// <param name="param">Parameters of the render</param>
+	Grid(const Camera* camera, const BlackHole* bh, Parameters& param);
 
 	void saveAsGpuHash();
 

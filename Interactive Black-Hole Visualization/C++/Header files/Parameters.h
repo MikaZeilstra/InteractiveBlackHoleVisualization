@@ -30,6 +30,7 @@ struct Parameters {
 	bool useAccretionDiskTexture = false;
 	int gridStartLevel, gridMaxLevel, gridMinLevel;
 	int gridNum = 1;
+	int grid_N, grid_M;
 
 	std::string getResourceFolder() const {
 		return "../Resources/";
@@ -230,6 +231,9 @@ struct Parameters {
 			gridStartLevel = config.lookup("gridStartLevel");
 			gridMinLevel = config.lookup("gridMinLevel");
 			gridMaxLevel = config.lookup("gridMaxLevel");
+			grid_N = round(pow(2, gridMaxLevel) + 1);
+			grid_M = 2 * (grid_N - 1);
+
 
 			useAccretionDisk = config.lookup("useAccretionDisk");
 			if (useAccretionDisk) {
