@@ -256,7 +256,7 @@ public:
 	/// <param name="camera">The camera.</param>
 	/// <param name="bh">The black hole.</param>
 	/// <param name="param">Parameters of the render</param>
-	Grid(const Camera* camera, const BlackHole* bh, Parameters& param);
+	Grid(const Camera* camera, const BlackHole* bh, Parameters* param);
 
 	void saveAsGpuHash();
 
@@ -266,7 +266,7 @@ public:
 
 	void makeHeatMapOfIntegrationSteps(std::string filename);
 
-	void saveGeodesics(Parameters& param);
+	void saveGeodesics(Parameters* param);
 
 	/// <summary>
 	/// Finalizes an instance of the <see cref="Grid"/> class.

@@ -22,7 +22,6 @@ struct Parameters {
 	bool savePaths;
 	bool camSpeedChange, camInclinationChange, camRadiusChange;
 	cv::Point2d camSpeedFromTo, camInclinationFromTo, camRadiusFromTo;
-	double camRadiusStepsize, camSpeedStepsize, camInclinationStepsize;
 	double afactor;
 	double accretionDiskMaxRadius;
 	double blackholeMass, blackholeAccretion;
@@ -200,6 +199,9 @@ struct Parameters {
 			viewOffset.y = config.lookup("offsetY");
 			viewOffset *= PI;
 			nrOfFrames = config.lookup("nrOfFrames");
+			gridNum = config.lookup("nrOfGrids");
+
+
 
 			std::string str1 = config.lookup("celestialSkyImg");
 			celestialSkyImg = str1;
@@ -253,14 +255,12 @@ struct Parameters {
 			if (camSpeedChange) {
 				camSpeedFromTo.x = config.lookup("camSpeedFrom");
 				camSpeedFromTo.y = config.lookup("camSpeedTo");
-				camSpeedStepsize = config.lookup("camSpeedStepsize");
 			}
 
 			camRadiusChange = config.lookup("camRadiusChange");
 			if (camRadiusChange) {
 				camRadiusFromTo.x = config.lookup("camRadiusFrom");
 				camRadiusFromTo.y = config.lookup("camRadiusTo");
-				camRadiusStepsize = config.lookup("camRadiusStepsize");
 			}
 
 			camInclinationChange = config.lookup("camInclinationChange");
@@ -268,17 +268,11 @@ struct Parameters {
 				camInclinationFromTo.x = config.lookup("camInclinationFrom");
 				camInclinationFromTo.y = config.lookup("camInclinationTo");
 				camInclinationFromTo *= PI;
-				camInclinationStepsize = config.lookup("camInclinationStepsize");
-				camInclinationStepsize *= PI;
 			}
 		}
 		catch (libconfig::SettingNotFoundException& e) {
 			std::cerr << "Incorrect setting(s) in configuration file." << std::endl;
 		}
-
-		if (camRadiusChange) gridNum = 1. + round(abs(camRadiusFromTo.y - camRadiusFromTo.x) / camRadiusStepsize);
-		else if (camInclinationChange) gridNum = 1. + round(abs(camInclinationFromTo.y - camInclinationFromTo.x) / camInclinationStepsize);
-		else if (camSpeedChange) gridNum = 1. + round(abs(camSpeedFromTo.y - camSpeedFromTo.x) / camSpeedStepsize);
 
 		if (sphereView) texHeight = (int)floor(texWidth / 2);
 	}

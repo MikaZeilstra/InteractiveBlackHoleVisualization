@@ -651,8 +651,8 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 /// <param name="angle">If the camera is not on the symmetry axis.</param>
 /// <param name="camera">The camera.</param>
 /// <param name="bh">The black hole.</param>
-Grid::Grid(const Camera* camera, const BlackHole* bh, Parameters& _param) {
-	param = &_param;
+Grid::Grid(const Camera* camera, const BlackHole* bh, Parameters* _param) {
+	param = _param;
 	
 	MAXLEVEL = param->gridMaxLevel;
 	STARTLVL = param->gridMinLevel;
@@ -669,14 +669,7 @@ Grid::Grid(const Camera* camera, const BlackHole* bh, Parameters& _param) {
 	grid_vector = std::vector<float2>(M * N, make_float2(-2,  -2));
 	disk_grid_vector = std::vector<float2>(M * N, make_float2( -2, -2));
 	disk_incident_vector = std::vector<float3>(M * N, make_float3(-2, -2,-2 ));
-
-
-	auto start = std::chrono::high_resolution_clock::now();
 	raytrace();
-	auto end = std::chrono::high_resolution_clock::now();
-	std::cout << "integrated in " <<
-		std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms!" <<
-		std::endl << std::endl;
 	//printGridCam(5);
 	
 
@@ -685,24 +678,14 @@ Grid::Grid(const Camera* camera, const BlackHole* bh, Parameters& _param) {
 		fixTvertices(block.first, block.second);
 	}
 
-	start = std::chrono::high_resolution_clock::now();
-	std::cout << "fixed vertices in " <<
-		std::chrono::duration_cast<std::chrono::milliseconds>(start - end).count() << "ms!" <<
-		std::endl << std::endl;
-	if (STARTLVL != MAXLEVEL) saveAsGpuHash();
-
-	end = std::chrono::high_resolution_clock::now();
-	std::cout << "hashed in " <<
-		std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms!" <<
-		std::endl << std::endl;
 	if (param->savePaths) {
 		saveGeodesics(_param);
 	}
 	
 };
 
-void Grid::saveGeodesics(Parameters& param) {
-	cv::FileStorage fs(param.getGeodesicsResultFileName(metric::a<double>,0), cv::FileStorage::WRITE);
+void Grid::saveGeodesics(Parameters* param) {
+	cv::FileStorage fs(param->getGeodesicsResultFileName(metric::a<double>,0), cv::FileStorage::WRITE);
 	fs << "paths" << geodesics;
 	fs.release();
 }

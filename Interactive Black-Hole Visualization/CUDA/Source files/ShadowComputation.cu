@@ -1,4 +1,5 @@
 #include "../Header files/ShadowComputation.cuh"
+#include "../Header files/vector_operations.cuh"
 
 __device__ __forceinline__ float atomicMinFloat(float* addr, float value) {
 	float old;
@@ -16,12 +17,12 @@ __device__ __forceinline__ float atomicMaxFloat(float* addr, float value) {
 	return old;
 }
 
-__global__ void findBhCenter(const int GM, const int GN, const float2* grid, float2* bhBorder) {
+__global__ void findBhCenter(const int GM, const int GN, const float2* grid, const float2* grid_2, float2* bhBorder) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 
 	if (i < GN && j < GM) {
-		if (isnan(grid[i * GM + j].x) || isnan(grid[GM * GN + i * GM + j].x)) {
+		if (isnan(grid[i * GM + j].x) || isnan(grid_2[ i * GM + j].x)) {
 			float gridsize = PI / (1.f * GN);
 			atomicMinFloat(&(bhBorder[0].x), gridsize * (float)i);
 			atomicMaxFloat(&(bhBorder[0].y), gridsize * (float)i);
@@ -31,7 +32,7 @@ __global__ void findBhCenter(const int GM, const int GN, const float2* grid, flo
 	}
 }
 
-__global__ void findBhBorders(const int GM, const int GN, const float2* grid, const int angleNum, float2* bhBorder) {
+__global__ void findBhBorders(const int GM, const int GN, const float2* grid,const float2* grid_2, const int angleNum, float2* bhBorder) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 
 	if (i < angleNum * 2) {
@@ -51,7 +52,10 @@ __global__ void findBhBorders(const int GM, const int GN, const float2* grid, co
 			pt.x += thetaChange;
 			pt.y += phiChange;
 			gridpt = { int(pt.x), int(pt.y) };
-			gridA = grid[(i % 2) * GM * GN + gridpt.x * GM + gridpt.y];
+
+			gridA = (i % 2) * grid[gridpt.x * GM + gridpt.y] + (1-(i%2)) * grid_2[gridpt.x * GM + gridpt.y];
+
+			
 		}
 
 		bhBorder[2 + i] = { (pt.x - thetaChange) * (float)PI2 / (1.f * GM), (pt.y - phiChange) * (float)PI2 / (1.f * GM) };

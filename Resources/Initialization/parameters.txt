@@ -14,10 +14,12 @@ viewAngle = 0.5 //*PI
 offsetX = 0 // *PI
 offsetY = 0 // *PI
 
-nrOfFrames = 1
+//Frame settings
+nrOfFrames = 50
+nrOfGrids = 50
 
 //Effect settings
-useRedshift = false
+useRedshift = true
 useLensing = true
 useStars = false
 
@@ -55,7 +57,7 @@ afactor = 0.982;
 
 // Camera location, speed, direction
 camRadius = 50.
-camInclination = 0.40 //*PI
+camInclination = 0.4 //*PI
 // If a custom user speed is used.
 userSpeed = false
 camSpeed = 0.32001
@@ -68,15 +70,12 @@ btheta = 0.
 camSpeedChange = false
 camSpeedFrom = 0.32001
 camSpeedTo = 0.0001
-camSpeedStepsize = 0.02
 
 camRadiusChange = false
 camRadiusFrom = 9.8
 camRadiusTo = 10.
-camRadiusStepsize = 0.2
 
-camInclinationChange = false
-camInclinationFrom = 0.5 //*PI
-camInclinationTo = 0.999 //*PI
-camInclinationStepsize = 0.03 //*PI
+camInclinationChange = true
+camInclinationFrom = 0.40 //*PI
+camInclinationTo = 0.45 //*PI
 

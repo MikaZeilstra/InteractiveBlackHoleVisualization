@@ -51,6 +51,27 @@ public:
 		initforms();
 	};
 
+	/// <summary>
+	/// Camera constructor for given location speed and direction
+	/// </summary>
+	/// <param name="cam_pos"> Camera positon in spherical coordinates (R, Theta,Phi) </param>
+	/// <param name="cam_speed_dir">Cameras direction of movement in spherical coordinates</param>
+	/// <param name="_speed"> Camera speed</param>
+	Camera(double3 cam_pos, double3 cam_speed_dir, double _speed)
+	{
+		theta = cam_pos.y;
+		phi = cam_pos.z;
+		r = cam_pos.x;
+
+		bphi = cam_speed_dir.z;
+		btheta = cam_speed_dir.y;
+		br = cam_speed_dir.x;
+
+		speed = _speed;
+		initforms();
+	};
+
+
 	void initforms() {
 		alpha = metric::_alpha(this->r, this->theta,metric::sq(this->r),metric::sq(sin(theta)), metric::sq(cos(theta)));
 		w = metric::_w(this->r, this->theta, metric::sq(this->r), metric::sq(sin(theta)));

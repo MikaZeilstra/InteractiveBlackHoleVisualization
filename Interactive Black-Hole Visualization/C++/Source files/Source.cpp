@@ -102,48 +102,6 @@ int main()
 
 
 	/* ------------------ INITIALIZATION CAMERAS & GRIDS ------------------ */
-
-	std::vector<Camera> cams;
-	std::vector<Grid> grids(param.gridNum);
-
-	for (int q = 0; q < param.gridNum; q++) {
-		double camRad = param.getRadius(q);
-		double camInc = param.getInclination(q);
-		double camSpeed = param.getSpeed(q);
-
-		Camera cam;
-		if (param.userSpeed) cam = Camera(camInc, 0, camRad, camSpeed);
-		else cam = Camera(camInc, 0, camRad, param.br, param.btheta, param.bphi);
-		cams.push_back(cam);
-
-		std::cout << "Initialized Camera at Radius " << camRad;
-		std::cout << " and Inclination " << camInc / PI << "pi" << std::endl;
-		
-
-
-		/* ------------------ GRID LOADING / COMPUTATION ------------------ */
-		#pragma region loading grid from file or computing new grid
-		
-		std::string gridFilename = param.getGridFileName(camRad, camInc, camSpeed);
-
-		//if (!Archive<Grid>::load(gridFilename, grids[q])) {
-
-			std::cout << "Computing new grid file..." << std::endl << std::endl;
-			auto start_time = std::chrono::high_resolution_clock::now();
-			grids[q] = Grid(&cam, &black, param);
-			reportDuration(start_time, "Computed", "grid file");
-
-			std::cout << "Writing to file..." << std::endl << std::endl;
-			//Archive<Grid>::serialize(gridFilename, grids[q]);
-
-			gridLevelCount(grids[q], param.gridMaxLevel);
-			grids[q].drawBlocks(param.getGridBlocksFileName(camRad, camInc, camSpeed));
-
-			//grids[q].makeHeatMapOfIntegrationSteps(heatMapFilename);
-		//}
-		std::cout << "Initialized Grid " << q + 1 << " of " << param.gridNum << std::endl;
-	}
-	std::cout << "Initialized all grids" << std::endl << std::endl;
 	
 	CUDA::Texture accretionTexture = {};
 
@@ -199,6 +157,6 @@ int main()
 
 	/* ----------------------- CALL CUDA ----------------------- */
 	//Distorter spacetime(&grids, &view, &starProcessor, &cams, &celestialProcessor);
-	CUDA::call(grids, cams, starProcessor, view, celestialSkyProcessor, accretionTexture, param);
+	CUDA::call(&black, starProcessor, view, celestialSkyProcessor, accretionTexture, param);
 
 }

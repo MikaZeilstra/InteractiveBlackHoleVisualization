@@ -32,14 +32,14 @@ __device__ bool piCheck(volatile float* p, float factor) {
 }
 
 
-template <class T> __device__ void findBlock(const float theta, const float phi, const int g, const T* grid,
+template <class T> __device__ void findBlock(const float theta, const float phi,const T* grid,
 	const int GM, const int GN, int& i, int& j, int& gap, const int level) {
 
 	for (int s = 0; s < level + 1; s++) {
 		int ngap = gap / 2;
 		int k = i + ngap;
 		int l = j + ngap;
-		if (gap <= 1 || grid[g * GN * GM + k * GM + l].x == -2.f) return;
+		if (gap <= 1 || grid[k * GM + l].x == -2.f) return;
 		else {
 			float thHalf = PI2 * k / ((float)GM);
 			float phHalf = PI2 * l / ((float)GM);

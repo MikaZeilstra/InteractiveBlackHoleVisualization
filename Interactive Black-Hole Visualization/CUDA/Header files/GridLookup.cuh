@@ -30,11 +30,11 @@ __device__ int2 hash0(int2 key, int hw);
 __device__ float3 hashLookup(int2 key, const float3* hashTable, const int2* hashPosTag, const int2* offsetTable, const int2* tableSize, const int g);
 
 
-template <class T> __device__ void findBlock(const float theta, const float phi, const int g, const T* grid,
+template <class T> __device__ void findBlock(const float theta, const float phi, const T* grid,
 	const int GM, const int GN, int& i, int& j, int& gap, const int level);
-template __device__ void findBlock(const float theta, const float phi, const int g, const float2* grid,
+template __device__ void findBlock(const float theta, const float phi, const float2* grid,
 	const int GM, const int GN, int& i, int& j, int& gap, const int level);
-template __device__ void findBlock(const float theta, const float phi, const int g, const float3* grid,
+template __device__ void findBlock(const float theta, const float phi, const float3* grid,
 	const int GM, const int GN, int& i, int& j, int& gap, const int level);
-template __device__ void findBlock(const float theta, const float phi, const int g, const float4* grid,
+template __device__ void findBlock(const float theta, const float phi, const float4* grid,
 	const int GM, const int GN, int& i, int& j, int& gap, const int level);

@@ -208,17 +208,17 @@ namespace CUDA {
 
 	void init();
 
-	void call(std::vector<Grid>& grids, std::vector<Camera>& cameras, StarProcessor& stars, Viewer& view, CelestialSkyProcessor& celestialSky, Texture& accretionTexture, Parameters& param);
+	void call(BlackHole* bh, StarProcessor& stars, Viewer& view, CelestialSkyProcessor& celestialSky, Texture& accretionTexture, Parameters& param);
 
 	//unsigned char* getDiffractionImage(const int size);
 	void allocateGridMemory(size_t size);
 
 
-	void memoryAllocationAndCopy(const Grids& grids, const Image& image, const CelestialSky& celestialSky,
+	void memoryAllocationAndCopy(const Image& image, const CelestialSky& celestialSky,
 		const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis,const Texture accretionTexture, const Parameters& param);
 
-	void runKernels(const Grids& grids, const Image& image, const CelestialSky& celestialSky,
-		const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis, const Texture& accretionDiskTexture, const Parameters& param);
+	void runKernels(BlackHole* bh, const Image& image, const CelestialSky& celestialSky,
+		const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis, const Texture& accretionDiskTexture, Parameters& param);
 
 	template <class T> void integrateGrid(const T rV, const T thetaV, const T phiV, std::vector <T>& pRV,
 		std::vector <T>& bV, std::vector <T>& qV, std::vector <T>& pThetaV, float3* disk_incident);
@@ -226,6 +226,25 @@ namespace CUDA {
 		std::vector <double>& bV, std::vector <double>& qV, std::vector <double>& pThetaV, float3* disk_incident);
 
 	ViewCamera* glfw_setup(int screen_width, int screen_height);
+
+	/// <summary>
+	/// Requests a grid to be generated and send to the GPU
+	/// </summary>
+	/// <param name="cam_pos">Camera positon of the grid</param>
+	/// <param name="cam_speed_dir">Direction of travel of the camera</param>
+	/// <param name="speed">Magnitude of velocity of the grid</param>
+	/// <param name="bh">The black hole data</param>
+	/// <param name="param">Render parameters</param>
+	/// <param name="dev_cam">GPU pointer to store camera</param>
+	/// <param name="dev_grid">GPU pointer to store generated grid</param>
+	/// <param name="dev_disk">GPU pointer to store generated disk grid</param>
+	/// <param name="dev_inc">GPU pointer to store generated disk incident angles</param>
+	void requestGrid(double3 cam_pos, double3 cam_speed_dir, float speed, BlackHole* bh, Parameters* param, float* dev_cam, float2* dev_grid, float2* dev_disk, float3* dev_inc);
+
+	/// <summary>
+	/// Swaps grid and related variables with grid_2 and related
+	/// </summary>
+	void swap_grids();
 
 	std::string readFile(const char* filePath);
 
