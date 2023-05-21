@@ -522,7 +522,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 	std::chrono::steady_clock::time_point frame_start_time;
 
 
-	while(q < param.nrOfFrames + startframe && !glfwWindowShouldClose(viewer->get_window())) {
+	while(q < param.nrOfFrames -1 + startframe && !glfwWindowShouldClose(viewer->get_window())) {
 		frame_start_time = std::chrono::high_resolution_clock::now();
 
 
@@ -542,7 +542,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 
 		//Get the blending between lower and higher grid
 		alpha = fmodf(grid_value, 1.f);
-
+		//alpha = 0.5;
 
 			
 
@@ -745,7 +745,6 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 
 		GL_CHECK(glDrawArrays(GL_TRIANGLE_STRIP, 0, 4));
 
-
 		glfwSwapBuffers(viewer->get_window());
 		glfwPollEvents();
 
@@ -773,7 +772,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 	cudaMemcpyAsync(area.data(), dev_solidAngles0, (image.N)* (image.M) * sizeof(float), cudaMemcpyDeviceToHost, stream);
 	cudaMemcpyAsync(interpolated_grid.data(), dev_interpolatedGrid, (image.N + 1)* (image.M + 1) * sizeof(float2), cudaMemcpyDeviceToHost, stream);
 	cudaMemcpyAsync(interpolated_disk_grid.data(), dev_interpolatedDiskGrid, (image.N + 1)* (image.M + 1) * sizeof(float2), cudaMemcpyDeviceToHost, stream);
-
+	checkCudaErrors();
 
 	cv::Mat img = cv::Mat(image.N, image.M, CV_8UC4, (void*)&image.result[0]);
 	cv::imwrite(param.getResultFileName(grid_value, q), img, image.compressionParams);
@@ -857,7 +856,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 
 	}
 
-	cv::Mat gridIntermat = cv::Mat((image.N + 1), (image.M + 1), CV_32FC4, (void*)interpolated_disk_grid_image.data());
+	cv::Mat gridIntermat = cv::Mat((image.N + 1), (image.M + 1), CV_32FC4, (void*)interpolated_grid_image.data());
 	cv::Mat gridInterUchar;
 	gridIntermat.convertTo(gridInterUchar, CV_8UC4, 255.0);
 	cv::imwrite(param.getInterpolatedGridResultFileName(grid_value, q, "_interpolated_grid"), gridInterUchar, image.compressionParams);

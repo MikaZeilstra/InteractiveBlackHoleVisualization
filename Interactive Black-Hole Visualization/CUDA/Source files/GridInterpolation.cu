@@ -20,6 +20,8 @@ __global__ void pixInterpolation(const float2* viewthing, const int M, const int
 	const float2* bhBorder, const int angleNum, const float alpha) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
+
+
 	if (i < N1 && j < M1) {
 		float theta = viewthing[i * M1 + j].x + ver;
 		float phi = fmodf(viewthing[i * M1 + j].y + hor + PI2, PI2);
@@ -27,6 +29,10 @@ __global__ void pixInterpolation(const float2* viewthing, const int M, const int
 
 
 		if (should_interpolate_grids) {
+			if (i == 1030 && j == 1920) {
+				i;
+			}
+
 			float2 A, B;
 			float2 center = { .5f * bhBorder[0].x + .5f * bhBorder[0].y, .5f * bhBorder[1].x + .5f * bhBorder[1].y };
 			float stretchRad = max(bhBorder[0].y - bhBorder[0].x, bhBorder[1].x - bhBorder[1].y) * 0.75f;
@@ -40,7 +46,7 @@ __global__ void pixInterpolation(const float2* viewthing, const int M, const int
 									   (1.f - alpha) * bhBorder[2 * angleSlot + 2].y + alpha * bhBorder[2 * angleSlot + 3].y };
 
 				if (centerdist <= (bhBorderNew.x - center.x) * (bhBorderNew.x - center.x) + (bhBorderNew.y - center.y) * (bhBorderNew.y - center.y)) {
-					thphi[i * M1 + j] = { -1, -1};
+					thphi[i * M1 + j] = { nanf(""), nanf("")};
 					return;
 				}
 
@@ -62,7 +68,7 @@ __global__ void pixInterpolation(const float2* viewthing, const int M, const int
 				B = interpolatePix<float2, true>(theta, phi, M, N,  gridlvl, grid_2, GM, GN, gapsave, i, j);
 
 			}
-			if (A.x == -1 || B.x == -1) thphi[i * M1 + j] = { -1, -1};
+			if (isnan(A.x) || isnan(B.x)) thphi[i * M1 + j] = { nanf(""),  nanf("") };
 			else {
 
 				if (A.y < .2f * PI2 && B.y > .8f * PI2) A.y += PI2;

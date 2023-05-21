@@ -15,16 +15,16 @@ offsetX = 0 // *PI
 offsetY = 0 // *PI
 
 //Frame settings
-nrOfFrames = 50
-nrOfGrids = 50
+nrOfFrames = 3
+nrOfGrids = 2
 
 //Effect settings
-useRedshift = true
+useRedshift = false
 useLensing = true
-useStars = false
+useStars = true
 
 //AccretionDisk
-useAccretionDisk = true
+useAccretionDisk = false
 accretionDiskRadius = 40.
 temperatureLUTSize = 500
 blackholeMass = 3.5e9 //Mass of the black hole in solar masses
