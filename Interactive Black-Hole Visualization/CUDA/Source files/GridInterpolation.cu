@@ -29,10 +29,6 @@ __global__ void pixInterpolation(const float2* viewthing, const int M, const int
 
 
 		if (should_interpolate_grids) {
-			if (i == 1030 && j == 1920) {
-				i;
-			}
-
 			float2 A, B;
 			float2 center = { .5f * bhBorder[0].x + .5f * bhBorder[0].y, .5f * bhBorder[1].x + .5f * bhBorder[1].y };
 			float stretchRad = max(bhBorder[0].y - bhBorder[0].x, bhBorder[1].x - bhBorder[1].y) * 0.75f;

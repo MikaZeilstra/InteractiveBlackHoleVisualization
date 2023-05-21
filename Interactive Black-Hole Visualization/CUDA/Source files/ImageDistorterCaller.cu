@@ -522,7 +522,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 	std::chrono::steady_clock::time_point frame_start_time;
 
 
-	while(q < param.nrOfFrames -1 + startframe && !glfwWindowShouldClose(viewer->get_window())) {
+	while(q < param.nrOfFrames + startframe && !glfwWindowShouldClose(viewer->get_window())) {
 		frame_start_time = std::chrono::high_resolution_clock::now();
 
 
@@ -542,7 +542,6 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 
 		//Get the blending between lower and higher grid
 		alpha = fmodf(grid_value, 1.f);
-		//alpha = 0.5;
 
 			
 
