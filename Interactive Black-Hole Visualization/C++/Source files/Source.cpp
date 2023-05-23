@@ -119,7 +119,7 @@ int main()
 
 	StarProcessor starProcessor;
 	std::string starFilename = param.getStarFileName();
-	if (!Archive<StarProcessor>::load(starFilename, starProcessor)) {
+	if (!Archive<StarProcessor>::load(starFilename, starProcessor) || param.useRandomStars) {
 
 		std::cout << "Computing new star file..." << std::endl;
 		auto start_time = std::chrono::high_resolution_clock::now();
@@ -128,7 +128,10 @@ int main()
 		auto end_time = std::chrono::high_resolution_clock::now();
 
 		std::cout << "Writing to file..." << std::endl << std::endl;
-		Archive<StarProcessor>::serialize(starFilename, starProcessor);
+		if (!param.useRandomStars) {
+			Archive<StarProcessor>::serialize(starFilename, starProcessor);
+		}
+		
 	}
 	std::cout << "Initialized " << starProcessor.starSize <<  " Stars" << std::endl << std::endl;
 	

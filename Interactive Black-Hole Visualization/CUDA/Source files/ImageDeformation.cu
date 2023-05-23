@@ -169,20 +169,24 @@ __global__ void makePix(float3* starLight, uchar4* out, int M, int N) {
 				(unsigned char)min(255, (int)(rgb.x + disk_r)), 255 };
 }
 
-__global__ void addStarsAndBackground(uchar4* stars, uchar4* background, uchar4* output, int M) {
+__global__ void addStarsAndBackground(uchar4* stars, uchar4* background, uchar4* output, int M, int N) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
-	float3 star = { (float)stars[ijc].x * stars[ijc].x, (float)stars[ijc].y * stars[ijc].y, (float)stars[ijc].z * stars[ijc].z };
-	float3 bg = { (float)background[ijc].x * background[ijc].x, (float)background[ijc].y * background[ijc].y, (float)background[ijc].z * background[ijc].z };
-	float p = 1.f;
-	float3 out = { sqrtf(p * star.x + (2.f - p) * bg.x), sqrtf(p * star.y + (2.f - p) * bg.y), sqrtf(p * star.z + (2.f - p) * bg.z) };
-	//float max = fmaxf(fmaxf(out.x, out.y), out.z);
-	//if (max > 255.f) {
-	//	out.y *= (255.f / max);
-	//	out.z *= (255.f / max);
-	//	out.x *= (255.f / max);
-	//}
 
-	//  CHANGED
-	output[ijc] = { (unsigned char)min((int)out.x, 255), (unsigned char)min((int)out.y, 255), (unsigned char)min((int)out.z, 255), 255 };
+	if (i < N && j < M) {
+		float3 star = { (float)stars[ijc].x * stars[ijc].x, (float)stars[ijc].y * stars[ijc].y, (float)stars[ijc].z * stars[ijc].z };
+		float3 bg = { (float)background[ijc].x * background[ijc].x, (float)background[ijc].y * background[ijc].y, (float)background[ijc].z * background[ijc].z };
+		float p = 1.f;
+		float3 out = { sqrtf(p * star.x + (2.f - p) * bg.x), sqrtf(p * star.y + (2.f - p) * bg.y), sqrtf(p * star.z + (2.f - p) * bg.z) };
+		//float max = fmaxf(fmaxf(out.x, out.y), out.z);
+		//if (max > 255.f) {
+		//	out.y *= (255.f / max);
+		//	out.z *= (255.f / max);
+		//	out.x *= (255.f / max);
+		//}
+
+		//  CHANGED
+		output[ijc] = { (unsigned char)min((int)out.x, 255), (unsigned char)min((int)out.y, 255), (unsigned char)min((int)out.z, 255), 255 };
+	}
+	
 }

@@ -74,6 +74,7 @@ void CheckOpenGLError(const char* stmt, const char* fname, int line)
 														cudaEventRecord(stop,stream);							\
 														cudaEventSynchronize(stop);						\
 														cudaEventElapsedTime(&milliseconds, start, stop); \
+														checkCudaErrors(); \
 														std::cout << milliseconds << " ms\t " << txt << std::endl; \
 													  }
 #else
@@ -576,18 +577,14 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 				metric::calcSpeed(param.getRadius(grid_nr + 1), param.getInclination(grid_nr + 1)), bh, & param, dev_cameras_2, dev_grid_2, dev_disk_grid_2, dev_incident_grid_2
 			);
 
-			checkCudaErrors();
-
 			
 			callKernelAsync("Find black-hole shadow center", findBhCenter, numBlocks_GN_GM_5_25, threadsPerBlock5_25, 0,
 				param.grid_M, param.grid_N, dev_grid, dev_grid_2, dev_blackHoleBorder0);
 
-			checkCudaErrors();
 
 			callKernelAsync("Find black-hole shadow border", findBhBorders, numBlocks_bordersize, threadsPerBlock_32, 0,
 				param.grid_M, param.grid_N, dev_grid, dev_grid_2, bhproc.angleNum, dev_blackHoleBorder0);
 
-			checkCudaErrors();
 			callKernelAsync("Smoothed shadow border 1/4", smoothBorder, numBlocks_bordersize, threadsPerBlock_32, 0,
 				dev_blackHoleBorder0, dev_blackHoleBorder1, bhproc.angleNum);
 
@@ -599,8 +596,6 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 			callKernelAsync("Smoothed shadow border 4/4", smoothBorder, numBlocks_bordersize, threadsPerBlock_32, 0,
 				dev_blackHoleBorder1, dev_blackHoleBorder0, bhproc.angleNum);
 			
-
-			checkCudaErrors();
 		}
 
 			
@@ -634,9 +629,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 		
 		callKernelAsync("Smoothed solid angles horizontally", smoothAreaH, numBlocks_N_M_5_25, threadsPerBlock5_25,0,
 			dev_solidAngles1, dev_solidAngles0, dev_blackHoleMask, dev_gridGap, image.M, image.N, dev_diskMask);
-#ifdef _DEBUG
-		checkCudaErrors();
-#endif // _DEBUG
+
 		callKernelAsync("Smoothed solid angles vertically", smoothAreaV, numBlocks_N_M_5_25, threadsPerBlock5_25, 0,
 			dev_solidAngles0, dev_solidAngles1, dev_blackHoleMask, dev_gridGap, image.M, image.N, dev_diskMask);
 		
@@ -685,7 +678,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 				dev_starLight1, dev_starImage, image.M, image.N);
 
 			callKernelAsync("Added distorted star and celestial sky image", addStarsAndBackground, numBlocks_N_M_5_25, threadsPerBlock5_25,0,
-				dev_starImage, dev_outputImage, dev_outputImage, image.M);
+				dev_starImage, dev_outputImage, dev_outputImage, image.M, image.N);
 		}
 		std::cout << std::endl;
 
@@ -711,10 +704,6 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 		
 		cudaStreamSynchronize(stream);
 		cudaGraphicsUnmapResources(1, &cuda_pbo_resource, 0);
-		
-		
-
-		//checkCudaErrors();
 
 		q++;
 
@@ -746,8 +735,6 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 
 		glfwSwapBuffers(viewer->get_window());
 		glfwPollEvents();
-
-		checkCudaErrors();
 		
 		std::cout << "frame_duration " <<
 			std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - frame_start_time).count() << "ms!" <<

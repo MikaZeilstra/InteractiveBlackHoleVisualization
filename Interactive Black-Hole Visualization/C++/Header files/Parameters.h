@@ -15,7 +15,8 @@ struct Parameters {
 	int nrOfFrames;
 
 	std::string celestialSkyImg, starCatalogue, diffractionImg, accretionDiskTexture;
-	int starTreeLevel, starMagnitudeCut;
+	int starTreeLevel;
+	float starMagnitudeCutLow, starMagnitudeCutHigh;
 	double br, bphi, btheta;
 	bool userSpeed;
 	bool useStars, useRedshift, useLensing,useAccretionDisk;
@@ -30,6 +31,9 @@ struct Parameters {
 	int gridStartLevel, gridMaxLevel, gridMinLevel;
 	int gridNum = 1;
 	int grid_N, grid_M;
+	bool useRandomStars;
+	float randomStarSelectionChance;
+
 
 	std::string getResourceFolder() const {
 		return "../Resources/";
@@ -138,7 +142,7 @@ struct Parameters {
 	std::string getStarFileName() {
 		// Filename for stars and image.
 		std::stringstream ss;
-		ss << getStarFolder() << "Stars_lvl_" << starTreeLevel << "_m" << starMagnitudeCut << ".star";
+		ss << getStarFolder() << "Stars_lvl_" << starTreeLevel << "_m" << starMagnitudeCutLow << "-"<< starMagnitudeCutHigh << ".star";
 		return ss.str();
 	}
 
@@ -214,9 +218,13 @@ struct Parameters {
 			std::string str2 = config.lookup("starCatalogue");
 			starCatalogue = str2;
 			starTreeLevel = config.lookup("starTreeLevel");
-			starMagnitudeCut = config.lookup("starMagnitudeCut");
+			starMagnitudeCutLow = config.lookup("starMagnitudeCutLow");
+			starMagnitudeCutHigh = config.lookup("starMagnitudeCutHigh");
 			std::string str3 = config.lookup("diffractionImg");
 			diffractionImg = str3;
+
+			useRandomStars = config.lookup("randomStarSelection");
+			randomStarSelectionChance = config.lookup("randomSelectionChance");
 
 			userSpeed = config.lookup("userSpeed");
 			br = config.lookup("br");

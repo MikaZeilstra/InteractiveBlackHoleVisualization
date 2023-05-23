@@ -9,4 +9,4 @@ __global__ void distortEnvironmentMap(const float2* thphi, uchar4* out, const un
 
 __global__ void makePix(float3* starLight, uchar4* out, int M, int N);
 
-__global__ void addStarsAndBackground(uchar4* stars, uchar4* background, uchar4* output, int M);
+__global__ void addStarsAndBackground(uchar4* stars, uchar4* background, uchar4* output, int M, int N);

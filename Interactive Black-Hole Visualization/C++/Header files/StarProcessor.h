@@ -28,15 +28,17 @@ public:
 
 	StarProcessor(Parameters& param) {
 		std::vector< std::vector<float> > starVec;
-		readStars2("../Stars/"+param.starCatalogue, starVec);
+		readStars2(param.getStarFolder() + param.starCatalogue, starVec);
 		std::vector< std::vector<float> > starThphi;
 		std::vector< std::vector<float> > lowStars;
+
+		srand(static_cast <unsigned> (time(0)));
 		for (int i = 0; i < starVec.size(); i++) {
-			if (starVec[i][2] > param.starMagnitudeCut) {
-				lowStars.push_back(starVec[i]);
-			}
-			else {
-				starThphi.push_back(starVec[i]);
+			if (starVec[i][2] > param.starMagnitudeCutLow && starVec[i][2] < param.starMagnitudeCutHigh) {
+				if ((!param.useRandomStars) || (static_cast <float> (rand()) / static_cast <float> (RAND_MAX) < param.randomStarSelectionChance)) {
+					starThphi.push_back(starVec[i]);
+				}
+				
 			}
 		}
 
