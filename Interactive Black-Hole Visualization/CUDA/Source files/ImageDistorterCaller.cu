@@ -83,7 +83,13 @@ void CheckOpenGLError(const char* stmt, const char* fname, int line)
 													  }
 #endif // DEBUG
 
-
+/// <summary>
+/// Trackers for the total time, total rays, integration batches and integration batches on the gpu over the entire program run.
+/// </summary>
+long total_time = 0;
+long total_rays = 0;
+long total_batches = 0;
+long gpu_batches = 0;
 
 CUstream stream;
 cudaEvent_t start, stop;
@@ -852,6 +858,10 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 	gridIntermat_disk.convertTo(gridInterUchar_disk, CV_8UC4, 255.0);
 	cv::imwrite(param.getInterpolatedGridResultFileName(grid_value, q, "_interpolated_grid_disk"), gridInterUchar_disk, image.compressionParams);
 	
+	std::cout << "total time " << total_time << " total ray count " << total_rays << std::endl;
+	std::cout << "total batches " << total_batches << " of which on the GPU " << gpu_batches << std::endl;
+
+
 	while (!glfwWindowShouldClose(viewer->get_window())) {
 
 		glActiveTexture(GL_TEXTURE0);
@@ -949,6 +959,9 @@ void CUDA::requestGrid(double3 cam_pos, double3 cam_speed_dir, float speed, Blac
 	std::cout << "grid_generation_duration " <<
 		std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - grid_time).count() << "ms!" <<
 		std::endl;
+	total_time += std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - grid_time).count();
+	total_batches += grid.integration_batches;
+	gpu_batches += grid.GPU_batches;
 
 }
 
@@ -1005,4 +1018,5 @@ void CUDA::gridLevelCount(Grid& grid) {
 	for (int p = 1; p < maxlevel + 1; p++)
 		std::cout << "lvl " << p << " blocks: " << check[p] << std::endl;
 	std::cout << std::endl << "Total rays: " << grid.ray_count << std::endl;
+	total_rays += grid.ray_count;
 }

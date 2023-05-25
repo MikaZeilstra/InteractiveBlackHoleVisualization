@@ -16,10 +16,6 @@
 #include <chrono>
 #include <numeric>
 
-#define PRECCELEST 0.015
-#define ERROR 0.001//1e-6
-#define MIN_GPU_INTEGRATION 1000
-
 
 #ifndef GRID_CLASS
 #define GRID_CLASS
@@ -219,8 +215,12 @@ public:
 	/// <summary>
 	/// The number of rays traced through the metric.
 	/// </summary>
-	int ray_count;
-
+	long ray_count = 0;
+	/// <summary>
+	/// The number of integration batches done through the metric and how many were delegetad to the gpu.
+	/// </summary>
+	long integration_batches = 0;
+	long GPU_batches = 0;
 
 
 

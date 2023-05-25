@@ -23,7 +23,7 @@
 #define PRECCELEST 0.015
 #define DISK_PRECCELEST_RELAXATION 3
 #define ERROR 0.001//1e-6
-#define MIN_GPU_INTEGRATION 1000
+#define MIN_GPU_INTEGRATION 10000000000000
 #define BLACK_HOLE_MAX_DIAGNAL 1e-10
 
 
@@ -558,9 +558,10 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 	double rS = cam->r;
 	double sp = cam->speed;
 
-	//Update the count of traced rays
+	//Update the count of traced rays and batches
 	ray_count += n;
-	
+	integration_batches += 1;
+
 	std::vector<float>paths;
 
 	//reserve space to save paths if required
@@ -609,8 +610,6 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 		//CPU integration simply loop over all the required gedesics and save them
 		for (int i = 0; i < n; i++) {
 			metric::rkckIntegrate1<double>(rS, thetaS, phiS, &disk_r[i], &theta[i], &phi[i], &disk_phi[i], &disk_incidents[i], param->savePaths, reinterpret_cast<float3*>(&(paths.data()[i * 3 * (MAXSTP / STEP_SAVE_INTERVAL)])));
-
-			
 		}
 		if (param->savePaths) {
 			geodesics.insert(geodesics.end(), paths.begin(), paths.end());
@@ -620,6 +619,7 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 	else {
 		//GPU integration delegate GPU integration to function doing the GPU stuff
 		CUDA::integrateGrid<double>(rS, thetaS, phiS, disk_r, theta, phi, disk_phi,disk_incidents);
+		GPU_batches += 1;
 	}	
 
 }
