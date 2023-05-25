@@ -248,7 +248,7 @@ __device__ void addTrails(const int starsToCheck, const int starSize, const int 
 	}
 }
 
-__global__ void distortStarMap(float3* starLight, const float2* thphi, const unsigned char* bh, const float* stars, const int* tree,
+__global__ void distortStarMap(float3* starLight, const float2* thphi, const unsigned char* disk_mask, const unsigned char* bh, const float* stars, const int* tree,
 	const int starSize, const float* camParam, const float* magnitude, const int treeLevel,
 	const int M, const int N, const int step, float camera_phi_offset, int* search, int searchNr, int2* stCache,
 	int* stnums, float3* trail, int trailnum, float2* grad, const int framenumber, const float2* viewthing, bool redshiftOn, bool lensingOn, const float* area) {
@@ -264,9 +264,9 @@ __global__ void distortStarMap(float3* starLight, const float2* thphi, const uns
 		}
 	}
 
-	// Only compute if pixel is in bounds and not black hole.
+	// Only compute if pixel is in bounds and not black hole and not occluded by the acretion disk.
 	if (i < N && j < M) {
-		if (bh[ijc] == 0) {
+		if (bh[ijc] == 0 && disk_mask[ijc] < 4) {
 
 			// Set values for projected pixel corners & update phi values in case of 2pi crossing.
 			volatile float t[4], p[4];

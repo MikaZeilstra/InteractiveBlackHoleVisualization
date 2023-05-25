@@ -646,7 +646,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 				dev_interpolatedGrid, image.M, image.N, dev_gradient);
 
 			callKernelAsync("Distorted star map", distortStarMap, numBlocks_N_M_4_4, threadsPerBlock4_4,0,
-				dev_starLight0, dev_interpolatedGrid, dev_blackHoleMask, dev_starPositions, dev_starTree, stars.starSize,
+				dev_starLight0, dev_interpolatedGrid, dev_diskMask, dev_blackHoleMask, dev_starPositions, dev_starTree, stars.starSize,
 				dev_cameras, dev_starMagnitudes, stars.treeLevel,
 				image.M, image.N, starvis.gaussian, camera_phi_offset, dev_treeSearch, starvis.searchNr, dev_starCache, dev_nrOfImagesPerStar,
 				dev_starTrails, starvis.trailnum, dev_gradient, q, dev_viewer, param.useRedshift, param.useLensing, dev_solidAngles0);

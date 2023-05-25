@@ -437,9 +437,6 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 	if (!((topLeftNan == isnan(topRight.x)) && (topLeftNan == isnan(bottomLeft.x)) && (topLeftNan == isnan(bottomRight.x)))) {
 		return true;
 	}
-	else if (topLeftNan) {
-		return false;
-	}
 
 	float diag = vector_ops::dot((topLeft - bottomRight), (topLeft - bottomRight));
 	bottomRight.y += PI2;

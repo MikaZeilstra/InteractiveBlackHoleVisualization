@@ -16,7 +16,7 @@ offsetY = 0 // *PI
 
 //Frame settings
 nrOfFrames = 50
-nrOfGrids = 4
+nrOfGrids = 50
 
 //Effect settings
 useRedshift = true
