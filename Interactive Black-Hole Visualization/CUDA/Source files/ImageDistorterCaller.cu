@@ -858,8 +858,8 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 	gridIntermat_disk.convertTo(gridInterUchar_disk, CV_8UC4, 255.0);
 	cv::imwrite(param.getInterpolatedGridResultFileName(grid_value, q, "_interpolated_grid_disk"), gridInterUchar_disk, image.compressionParams);
 	
-	std::cout << "total time " << total_time << " total ray count " << total_rays << std::endl;
-	std::cout << "total batches " << total_batches << " of which on the GPU " << gpu_batches << std::endl;
+	std::cout << "total time spend generating grids " << total_time << " total ray count " << total_rays << std::endl;
+	std::cout << "total integration batches " << total_batches << " of which on the GPU " << gpu_batches << std::endl;
 
 
 	while (!glfwWindowShouldClose(viewer->get_window())) {
