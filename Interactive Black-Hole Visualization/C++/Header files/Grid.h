@@ -216,13 +216,13 @@ public:
 	/// N = max vertical rays, M = max horizontal rays.
 	/// </summary>
 	int MAXLEVEL, N, M, STARTN, STARTM, STARTLVL;
-
 	/// <summary>
-	/// Mapping from camera sky position to celestial angle.
+	/// The number of rays traced through the metric.
 	/// </summary>
-	//std::unordered_map <uint64_t, float2, hashing_func2> CamToCel;
-	//std::unordered_map <uint64_t, float2, hashing_func2> CamToDisk;
-	//std::unordered_map <uint64_t, float3, hashing_func2> CamToIncident;
+	int ray_count;
+
+
+
 
 	std::vector<int> steps;
 
@@ -231,7 +231,14 @@ public:
 	/// </summary>
 	std::vector<float> geodesics;
 
+
+	/// <summary>
+/// Mapping from camera sky position to celestial angle
+/// </summary>
 	std::vector<float2> grid_vector;
+	/// <summary>
+/// Mapping from camera sky position to disk postion and the angle of the incoming ray at the disk.
+/// </summary>
 	std::vector<float2> disk_grid_vector;
 	std::vector<float3> disk_incident_vector;
 

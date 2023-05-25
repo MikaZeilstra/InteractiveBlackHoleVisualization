@@ -561,36 +561,21 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 	double rS = cam->r;
 	double sp = cam->speed;
 
-	//std::vector<double>pRs;
-	//std::vector<double>bs;
-	//std::vector<double>qs;
-	//std::vector<double>pThetas;
-
-	//std::vector<double>disk_r;
-	//std::vector<double>disk_phi;
+	//Update the count of traced rays
+	ray_count += n;
 	
 	std::vector<float>paths;
 
+	//reserve space to save paths if required
 	if (param->savePaths) {
 		paths = std::vector<float>(n * 3 * (MAXSTP / STEP_SAVE_INTERVAL));
 	}
 
-	/*
-	pRs.reserve(n);
-	bs.reserve(n);
-	qs.reserve(n);
-	pThetas.reserve(n);
-	
-
-	disk_r.resize(n);
-	disk_phi.resize(n);
-	*/
 
 #pragma loop(hint_parallel(8))
 #pragma loop(ivdep)
 	for (int i = 0; i < n; i++) {
-		
-
+		//Calculate starting paramaters
 		double xCam = sin(theta[i]) * cos(phi[i]);
 		double yCam = sin(theta[i]) * sin(phi[i]);
 		double zCam = cos(theta[i]);
@@ -614,7 +599,7 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 		double q = pTheta * pTheta + cos(thetaS) * cos(thetaS) * (b * b / (sin(thetaS) * sin(thetaS)) - metric::asq<double>);
 
 
-
+		//Save the starting parameters in the places were they will be used for integration, the vectors are also reused as return values
 		disk_r[i] = pR;
 		theta[i] = b;
 		phi[i] = q;
@@ -624,6 +609,7 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 
 	if (n < MIN_GPU_INTEGRATION) {
 	#pragma loop(hint_parallel(8))
+		//CPU integration simply loop over all the required gedesics and save them
 		for (int i = 0; i < n; i++) {
 			metric::rkckIntegrate1<double>(rS, thetaS, phiS, &disk_r[i], &theta[i], &phi[i], &disk_phi[i], &disk_incidents[i], param->savePaths, reinterpret_cast<float3*>(&(paths.data()[i * 3 * (MAXSTP / STEP_SAVE_INTERVAL)])));
 
@@ -635,6 +621,7 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 		
 	}
 	else {
+		//GPU integration delegate GPU integration to function doing the GPU stuff
 		CUDA::integrateGrid<double>(rS, thetaS, phiS, disk_r, theta, phi, disk_phi,disk_incidents);
 	}	
 

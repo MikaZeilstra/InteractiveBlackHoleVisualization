@@ -638,6 +638,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 
 
 		if (star) {
+			//TODO fix using correct camera (interpolate it)
 			callKernelAsync("Cleared star cache", clearArrays, numBlocks_starsize, threadsPerBlock_32,0,
 				dev_nrOfImagesPerStar, dev_starCache, q, starvis.trailnum, stars.starSize);
 
@@ -680,7 +681,6 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 			callKernelAsync("Added distorted star and celestial sky image", addStarsAndBackground, numBlocks_N_M_5_25, threadsPerBlock5_25,0,
 				dev_starImage, dev_outputImage, dev_outputImage, image.M, image.N);
 		}
-		std::cout << std::endl;
 
 		if (param.useAccretionDisk) {
 			if (!param.useAccretionDiskTexture) {
@@ -922,8 +922,12 @@ ViewCamera* CUDA::glfw_setup(int screen_width, int screen_height) {
 }
 
 void CUDA::requestGrid(double3 cam_pos, double3 cam_speed_dir, float speed, BlackHole* bh, Parameters* param, float* dev_cam, float2* dev_grid, float2* dev_disk, float3* dev_inc){
+
+	auto grid_time = std::chrono::high_resolution_clock::now();
+	
 	//make camera
 	Camera cam(cam_pos, cam_speed_dir, speed);
+
 
 	//Save camera
 	std::vector<float> camera_data = cam.getParamArray();
@@ -933,25 +937,18 @@ void CUDA::requestGrid(double3 cam_pos, double3 cam_speed_dir, float speed, Blac
 	Grid grid(&cam, bh, param);
 
 	//if in debug mode print grid output
-#ifdef  _DEBUG
+	
 
-
-
-	int maxlevel = param->gridMaxLevel;
-	std::vector<int> check(maxlevel + 1);
-	for (int p = 1; p < maxlevel + 1; p++)
-		check[p] = 0;
-	for (auto block : grid.blockLevels)
-		check[block.second]++;
-	for (int p = 1; p < maxlevel + 1; p++)
-		std::cout << "lvl " << p << " blocks: " << check[p] << std::endl;
-
-	std::cout << std::endl;
-#endif //  _DEBUG
 	//Save grid
 	copyHostToDeviceAsync(dev_grid, grid.grid_vector.data(), grid.grid_vector.size() * sizeof(float2), "Requested grid");
 	copyHostToDeviceAsync(dev_disk, grid.disk_grid_vector.data(), grid.disk_grid_vector.size() *sizeof(float2), "Requested grid");
 	copyHostToDeviceAsync(dev_inc, grid.disk_incident_vector.data(), grid.disk_incident_vector.size() *sizeof(float3), "Requested grid");
+
+
+	CUDA::gridLevelCount(grid);
+	std::cout << "grid_generation_duration " <<
+		std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - grid_time).count() << "ms!" <<
+		std::endl;
 
 }
 
@@ -992,4 +989,20 @@ std::string CUDA::readFile(const char* filePath) {
 
 	fileStream.close();
 	return content;
+}
+
+/// <summary>
+/// Prints the number of blocks for each level, and total rays of a grid.
+/// </summary>
+/// <param name="grid">The grid.</param>
+void CUDA::gridLevelCount(Grid& grid) {
+	int maxlevel = grid.MAXLEVEL;
+	std::vector<int> check(maxlevel + 1);
+	for (int p = 1; p < maxlevel + 1; p++)
+		check[p] = 0;
+	for (auto block : grid.blockLevels)
+		check[block.second]++;
+	for (int p = 1; p < maxlevel + 1; p++)
+		std::cout << "lvl " << p << " blocks: " << check[p] << std::endl;
+	std::cout << std::endl << "Total rays: " << grid.ray_count << std::endl;
 }

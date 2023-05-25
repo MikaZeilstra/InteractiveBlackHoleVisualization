@@ -248,6 +248,8 @@ namespace CUDA {
 
 	std::string readFile(const char* filePath);
 
+	void gridLevelCount(Grid& grid);
+
 }
 
 #endif // !CUDA_FUNCTIONS

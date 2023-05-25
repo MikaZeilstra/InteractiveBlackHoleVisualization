@@ -19,22 +19,6 @@
 #include "../Header files/Archive.h"
 
 /// <summary>
-/// Prints the number of blocks for each level, and total rays of a grid.
-/// </summary>
-/// <param name="grid">The grid.</param>
-/// <param name="maxlevel">The maxlevel.</param>
-void gridLevelCount(Grid& grid, int maxlevel) {
-	std::vector<int> check(maxlevel + 1);
-	for (int p = 1; p < maxlevel + 1; p++)
-		check[p] = 0;
-	for (auto block : grid.blockLevels)
-		check[block.second]++;
-	for (int p = 1; p < maxlevel + 1; p++)
-		std::cout << "lvl " << p << " blocks: " << check[p] << std::endl;
-	//std::cout << std::endl << "Total rays: " << grid.CamToCel.size() << std::endl << std::endl;
-}
-
-/// <summary>
 /// Compares two images and gives the difference error.
 /// Prints error info and writes difference image.
 /// </summary>

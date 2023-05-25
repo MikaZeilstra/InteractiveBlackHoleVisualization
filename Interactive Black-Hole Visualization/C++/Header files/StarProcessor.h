@@ -42,6 +42,8 @@ public:
 			}
 		}
 
+		std::cout << "Number of stars : " << starThphi.size() << std::endl;
+
 		//for (int i = 0; i < starVec.size(); i+=5) starThphi.push_back(starVec[i]);
 		//cout << "size " << starThphi.size() << endl;
 

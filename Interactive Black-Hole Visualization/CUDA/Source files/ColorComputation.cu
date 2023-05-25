@@ -542,7 +542,6 @@ __device__ void findLensingRedshift(const int M, const int ind, const float* cam
 
 	float pixArea = a1 + a2;
 
-	//TODO ASK ABOUT THIS
 	frac = pixArea / solidAngle;
 	float thetaCam = (ver4[0] + ver4[1] + ver4[2] + ver4[3]) * .25f;
 	float phiCam = (hor4[0] + hor4[1] + hor4[2] + hor4[3]) * .25f;
