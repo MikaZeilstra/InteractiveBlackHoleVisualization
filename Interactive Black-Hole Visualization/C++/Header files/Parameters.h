@@ -31,6 +31,8 @@ struct Parameters {
 	int gridStartLevel, gridMaxLevel, gridMinLevel;
 	int gridNum = 1;
 	int grid_N, grid_M;
+	int n_black_hole_angles;
+	int n_disk_angles, n_disk_sample, max_disk_segments;
 	bool useRandomStars;
 	float randomStarSelectionChance;
 
@@ -204,7 +206,7 @@ struct Parameters {
 			viewOffset *= PI;
 			nrOfFrames = config.lookup("nrOfFrames");
 			gridNum = config.lookup("nrOfGrids");
-
+			n_black_hole_angles = config.lookup("n_black_hole_angles");
 
 
 			std::string str1 = config.lookup("celestialSkyImg");
@@ -257,6 +259,11 @@ struct Parameters {
 				accretionTemperatureLUTSize = config.lookup("temperatureLUTSize");
 				blackholeMass = config.lookup("blackholeMass");
 				blackholeAccretion = config.lookup("blackholeAccretionRate");
+
+				n_disk_angles = config.lookup("n_disk_angles");
+				n_disk_sample = config.lookup("n_disk_sample");
+				max_disk_segments = config.lookup("max_disk_segments");
+
 			}
 
 			camSpeedChange = config.lookup("camSpeedChange");

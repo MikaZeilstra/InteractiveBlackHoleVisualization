@@ -13,6 +13,10 @@ inline __host__ __device__  float2 operator- (float2 a, float2 b) {
 	return make_float2(a.x - b.x, a.y - b.y);
 }
 
+inline __host__ __device__  float2 operator- (int2 a, float2 b) {
+	return make_float2(a.x - b.x, a.y - b.y);
+}
+
 inline __host__ __device__ float2 operator*(float b, float2 a)
 {
 	return make_float2(b * (float)a.x, b * (float)a.y);
@@ -29,6 +33,11 @@ inline __host__ __device__  float3 operator- (float3 a, float3 b) {
 inline __host__ __device__ float3 operator*(float b, float3 a)
 {
 	return make_float3(b * (float) a.x, b * (float) a.y, b * (float) a.z);
+}
+
+inline __host__ __device__ float4 operator*(float b, uchar4 a)
+{
+	return make_float4(b * (float)a.x, b * (float)a.y, b * (float)a.z,b * (float)a.w);
 }
 
 inline __host__ __device__ float3 operator*(float b, uchar3 a)
@@ -74,6 +83,10 @@ namespace vector_ops {
 	}
 
 	inline __host__ __device__ float sq_norm(float3 a) {
+		return dot(a, a);
+	}
+
+	inline __host__ __device__ float sq_norm(float2 a) {
 		return dot(a, a);
 	}
 }

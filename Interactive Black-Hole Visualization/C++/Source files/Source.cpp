@@ -80,7 +80,7 @@ int main()
 	/* ----------------------- SETUP CUDA -------------------------- */
 	CUDA::init();
 
-	int max_grid_size = pow(2, param.gridMaxLevel) + 1;
+	int max_grid_size = pow(2, param.gridMaxLevel + 1) + 1;
 
 	CUDA::allocateGridMemory(max_grid_size * max_grid_size);
 
@@ -92,7 +92,7 @@ int main()
 	/* ------------------- ACCRETION DISK TEXTURE --------------------- */
 	if (param.useAccretionDiskTexture) {
 
-		cv::Mat accretionTextureMat = cv::imread(param.getAccretionDiskTextureFolder() + param.accretionDiskTexture);
+		cv::Mat accretionTextureMat = cv::imread(param.getAccretionDiskTextureFolder() + param.accretionDiskTexture, cv::IMREAD_UNCHANGED);
 
 		accretionTexture = { accretionTextureMat ,accretionTextureMat.cols, accretionTextureMat.rows };
 	}

@@ -3,11 +3,15 @@
 #include "./../Header files/Metric.cuh"
 #include "./../Header files/Temperature_color_lookup.cuh"
 #include "./../Header files/vector_operations.cuh"
+#include "./../Header files/GridInterpolation.cuh"
+#include "./../Header files/GridLookup.cuh"
 #include "../../C++/Header files/IntegrationDefines.h"
 #include "../../CUDA/Header files/ColorComputation.cuh"
 
 #include "device_launch_parameters.h"
 
+#define MAX_R_NEW_DISK_SEGMENT 0.5
+#define MIN_R_CHANGE_SEGMENT 0.3
 
 /// <summary>
 /// Calculates the actual temperature of the disk at a given radius r in schwarschild radii and actual Mass M and accretion rate Ma.
@@ -70,7 +74,7 @@ __global__ void addAccretionDisk(const float2* thphi, const float3* disk_inciden
 	// Only compute if pixel is not black hole and i j is in image
 	float4 color = { 0.f, 0.f, 0.f };
 
-	
+
 
 	if (i < N && j < M) {
 		bool r_check = false;
@@ -100,12 +104,13 @@ __global__ void addAccretionDisk(const float2* thphi, const float3* disk_inciden
 			float orbit_speed = metric::calcSpeed(avg_thp.x, (float)PI1_2);
 			float doppler_redshift = (1 + orbit_speed * vector_ops::dot(norm_incident, { 0,0,1 }))/ sqrt(1 - (orbit_speed * orbit_speed));
 
+			doppler_redshift = 1;
+
 			float redshift = doppler_redshift * grav_redshift;
 
 			//Apply redshift and clip temperature to [100,29000] outside this range barely any change 
 			double observerd_temp = temp * redshift;
 
-				
 
 			if (observerd_temp < TEMP_SPLIT) {
 				float mix = (observerd_temp / TEMP_STEP_SMALL) - floor(observerd_temp / TEMP_STEP_SMALL);
@@ -171,16 +176,16 @@ __device__ int2 coord_min(int2* coords) {
 	};
 }
 
-__global__ void addAccretionDiskTexture(const float2* thphi, const int M, const unsigned char* bh, uchar4* out, float3* summed_texture, float  maxAccretionRadius, int tex_width, int tex_height,
+__global__ void addAccretionDiskTexture(const float2* thphi, const int M, const unsigned char* bh, uchar4* out, float4* summed_texture, float  maxAccretionRadius, int tex_width, int tex_height,
 	const float* camParam, const float* solidangle, float2* viewthing, bool lensingOn, const unsigned char* diskMask) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 	int ind = i * M1 + j;
 	
 
-	float3 color = { 0.f, 0.f, 0.f };
+	float4 color = { 0.f, 0.f, 0.f,0.f };
 	
-	if (bh[ijc] == 0 && diskMask[ijc] == 4) {
+	if (diskMask[ijc] == 4) {
 		//Get the coordinates of the disk
 		float2 corners[4] = {
 			thphi[ind],
@@ -274,6 +279,8 @@ __global__ void addAccretionDiskTexture(const float2* thphi, const int M, const 
 		}
 
 		color = (1 / ((float)pix_sum)) * color;
+		
+
 		float4 out_color = {
 			fminf(1.0f,color.x),
 			fminf(1.0f,color.y),
@@ -297,15 +304,195 @@ __global__ void addAccretionDiskTexture(const float2* thphi, const int M, const 
 
 
 		out_color = {
-				fminf(color.x,1.0f),
-				fminf(color.y,1.0f),
-				fminf(color.z,1.0f),
-				1
+				fminf(out_color.x,1.0f), 
+				fminf(out_color.y,1.0f),
+				fminf(out_color.z,1.0f),
+				fmaxf(fminf(color.w,1.0f),0.0f)
 		};
+
+		float4 prev_color = (1.0f / 255.0f) * out[ijc];
+
+		out_color = (1 - out_color.w) * prev_color + (out_color.w) * out_color;
+		out_color.w = 1;
 
  		out[ijc] = {(unsigned char)(out_color.x * 255),(unsigned char)(out_color.y * 255),(unsigned char)(out_color.z * 255), 255};
 	}
 }
+
+/// <summary>
+/// Creates a disk summary from the disk grid, summarizing the shape and structure of the disk in an easy to intepolate way
+/// </summary>
+/// <param name="GM">Grid size in horizontal direction</param>
+/// <param name="GN">Grid size in vertical direction</param>
+/// <param name="disk_grid">disk grid</param>
+/// <param name="disk_summary">Summary for each angle the first max_disk_segments are the starting and ending distances from the center for each segment, the next max_disk_segments entries are the min indexes for the sample values per segment, lastly the remaining n_samples entries are the actual samples </param>
+/// <param name="bhBorder">The black hole border with the center of the black hole filled</param>
+/// <param name="max_r">maximum accretion disk radius</param>
+/// <param name="n_angles">Number of angles to sample</param>
+/// <param name="n_samples">Number of samples per angle</param>
+/// <param name="max_disk_segments">Maximum number of segments to keep track of</param>
+/// <returns></returns>
+__global__ void CreateDiskSummary(const int M, const int N,const int GM, const int GN, float2* disk_grid, int grid_lvl, int* gapsave, float2* disk_summary, float2* bhBorder, float max_r, int n_angles, int n_samples, int max_disk_segments) {
+	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+
+	if (i < n_angles) {
+		//First zero the sections since it might retain some from previous frame.
+		for (int x = 0; x < max_disk_segments;x++) {
+			disk_summary[x + ((n_samples + max_disk_segments) * i)] = { 0,0 };
+		}
+		
+		float total_distance = 0;
+
+		int disk_found = -1;
+		bool between_disk = true;
+
+		float angle = PI2 / (1.f * n_angles) * 1.f * i;
+		float2 mov_dir = { -sinf(angle) , cosf(angle) };
+		float2 bh_pt = { .5f * bhBorder[0].x + .5f * bhBorder[0].y, .5f * bhBorder[1].x + .5f * bhBorder[1].y };
+		bh_pt = { bh_pt.x / (float)PI2 * GM, bh_pt.y / (float)PI2 * GM };
+		float2 pt = bh_pt;
+		int2 gridpt = { int(pt.x), int(pt.y) };
+
+		float2 gridB = disk_grid[gridpt.x * GM + gridpt.y];
+		float2 gridA = disk_grid[gridpt.x * GM + gridpt.y];
+
+		while (!(disk_found==max_disk_segments)) {
+
+
+			//If the next point is nan we exited the disk
+			if (gridB.x > 0 && isnan(gridA.x) && !between_disk) {
+
+				//Calculate distance and save it in the high distance spot for the disk
+				float dist = sqrtf(vector_ops::sq_norm(gridpt - bh_pt));
+				disk_summary[disk_found + ((n_samples+ 2*max_disk_segments) * i)].y = dist;
+
+				//Now between disk
+				between_disk = true;
+
+				//Update total distance
+				total_distance += disk_summary[disk_found + ((n_samples + 2 * max_disk_segments) * i)].y - disk_summary[disk_found + ((n_samples + 2 * max_disk_segments) * i)].x;
+
+			}
+			//If we are inbetween disk and the next point is on disk we note the distance
+			//We also dont start a new segment if r is to close to the border. The disk is convcave and although small there is a chance it will clip the same segment twice messing up the ordering
+			//This only happens near the edges where r is very large
+			else if (between_disk && gridA.x > 0 && gridA.x < MAX_R_NEW_DISK_SEGMENT * max_r) {
+				if (i == 27) {
+					i;
+				}
+
+				//We found another part of the disk
+				disk_found++;
+
+				//Calculate distance and save it in the low distance spot for the disk
+				float dist = sqrtf(vector_ops::sq_norm(gridpt - bh_pt));
+				disk_summary[disk_found + ((n_samples + 2 * max_disk_segments) * i)].x = dist;
+
+				//No longer between the disks
+				between_disk = false;
+				
+
+			}
+			//If we are on the disk but the change in r is too large we probably changed surface.
+			else if (gridA.x > 0 && gridB.x > 0 && (gridA.y - gridB.y) > (max_r * MIN_R_CHANGE_SEGMENT) && !between_disk) {
+				//Calculate distance and save it in the high distance spot for the disk
+				float dist = sqrtf(vector_ops::sq_norm(gridpt - bh_pt));
+				disk_summary[disk_found + ((n_samples + 2 * max_disk_segments) * i)].y = dist;
+
+				//Update total distance
+				total_distance += disk_summary[disk_found + ((n_samples + 2 * max_disk_segments) * i)].y - disk_summary[disk_found + ((n_samples + 2 * max_disk_segments) * i)].x;
+
+				//Update disk count
+				disk_found++;
+
+				//Calculate distance and save it in the low distance spot for the disk
+				disk_summary[disk_found + ((n_samples + 2 * max_disk_segments)* i)].x = dist;
+
+			}
+
+
+
+			//Walk over the grid while saving last step
+			gridB = gridA;
+			pt = pt + mov_dir;
+			gridpt = { int(roundf(pt.x)), int(roundf(pt.y)) };
+
+			//If either coord is oob break
+			if (gridpt.x > GN|| gridpt.x < 0 || gridpt.y > GM || gridpt.y < 0) {
+				break;
+			}
+
+
+			gridA = disk_grid[gridpt.x * GM + gridpt.y];
+
+		}
+
+		// We trace a ray outwards over the image to detect disk segments, this means the most inner segment is inside, however the most inner segment varies per angle since it might be ocluded by the disk or the black hole.
+		// We know that the outer segments can only oclude inner segments so if we store the segments inside-out it means that indexes ar guaranteed to correspond to the same disk-segment, if an inner segment is occluded it will be zero. 
+		//We need to switch everything untill half rounded down of the outer disk segment index.		
+		int half = (disk_found / 2);
+
+		float2 temp;
+		for (int y = 0; y <= half; y++) {
+			//Swap inner and outer segments
+			temp = disk_summary[y + ((n_samples + 2 * max_disk_segments) * i)];
+			disk_summary[y + ((n_samples + 2 * max_disk_segments) * i)] = disk_summary[(disk_found - y) + ((n_samples + 2 * max_disk_segments) * i)];
+ 			disk_summary[(disk_found - y) + ((n_samples + 2 * max_disk_segments) * i)] = temp;
+
+		}
+
+		
+
+		//We also need to set the 0 values if the disk segement was not found to the minimum of the lower disk segment such that the interpolation does not go into the black hole but into the other disk segment
+		float2 value = { disk_summary[disk_found + ((n_samples + 2 * max_disk_segments) * i)].x, disk_summary[disk_found + ((n_samples + 2 * max_disk_segments) * i)].x };
+		for (int y = disk_found + 1; y < max_disk_segments; y++) {
+			disk_summary[y + ((n_samples + 2 * max_disk_segments) * i)] = value;
+		}
+
+		//Now we need to sample each disk section based on the size;
+		int current_sample_count = 0;
+		
+	
+		
+		
+		for (int y = 0; y <= disk_found;y++) {
+			//Find the number of samples for this segment
+			float2 disk_edges = disk_summary[y + ((n_samples + 2 * max_disk_segments) * i)];
+			float size_fraction = (disk_edges.y - disk_edges.x) / total_distance;
+			int n_segment_samples = size_fraction * n_samples;
+
+			//Intialize the grid_point and how much to move for each sanple
+			float2 grid_pt = bh_pt + disk_edges.x * mov_dir;
+			float2 grid_mvmnt = ((disk_edges.y - disk_edges.x) / n_segment_samples) * mov_dir;
+
+			int2 int_grid_pt = { (int)grid_pt.x, (int)grid_pt.y };
+
+			//Save the starting index of these segments
+			disk_summary[max_disk_segments + y + ((n_samples + 2 * max_disk_segments) * i)].x = current_sample_count;
+					
+
+			for (int z = 0; z < n_segment_samples; z++){
+
+
+				int_grid_pt = { (int)grid_pt.x, (int)grid_pt.y };
+
+				//Find the of the sample by interpolating the disk to the requested theta-phi values
+				disk_summary[2 * max_disk_segments + current_sample_count + ((n_samples + 2 * max_disk_segments) * i)] =
+					interpolateGridCoord<float2,true>(GM, GN, disk_grid, grid_pt);
+
+				//Update grid point and sample counter
+				grid_pt = grid_pt + grid_mvmnt;
+				current_sample_count++;
+			}
+
+			//Save the last index of these segments
+			disk_summary[max_disk_segments + y + ((n_samples + 2 * max_disk_segments) * i)].y = current_sample_count - 1;
+
+		}
+	}
+}
+
 
 __global__ void makeDiskCheck(const float2* thphi, unsigned char* disk, const int M, const int N) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;

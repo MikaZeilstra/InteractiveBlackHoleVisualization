@@ -175,8 +175,6 @@ __global__ void smoothAreaH(float* areaSmooth, float* area, const unsigned char*
 		
 
 		for (int h = -fs; h <= fs; h++) {
-
-
 			if (!bh[i * M + ((j + h + M) % M)] && ((diskMask[i * M + ((j + h + M) % M)] == 4) == disk_mask_ijc) && area[i * M + ((j + h + M) % M)] != -1) {
 				float ar = area[i * M + ((j + h + M) % M)];
 				sum += ar * expf(-(h * h) / (HORIZONTAL_GAUSSIAN_BLUR_SIGMA * fs));

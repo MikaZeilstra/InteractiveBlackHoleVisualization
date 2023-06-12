@@ -14,6 +14,7 @@
 #include "../Header files/IntegrationDefines.h"
 #include <chrono>
 #include <numeric>
+#include <algorithm>
 
 #include "../../CUDA/Header files/Metric.cuh"
 #include "../../CUDA/Header files/ImageDistorterCaller.cuh"
@@ -23,7 +24,8 @@
 #define PRECCELEST 0.015
 #define DISK_PRECCELEST_RELAXATION 3
 #define ERROR 0.001//1e-6
-#define MIN_GPU_INTEGRATION 10000000000000
+
+#define MIN_GPU_INTEGRATION 50
 #define BLACK_HOLE_MAX_DIAGNAL 1e-10
 
 
@@ -403,8 +405,13 @@ void Grid::integrateCameraCoordinates(std::vector<uint64_t>& ijvec) {
 /// <param name="gap">The current block gap.</param>
 /// <param name="level">The current block level.</param>
 bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const int level) {
-	uint32_t k = i + gap;
-	uint32_t l = (j + gap) % M;
+	int k = i + gap;
+	int l = (j + gap) % M;
+
+	int k_low = std::max((int) i - gap, 0);
+	int k_high = std::min(k + gap, N-1);
+	int l_low = ((j - gap) + M) % M;
+	int l_high = (l + gap) % M;
 
 	//If the block level is still lower than the minimum required number return 
 	if (level < param->gridMinLevel) return true;
@@ -420,8 +427,6 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 	float2 disk_bottomLeft = disk_grid_vector[i * M + l ];
 	float2 disk_bottomRight = disk_grid_vector[k * M + l];
 
-
-
 	
 	bool topLeft_on_disk = !isnan(disk_topLeft.x);
 
@@ -429,6 +434,13 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 	if (!((topLeft_on_disk == !isnan(disk_topRight.x)) && (topLeft_on_disk == !isnan(disk_bottomLeft.x)) && (topLeft_on_disk == !isnan(disk_bottomRight.x)))) {
 		return true;
 	}
+
+	//If the r coordinate on the disk is close enough to the max
+	/*
+	if (disk_topLeft.x > DISK_EDGE_REFINE_FRAC * param->accretionDiskMaxRadius || disk_topRight.x > DISK_EDGE_REFINE_FRAC * param->accretionDiskMaxRadius || disk_bottomLeft.x > DISK_EDGE_REFINE_FRAC * param->accretionDiskMaxRadius || disk_bottomRight.x > DISK_EDGE_REFINE_FRAC * param->accretionDiskMaxRadius) {
+		return true;
+	}
+	*/
 
 
 	//If all vertices are not either in the blackhole or out we need to refine
@@ -462,11 +474,34 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 		bottomRight.y += PI2;
 		diag2 = std::min(diag2, (float)abs(disk_topRight.y - disk_bottomLeft.y));
 
+
 		// If phi change is too large refine
 		if (diag > PRECCELEST * DISK_PRECCELEST_RELAXATION || diag2 > PRECCELEST * DISK_PRECCELEST_RELAXATION) return true;
+
+
+		//if we are on the disk but a neighbour point is not refine
+		float2 disk_topLeft_out = disk_grid_vector[k_low * M + l_low];
+		float2 disk_topRight_out = disk_grid_vector[k_low * M + l_high];
+		float2 disk_bottomLeft_out = disk_grid_vector[k_high * M + l_low];
+		float2 disk_bottomRight_out = disk_grid_vector[k_high * M + l_high];
+
+		if (isnan(disk_topLeft_out.x) || isnan(disk_topRight_out.x) || isnan(disk_bottomLeft_out.x) || isnan(disk_bottomRight_out.x)) {
+			return true;
+		}
+
+		return true;
 	}
 	else {
+		//if we are not on the disk but a neighbour point is refine
+		float2 disk_topLeft_out = disk_grid_vector[k_low * M + l_low];
+		float2 disk_topRight_out = disk_grid_vector[k_low * M + l_high];
+		float2 disk_bottomLeft_out = disk_grid_vector[k_high * M + l_low];
+		float2 disk_bottomRight_out = disk_grid_vector[k_high * M + l_high];
 
+		//We only need to check for positive since we are not on the disk and values might be -2 and Nan / not on the disk returns false
+		if (disk_topLeft_out.x > 0 || disk_topRight_out.x > 0 || disk_bottomLeft_out.x > 0 || disk_bottomRight_out.x > 0) {
+			return true;
+		}
 	}
 
 	

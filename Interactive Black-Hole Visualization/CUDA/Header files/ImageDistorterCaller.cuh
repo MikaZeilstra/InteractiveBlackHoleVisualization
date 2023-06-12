@@ -88,7 +88,7 @@ namespace CUDA {
 		cv::Mat texture;
 		int width;
 		int height;
-		std::vector<float3> summed;
+		std::vector<float4> summed;
 
 		Texture() {
 			width = 0;
@@ -100,10 +100,10 @@ namespace CUDA {
 			width = width_;
 			height = height_;
 
-			uchar3* texture_pointer = reinterpret_cast<uchar3*>(texture.data);
+			uchar4* texture_pointer = reinterpret_cast<uchar4*>(texture.data);
 
 
-			summed = std::vector<float3>(width * height);
+			summed = std::vector<float4>(width * height);
 			summed[0] = (1/255.f) * texture_pointer[0] ;
 
 
@@ -193,7 +193,7 @@ namespace CUDA {
 			bh[1] = { 100, 0 };
 			bhBorder = (float2*)&(bh[0]);
 		}
-		int angleNum;// = 1000;
+		int angleNum;
 		float2* bhBorder;
 		std::vector<float2> bh;
 	};

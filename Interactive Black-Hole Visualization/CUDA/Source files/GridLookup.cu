@@ -51,12 +51,17 @@ template <class T> __device__ void findBlock(const float theta, const float phi,
 }
 
 /// <summary>
-/// Checks and corrects phi values for 2-pi crossings. if the template parameter 
+/// Checks and corrects phi values for 2-pi crossings. if the template parameter is true
 /// </summary>
 /// <param name="p">The phi values to check.</param>
 /// <param name="factor">The factor to check if a point is close to the border.</param>
 /// <returns></returns>
 template<> __device__ void piCheckTot<float2, true>(float2* tp, float factor, int size) {
+	for (int q = 0; q < size; q++) {
+		fmodf(tp[q].y, PI2);
+	}
+
+
 	float factor1 = PI2 * (1.f - factor);
 	bool check = false;
 	for (int q = 0; q < size; q++) {
@@ -75,6 +80,10 @@ template<> __device__ void piCheckTot<float2, true>(float2* tp, float factor, in
 }
 
 template<> __device__ void piCheckTot<float4, true>(float4* tp, float factor, int size) {
+	for (int q = 0; q < size; q++) {
+		fmodf(tp[q].y, PI2);
+	}
+
 	float factor1 = PI2 * (1.f - factor);
 	bool check = false;
 	for (int q = 0; q < size; q++) {
@@ -95,6 +104,8 @@ template<> __device__ void piCheckTot<float4, true>(float4* tp, float factor, in
 
 //If we dont need to check pi crossings this function does nothing
 template<> __device__ void piCheckTot<float3, false>(float3* tp, float factor, int size) {}
+template<> __device__ void piCheckTot<float2, false>(float2* tp, float factor, int size) {}
+
 
 // Set values for projected pixel corners & update phi values in case of 2pi crossing.
 // If the corners cross into the accretion disk we set them to a known good value

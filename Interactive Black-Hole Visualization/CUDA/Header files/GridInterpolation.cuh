@@ -8,12 +8,16 @@ __global__ void pixInterpolation(const float2* viewthing, const int M, const int
 	const float2* bhBorder, const int angleNum, const float alpha);
 
 __global__ void disk_pixInterpolation(const float2* viewthing, const int M, const int N, const bool should_interpolate_grids, float2* disk_thphi, float3* disk_incident, const float2* disk_grid, const float3* disk_incident_grid,
-	const int GM, const int GN, const float hor, const float ver, int* gapsave, int gridlvl,
+	float2* disk_summary, float2* disk_summary_2, const int n_angles, const int n_sample, const int n_segments, const int GM, const int GN, const float hor, const float ver, int* gapsave, int gridlvl,
 	const float2* bhBorder, const int angleNum, const float alpha);
 
+__device__ float2 interpolate_summary_angle(float2* disk_summary, float segment_frac, int segment_slot, int angleSlot, const int n_disk_segments, const int n_disk_sample);
+__device__ float2 interpolate_summary(float2* disk_summary, float angle_alpha, float segment_frac, int segment_slot, int angleSlot, int angleSlot2, const int n_disk_segments, const int n_disk_sample);
 
 template <class T, bool B> __device__ T  interpolatePix(const float theta, const float phi, const int M, const int N, const int gridlvl,
 	const T* grid, const int GM, const int GN, int* gapsave, const int i, const int j);
+template <class T, bool CheckPi> __device__ T interpolateGridCoord(const int GM, const int GN, T* grid, float2 grid_coord);
+template  __device__ float2 interpolateGridCoord<float2, true>(const int GM, const int GN, float2* grid, float2 grid_coord);
 
 /// <summary>
 /// Interpolates the corners of a projected pixel on the celestial sky to find the position
@@ -40,5 +44,5 @@ template <class T, bool CheckPi> __device__ T findPoint(const int i, const int j
 template <class T, bool CheckPi> __device__ T interpolateHermite(const int i, const int j, const int gap, const int GM, const int GN, const float percDown, const float percRight,
 	 T* cornersCel, const T* grid, int count, T& r_check);
 
-template <class T, bool CheckPi> __device__ T interpolateSpline(const int i, const int j, const int gap, const int GM, const int GN, const float thetaCam, const float phiCam, 
-	T* cornersCel, float* cornersCam, const T* grid);
+template <class T, bool CheckPi> __device__ T interpolateSpline(const int i, const int j, const int gap, const int GM, const int GN, float perc_down, float perc_right,
+	T* cornersCel, const T* grid);
