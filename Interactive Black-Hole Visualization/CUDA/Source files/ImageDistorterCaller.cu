@@ -539,7 +539,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 
 
 	while(q < param.nrOfFrames + startframe && !glfwWindowShouldClose(viewer->get_window())) {
-		frame_start_time = std::chrono::high_resolution_clock::now();
+ 		frame_start_time = std::chrono::high_resolution_clock::now();
 
 
 		//Map the PBO to cuda and set the outputimage pointer to that location

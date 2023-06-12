@@ -36,7 +36,7 @@ accretionDiskTexture = "rainbow_alpha_transp.png"
 
 //AcretionDiskInterpolation
 n_disk_angles = 200;
-n_disk_sample = 200;
+n_disk_sample = 100;
 max_disk_segments = 4;
 
 //Option to save the geodesics used to generate the image

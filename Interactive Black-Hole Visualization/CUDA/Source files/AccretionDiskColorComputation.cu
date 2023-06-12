@@ -10,6 +10,7 @@
 
 #include "device_launch_parameters.h"
 
+
 #define MAX_R_NEW_DISK_SEGMENT 0.5
 #define MIN_R_CHANGE_SEGMENT 0.3
 
@@ -378,9 +379,6 @@ __global__ void CreateDiskSummary(const int M, const int N,const int GM, const i
 			//We also dont start a new segment if r is to close to the border. The disk is convcave and although small there is a chance it will clip the same segment twice messing up the ordering
 			//This only happens near the edges where r is very large
 			else if (between_disk && gridA.x > 0 && gridA.x < MAX_R_NEW_DISK_SEGMENT * max_r) {
-				if (i == 27) {
-					i;
-				}
 
 				//We found another part of the disk
 				disk_found++;
@@ -471,15 +469,14 @@ __global__ void CreateDiskSummary(const int M, const int N,const int GM, const i
 			//Save the starting index of these segments
 			disk_summary[max_disk_segments + y + ((n_samples + 2 * max_disk_segments) * i)].x = current_sample_count;
 					
-
 			for (int z = 0; z < n_segment_samples; z++){
-
-
 				int_grid_pt = { (int)grid_pt.x, (int)grid_pt.y };
+
 
 				//Find the of the sample by interpolating the disk to the requested theta-phi values
 				disk_summary[2 * max_disk_segments + current_sample_count + ((n_samples + 2 * max_disk_segments) * i)] =
-					interpolateGridCoord<float2,true>(GM, GN, disk_grid, grid_pt);
+					interpolateGridCoord<float2, true>(GM, GN, disk_grid, grid_pt);
+
 
 				//Update grid point and sample counter
 				grid_pt = grid_pt + grid_mvmnt;

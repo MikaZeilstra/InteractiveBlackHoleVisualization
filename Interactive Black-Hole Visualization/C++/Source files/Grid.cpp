@@ -488,8 +488,6 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 		if (isnan(disk_topLeft_out.x) || isnan(disk_topRight_out.x) || isnan(disk_bottomLeft_out.x) || isnan(disk_bottomRight_out.x)) {
 			return true;
 		}
-
-		return true;
 	}
 	else {
 		//if we are not on the disk but a neighbour point is refine

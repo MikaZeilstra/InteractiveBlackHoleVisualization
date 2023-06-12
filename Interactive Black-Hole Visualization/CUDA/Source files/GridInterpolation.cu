@@ -107,8 +107,7 @@ __global__ void disk_pixInterpolation(const float2* viewthing, const int M, cons
 			int angleSlot2 = (angleSlot + 1) % n_disk_angles;
 
 			float angle_alpha = ((angle / PI2) * n_disk_angles) - angleSlot;
-
-
+			
 			//Find which band in the angleslot the disk falls in
 			for (int segment_slot = 0; segment_slot < n_disk_segments; segment_slot++) {
 				//Interpolate within each angle
@@ -172,7 +171,6 @@ __device__ float2 interpolate_summary_angle(float2* disk_summary, float segment_
 	//floor index for lower index and subtract to get the alpha
 	int lower_index = index_fl;
 	float index_alpha = index_fl - lower_index;
-
 	//Get values from summary
 	float2 summary_values[] = {
 		disk_summary[2 * n_disk_segments + lower_index + angleSlot * (n_disk_sample + 2 * n_disk_segments)],
@@ -246,7 +244,11 @@ template <class T, bool CheckPi> __device__ T interpolateGridCoord(const int GM,
 	
 	int gap = 1;
 	
-	while (grid[a * GM + b].x < 0) {
+	//if the grid value is not positive or nan find new a and b coordinates
+	while (!(!(grid[a * GM + b].x < 0)
+		&& !(grid[(a + gap) * GM + ((b) % GM)].x < 0)
+		&& !(grid[(a) * GM + ((b + gap) % GM)].x < 0)
+		&& !(grid[(a + gap) * GM + ((b + gap) % GM)].x < 0))) {
 		gap = gap * 2;
 		a = a - (a % gap);
 		b = b - (b % gap);
