@@ -8,6 +8,36 @@
 
 #include <stdio.h>
 
+/// <summary>
+/// Interpolated the vector while interpolating the length seperatly, the calculate area function is very sensitive to the vector length and thus needs to be taken extra care off,
+/// this is actually the exact oposite for when interpolating grid coordinates where we (obviously) not want to preserve length we can thus just use the CheckPi template parameter
+/// </summary>
+/// <param name="values">Array where the first two values are interpolated</param>
+/// <param name="alpha">The mixing factor to use</param>
+/// <returns></returns>
+template<>  __device__ float3 interpolate_vector_linearly<float3, false>(float3* values, float alpha) {
+	//Calculate the inverse length so we can interpolate it seperately
+	float inv_length[] = {
+		rsqrtf(vector_ops::sq_norm(values[0])),
+		rsqrtf(vector_ops::sq_norm(values[1]))
+	};
+
+	float3 normalized_values[] = {
+		inv_length[0] * values[0],
+		inv_length[1] * values[1]
+	};
+
+	//Interpolate vector and length seperatly
+	float3  interpolated = (1 - alpha) * normalized_values[0] + alpha * normalized_values[1];
+	float interpolated_length = (1 - alpha) * inv_length[0] + alpha * inv_length[1];
+
+	//Normalize interpolated vector and then rescale to interpolated length
+	return rsqrtf(vector_ops::sq_norm(interpolated)) * (1 / interpolated_length) * interpolated;
+}
+
+template<>  __device__ float2 interpolate_vector_linearly<float2, true>(float2* values, float alpha) {
+	return (1 - alpha) * values[0] + alpha * values[1];
+}
 
 __global__ void camUpdate(const float alpha, const int g, const float* camParam, float* cam) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
@@ -80,7 +110,7 @@ __global__ void pixInterpolation(const float2* viewthing, const int M, const int
 }
 
 __global__ void disk_pixInterpolation(const float2* viewthing, const int M, const int N, const bool should_interpolate_grids, float2* disk_thphi, float3* disk_incident, const float2* disk_grid, const float3* disk_incident_grid,
-	float2* disk_summary, float2* disk_summary_2, const int n_disk_angles, const int n_disk_sample, const int n_disk_segments, const int GM, const int GN, const float hor, const float ver, int* gapsave, int gridlvl,
+	float2* disk_summary, float2* disk_summary_2, float3* disk_incident_summary, float3* disk_incident_summary_2, const int n_disk_angles, const int n_disk_sample, const int n_disk_segments, const int GM, const int GN, const float hor, const float ver, int* gapsave, int gridlvl,
 	const float2* bhBorder, const int angleNum, const float alpha) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
@@ -107,7 +137,7 @@ __global__ void disk_pixInterpolation(const float2* viewthing, const int M, cons
 			int angleSlot2 = (angleSlot + 1) % n_disk_angles;
 
 			float angle_alpha = ((angle / PI2) * n_disk_angles) - angleSlot;
-			
+
 			//Find which band in the angleslot the disk falls in
 			for (int segment_slot = 0; segment_slot < n_disk_segments; segment_slot++) {
 				//Interpolate within each angle
@@ -124,16 +154,42 @@ __global__ void disk_pixInterpolation(const float2* viewthing, const int M, cons
 				if (centerdist > interp_edges.x && centerdist < interp_edges.y) {
 					float segment_frac = (centerdist - interp_edges.x) / (interp_edges.y - interp_edges.x);
 
+					//Get index range for this segment on grid 1 and 2
+					float2 index_edges_G1_A1 = disk_summary[n_disk_segments + segment_slot + angleSlot * (n_disk_sample + 2 * n_disk_segments)];
+					float2 index_edges_G1_A2 = disk_summary[n_disk_segments + segment_slot + angleSlot2 * (n_disk_sample + 2 * n_disk_segments)];
+
+					float2 index_edges_G2_A1 = disk_summary_2[n_disk_segments + segment_slot + angleSlot * (n_disk_sample + 2 * n_disk_segments)];
+					float2 index_edges_G2_A2 = disk_summary_2[n_disk_segments + segment_slot + angleSlot2 * (n_disk_sample + 2 * n_disk_segments)];
+
+
 					//Calculate grid values
 					float2 grid_values[] = {
-						interpolate_summary(disk_summary, angle_alpha, segment_frac, segment_slot, angleSlot, angleSlot2, n_disk_segments, n_disk_sample),
-						interpolate_summary(disk_summary_2,angle_alpha, segment_frac, segment_slot, angleSlot, angleSlot2, n_disk_segments, n_disk_sample)
+						interpolate_summary<float2, true>(&disk_summary[2 * n_disk_segments + angleSlot * (n_disk_sample + 2 * n_disk_segments)],
+							&disk_summary[2 * n_disk_segments + angleSlot2 * (n_disk_sample + 2 * n_disk_segments)],
+							index_edges_G1_A1, index_edges_G1_A2, angle_alpha, segment_frac),
+						interpolate_summary<float2, true>(&disk_summary_2[2 * n_disk_segments + angleSlot * (n_disk_sample + 2 * n_disk_segments)],
+							&disk_summary_2[2 * n_disk_segments + angleSlot2 * (n_disk_sample + 2 * n_disk_segments)],
+							index_edges_G2_A1,index_edges_G2_A2, angle_alpha, segment_frac)
 					};
 
 					piCheckTot<float2, true>(grid_values, PI_CHECK_FACTOR, 2);
 
 					//Interpolate grids to get final value
-					disk_thphi[i * M1 + j] = (1 - alpha) * grid_values[0] + alpha * grid_values[1];;
+					disk_thphi[i * M1 + j] = (1 - alpha) * grid_values[0] + alpha * grid_values[1];
+					
+					//Calulate the incident grid values
+					//Calculate grid values
+					float3 incident_grid_values[] = {
+						interpolate_summary<float3, false>(&disk_incident_summary[angleSlot * n_disk_sample],
+							&disk_incident_summary[angleSlot2 * n_disk_sample],
+							index_edges_G1_A1, index_edges_G1_A2, angle_alpha, segment_frac),
+						interpolate_summary<float3, false>(&disk_incident_summary_2[angleSlot * n_disk_sample],
+							&disk_incident_summary_2[angleSlot2 * n_disk_sample],
+							index_edges_G2_A1,index_edges_G2_A2, angle_alpha, segment_frac)
+					};
+
+					disk_incident[i * M1 + j] = interpolate_vector_linearly<float3, false>(incident_grid_values,alpha);
+
 					return;
 				}
 			}
@@ -152,53 +208,57 @@ __global__ void disk_pixInterpolation(const float2* viewthing, const int M, cons
 }
 
 /// <summary>
-/// Interpolates a disksegment angleslot to give value.
+/// Interpolates the disk summary at a given angle
 /// </summary>
-/// <param name="disk_summary">The disk summary to use</param>
-/// <param name="segment_frac">The distance into the disk segment as fraction [0-1]</param>
-/// <param name="segment_slot">The segmentslot to interpolate</param>
-/// <param name="angleSlot">The anglslot to use</param>
-/// <param name="n_disk_segments">number of segments per angle</param>
-/// <param name="n_disk_sample">number of samples per angle</param>
-/// <returns>Interpolated segment value</returns>
-__device__ float2 interpolate_summary_angle(float2* disk_summary, float segment_frac, int segment_slot, int angleSlot, const int n_disk_segments, const int n_disk_sample) {
-	//Get index range for this segment
-	float2 index_edges = disk_summary[n_disk_segments + segment_slot + angleSlot * (n_disk_sample + 2 * n_disk_segments)];
-	
+/// <param name="disk_summary">Pointer in the summary to the angle</param>
+/// <param name="segment_frac">The length along the disk segment we want to know</param>
+/// <param name="index_edges">The min and max index for this disk segment in the summary</param>
+/// <returns>interpolated value</returns>
+template <class T, bool CheckPi> __device__ T interpolate_summary_angle(T* disk_summary, float segment_frac, float2 index_edges) {
 	//Calculate the index segment, segment frac needs
 	float index_fl = ((index_edges.y - index_edges.x) * segment_frac) + index_edges.x;
 
 	//floor index for lower index and subtract to get the alpha
 	int lower_index = index_fl;
 	float index_alpha = index_fl - lower_index;
+
 	//Get values from summary
-	float2 summary_values[] = {
-		disk_summary[2 * n_disk_segments + lower_index + angleSlot * (n_disk_sample + 2 * n_disk_segments)],
-		disk_summary[2 * n_disk_segments + lower_index + 1 + angleSlot * (n_disk_sample + 2 * n_disk_segments)]
+	T values[] = {
+		disk_summary[lower_index],
+		disk_summary[lower_index + 1]
 	};
 
 	//Fix 2pi crossings
-	piCheckTot<float2, true>(summary_values, PI_CHECK_FACTOR, 2);
+	piCheckTot<T, CheckPi>(values, PI_CHECK_FACTOR, 2);
 
-	//Return linearly interpolated values
-	return (1 - index_alpha) * summary_values[0] +
-		(index_alpha)*summary_values[1];
+
+	//Interpolate angles to get grid value
+	return interpolate_vector_linearly<T,CheckPi>(values,index_alpha);
 }
 
-__device__ float2 interpolate_summary(float2* disk_summary,float angle_alpha, float segment_frac, int segment_slot, int angleSlot, int angleSlot2, const int n_disk_segments, const int n_disk_sample) {
+/// <summary>
+/// Calculates the value for a given grid summary at the given position
+/// </summary>
+/// <param name="disk_summary_angle_1">Pointer in summary to the first angle</param>
+/// <param name="disk_summary_angle_2">Pointer in summary to the second angle</param>
+/// <param name="index_edges_1">min and max index in the summary for the disk segment in the first angle</param>
+/// <param name="index_edges_2">min and max index in the summary for the disk segment in the second angle</param>
+/// <param name="angle_alpha">Mixing factor for the angles</param>
+/// <param name="segment_frac">How far along the segment the point is [0,1]</param>
+/// <returns>interpolated value</returns>
+template <class T, bool CheckPi> __device__ T interpolate_summary(T* disk_summary_angle_1, T* disk_summary_angle_2, float2 index_edges_1, float2 index_edges_2, float angle_alpha, float segment_frac) {
 
 	//Calculate the values according to both adjecent angles
-	float2 values[] = {
-		interpolate_summary_angle(disk_summary, segment_frac, segment_slot, angleSlot, n_disk_segments, n_disk_sample),
-		interpolate_summary_angle(disk_summary, segment_frac, segment_slot, angleSlot2, n_disk_segments, n_disk_sample)
+	T values[] = {
+		interpolate_summary_angle<T, CheckPi>(disk_summary_angle_1, segment_frac,index_edges_1),
+		interpolate_summary_angle<T, CheckPi>(disk_summary_angle_2, segment_frac,index_edges_2)
 	};
 
 	//Fix 2 pi crossings
-	piCheckTot<float2, true>(values, PI_CHECK_FACTOR, 2);
-
+	piCheckTot<T, CheckPi>(values, PI_CHECK_FACTOR, 2);
+	
 	//Interpolate angles to get grid value
-	return (1 - angle_alpha) * values[0] + angle_alpha * values[1];
-
+	return interpolate_vector_linearly<T, CheckPi>(values, angle_alpha);
 }
 
 
@@ -245,10 +305,10 @@ template <class T, bool CheckPi> __device__ T interpolateGridCoord(const int GM,
 	int gap = 1;
 	
 	//if the grid value is not positive or nan find new a and b coordinates
-	while (!(!(grid[a * GM + b].x < 0)
-		&& !(grid[(a + gap) * GM + ((b) % GM)].x < 0)
-		&& !(grid[(a) * GM + ((b + gap) % GM)].x < 0)
-		&& !(grid[(a + gap) * GM + ((b + gap) % GM)].x < 0))) {
+	while (!(!(grid[a * GM + b].x == -2)
+		&& !(grid[(a + gap) * GM + ((b) % GM)].x == -2)
+		&& !(grid[(a) * GM + ((b + gap) % GM)].x == -2)
+		&& !(grid[(a + gap) * GM + ((b + gap) % GM)].x == -2))) {
 		gap = gap * 2;
 		a = a - (a % gap);
 		b = b - (b % gap);

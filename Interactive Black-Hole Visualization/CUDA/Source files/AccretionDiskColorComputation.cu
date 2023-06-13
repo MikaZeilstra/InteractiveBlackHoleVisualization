@@ -105,7 +105,7 @@ __global__ void addAccretionDisk(const float2* thphi, const float3* disk_inciden
 			float orbit_speed = metric::calcSpeed(avg_thp.x, (float)PI1_2);
 			float doppler_redshift = (1 + orbit_speed * vector_ops::dot(norm_incident, { 0,0,1 }))/ sqrt(1 - (orbit_speed * orbit_speed));
 
-			doppler_redshift = 1;
+			//doppler_redshift = 1;
 
 			float redshift = doppler_redshift * grav_redshift;
 
@@ -333,7 +333,7 @@ __global__ void addAccretionDiskTexture(const float2* thphi, const int M, const 
 /// <param name="n_samples">Number of samples per angle</param>
 /// <param name="max_disk_segments">Maximum number of segments to keep track of</param>
 /// <returns></returns>
-__global__ void CreateDiskSummary(const int M, const int N,const int GM, const int GN, float2* disk_grid, int grid_lvl, int* gapsave, float2* disk_summary, float2* bhBorder, float max_r, int n_angles, int n_samples, int max_disk_segments) {
+__global__ void CreateDiskSummary(const int GM, const int GN, float2* disk_grid, float3* disk_incident_grid, float2* disk_summary, float3* disk_incident_summary,  float2* bhBorder, float max_r, int n_angles, int n_samples, int max_disk_segments) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 
 
@@ -472,11 +472,13 @@ __global__ void CreateDiskSummary(const int M, const int N,const int GM, const i
 			for (int z = 0; z < n_segment_samples; z++){
 				int_grid_pt = { (int)grid_pt.x, (int)grid_pt.y };
 
-
 				//Find the of the sample by interpolating the disk to the requested theta-phi values
 				disk_summary[2 * max_disk_segments + current_sample_count + ((n_samples + 2 * max_disk_segments) * i)] =
 					interpolateGridCoord<float2, true>(GM, GN, disk_grid, grid_pt);
 
+				//Find the incident angle as well
+				disk_incident_summary[current_sample_count + (n_samples * i)] = 
+					interpolateGridCoord<float3, false>(GM, GN, disk_incident_grid, grid_pt);
 
 				//Update grid point and sample counter
 				grid_pt = grid_pt + grid_mvmnt;

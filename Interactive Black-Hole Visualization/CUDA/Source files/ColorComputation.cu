@@ -40,6 +40,7 @@ __global__ void findArea(const float2* thphi, const float2* thphi_disk, const in
 
 	//Check if any pixel is on the accretion disk
 	if (i < N && j < M) {
+
 		if (diskMask[ijc] != 4) {
 			bool picheck = false;
 			float t[4];

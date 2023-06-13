@@ -109,6 +109,9 @@ float3* dev_incident_grid_2 = 0;
 float2* dev_disk_summary = 0;
 float2* dev_disk_summary_2 = 0;
 
+float3* dev_disk_incident_summary = 0;
+float3* dev_disk_incident_summary_2 = 0;
+
 static float2* dev_interpolatedGrid = 0;
 
 static float2* dev_interpolatedDiskGrid = 0;
@@ -168,6 +171,7 @@ cudaError_t CUDA::cleanup() {
 	cudaFree(dev_interpolatedIncidentGrid);
 
 	cudaFree(dev_disk_summary);
+	cudaFree(dev_disk_incident_summary);
 
 	cudaFree(dev_gridGap);
 
@@ -338,6 +342,10 @@ void CUDA::memoryAllocationAndCopy(const Image& image, const CelestialSky& celes
 
 	allocate(dev_disk_summary, 2 * param.n_disk_angles * (param.n_disk_sample + 2 *  param.max_disk_segments) * sizeof(float2), "grid_summary");
 	dev_disk_summary_2 = &dev_disk_summary[param.n_disk_angles * (param.n_disk_sample + 2 * param.max_disk_segments)];
+
+	allocate(dev_disk_incident_summary, 2 * param.n_disk_angles * (param.n_disk_sample) * sizeof(float3), "grid_incident_summary");
+	dev_disk_incident_summary_2 = &dev_disk_incident_summary[param.n_disk_angles * (param.n_disk_sample)];
+
 
 	allocate(dev_gridGap, rastSize * sizeof(int), "gridGap");
 
@@ -538,7 +546,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 	std::chrono::steady_clock::time_point frame_start_time;
 
 
-	while(q < param.nrOfFrames + startframe && !glfwWindowShouldClose(viewer->get_window())) {
+	while(q < 2 + startframe && !glfwWindowShouldClose(viewer->get_window())) {
  		frame_start_time = std::chrono::high_resolution_clock::now();
 
 
@@ -609,8 +617,8 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 			callKernelAsync("Smoothed shadow border 4/4", smoothBorder, numBlocks_bordersize, threadsPerBlock_32, 0,
 				dev_blackHoleBorder1, dev_blackHoleBorder0, bhproc.angleNum);
 
-			callKernelAsync("disk_edges", CreateDiskSummary, numBlocks_disk_edges, threadsPerBlock_32, 0, image.M, image.N, param.grid_M, param.grid_N, dev_disk_grid, param.gridMaxLevel, dev_gridGap, dev_disk_summary, dev_blackHoleBorder0, param.accretionDiskMaxRadius, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments);
-			callKernelAsync("disk_edges", CreateDiskSummary, numBlocks_disk_edges, threadsPerBlock_32, 0, image.M, image.N, param.grid_M, param.grid_N, dev_disk_grid_2, param.gridMaxLevel, dev_gridGap, dev_disk_summary_2, dev_blackHoleBorder0, param.accretionDiskMaxRadius, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments);
+			callKernelAsync("disk_edges", CreateDiskSummary, numBlocks_disk_edges, threadsPerBlock_32, 0, param.grid_M, param.grid_N, dev_disk_grid, dev_incident_grid, dev_disk_summary, dev_disk_incident_summary, dev_blackHoleBorder0, param.accretionDiskMaxRadius, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments);
+			callKernelAsync("disk_edges", CreateDiskSummary, numBlocks_disk_edges, threadsPerBlock_32, 0,  param.grid_M, param.grid_N, dev_disk_grid_2, dev_incident_grid_2, dev_disk_summary_2, dev_disk_incident_summary_2,  dev_blackHoleBorder0, param.accretionDiskMaxRadius, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments);
 
 		}
 
@@ -626,7 +634,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 
 		callKernelAsync("Interpolated disk grid", disk_pixInterpolation, numBlocks_N1_M1_5_25, threadsPerBlock5_25, 0,
 			dev_viewer, image.M, image.N, should_interpolate_grids, dev_interpolatedDiskGrid, dev_interpolatedIncidentGrid, dev_disk_grid,  dev_incident_grid,
-			dev_disk_summary, dev_disk_summary_2, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments,
+			dev_disk_summary, dev_disk_summary_2,dev_disk_incident_summary,dev_disk_incident_summary_2, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments,
 			param.grid_M, param.grid_N,
 			hor, ver, dev_gridGap, param.gridMaxLevel, dev_blackHoleBorder0, bhproc.angleNum, alpha);
 
@@ -1033,6 +1041,9 @@ void CUDA::swap_grids() {
 	dev_disk_summary = dev_disk_summary_2;
 	dev_disk_summary_2 = disk_summary_tmp;
 
+	float3* disk_incident_tmp = dev_disk_incident_summary;
+	dev_disk_incident_summary = dev_disk_incident_summary_2;
+	dev_disk_incident_summary_2 = disk_incident_tmp;
 }
 
 

@@ -9,4 +9,4 @@ __global__ void addAccretionDiskTexture(const float2* thphi, const int M, const 
 	const float* camParam, const float* solidangle, float2* viewthing, bool lensingOn, const unsigned char* diskMask);
 __global__ void makeDiskCheck(const float2* thphi, unsigned char* disk,const int M, const int N);
 
-__global__ void CreateDiskSummary(const int M, const int N, const int GM, const int GN, float2* disk_grid, int grid_lvl, int* gapsave, float2* disk_summary, float2* bhBorder, float max_r, int n_angles, int n_samples, int max_disk_segments);
+__global__ void CreateDiskSummary(const int GM, const int GN, float2* disk_grid, float3* disk_incident_grid, float2* disk_summary, float3* disk_incident_summary, float2* bhBorder, float max_r, int n_angles, int n_samples, int max_disk_segments);
