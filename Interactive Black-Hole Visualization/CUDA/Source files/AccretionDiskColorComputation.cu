@@ -8,11 +8,14 @@
 #include "../../C++/Header files/IntegrationDefines.h"
 #include "../../CUDA/Header files/ColorComputation.cuh"
 
+#include <stdio.h>
+
 #include "device_launch_parameters.h"
 
 
 #define MAX_R_NEW_DISK_SEGMENT 0.5
-#define MIN_R_CHANGE_SEGMENT 0.3
+#define MIN_R_CHANGE_SEGMENT 0.4
+#define MAX_DISTANCE_JUMP_SEGMENT 5
 
 /// <summary>
 /// Calculates the actual temperature of the disk at a given radius r in schwarschild radii and actual Mass M and accretion rate Ma.
@@ -339,14 +342,19 @@ __global__ void CreateDiskSummary(const int GM, const int GN, float2* disk_grid,
 
 	if (i < n_angles) {
 		//First zero the sections since it might retain some from previous frame.
-		for (int x = 0; x < max_disk_segments;x++) {
-			disk_summary[x + ((n_samples + max_disk_segments) * i)] = { 0,0 };
+		for (int x = 0; x < 2 * (1 + max_disk_segments) ;x++) {
+			disk_summary[x + ((n_samples + (2 * (1 + max_disk_segments))) * i)] = { 0,0 };
 		}
 		
 		float total_distance = 0;
 
 		int disk_found = -1;
 		bool between_disk = true;
+
+		bool switched_directly = false;
+		bool ray_length_jumped = false;
+		float last_ray_length_disk = -1;
+
 
 		float angle = PI2 / (1.f * n_angles) * 1.f * i;
 		float2 mov_dir = { -sinf(angle) , cosf(angle) };
@@ -357,35 +365,40 @@ __global__ void CreateDiskSummary(const int GM, const int GN, float2* disk_grid,
 
 		float2 gridB = disk_grid[gridpt.x * GM + gridpt.y];
 		float2 gridA = disk_grid[gridpt.x * GM + gridpt.y];
+		float ray_length_A = vector_ops::sq_norm(disk_incident_grid[gridpt.x * GM + gridpt.y]);
+		float ray_length_B = vector_ops::sq_norm(disk_incident_grid[gridpt.x * GM + gridpt.y]);
 
 		while (!(disk_found==max_disk_segments)) {
-
 
 			//If the next point is nan we exited the disk
 			if (gridB.x > 0 && isnan(gridA.x) && !between_disk) {
 
 				//Calculate distance and save it in the high distance spot for the disk
-				float dist = sqrtf(vector_ops::sq_norm(gridpt - bh_pt));
-				disk_summary[disk_found + ((n_samples+ 2*max_disk_segments) * i)].y = dist;
+				float dist = sqrtf(vector_ops::sq_norm(pt - bh_pt - mov_dir));
+				disk_summary[disk_found + ((n_samples+ 2* (1 + max_disk_segments)) * i)].y = dist;
 
 				//Now between disk
 				between_disk = true;
 
+				last_ray_length_disk = ray_length_B;
 				//Update total distance
-				total_distance += disk_summary[disk_found + ((n_samples + 2 * max_disk_segments) * i)].y - disk_summary[disk_found + ((n_samples + 2 * max_disk_segments) * i)].x;
+				total_distance += disk_summary[disk_found + ((n_samples + 2 * (1 + max_disk_segments)) * i)].y - disk_summary[disk_found + ((n_samples + 2 * (1 + max_disk_segments)) * i)].x;
 
 			}
 			//If we are inbetween disk and the next point is on disk we note the distance
 			//We also dont start a new segment if r is to close to the border. The disk is convcave and although small there is a chance it will clip the same segment twice messing up the ordering
 			//This only happens near the edges where r is very large
 			else if (between_disk && gridA.x > 0 && gridA.x < MAX_R_NEW_DISK_SEGMENT * max_r) {
-
 				//We found another part of the disk
 				disk_found++;
 
 				//Calculate distance and save it in the low distance spot for the disk
-				float dist = sqrtf(vector_ops::sq_norm(gridpt - bh_pt));
-				disk_summary[disk_found + ((n_samples + 2 * max_disk_segments) * i)].x = dist;
+				float dist = sqrtf(vector_ops::sq_norm(pt - bh_pt));
+				disk_summary[disk_found + ((n_samples + 2 * (1 + max_disk_segments)) * i)].x = dist;
+
+				if (ray_length_A / last_ray_length_disk > MAX_DISTANCE_JUMP_SEGMENT) {
+					ray_length_jumped = true;
+				}
 
 				//No longer between the disks
 				between_disk = false;
@@ -393,28 +406,32 @@ __global__ void CreateDiskSummary(const int GM, const int GN, float2* disk_grid,
 
 			}
 			//If we are on the disk but the change in r is too large we probably changed surface.
-			else if (gridA.x > 0 && gridB.x > 0 && (gridA.y - gridB.y) > (max_r * MIN_R_CHANGE_SEGMENT) && !between_disk) {
+			else if (gridA.x > 0 && gridB.x > 0 && ((ray_length_A / ray_length_B) < (1 / MAX_DISTANCE_JUMP_SEGMENT) || (ray_length_A / ray_length_B) > MAX_DISTANCE_JUMP_SEGMENT) && !between_disk) {
 				//Calculate distance and save it in the high distance spot for the disk
-				float dist = sqrtf(vector_ops::sq_norm(gridpt - bh_pt));
-				disk_summary[disk_found + ((n_samples + 2 * max_disk_segments) * i)].y = dist;
+				if (ray_length_A / ray_length_B > MAX_DISTANCE_JUMP_SEGMENT) {
+					ray_length_jumped = true;
+				}
+
+				float dist = sqrtf(vector_ops::sq_norm(pt - bh_pt - mov_dir));
+				disk_summary[disk_found + ((n_samples + 2 * (1 + max_disk_segments)) * i)].y = dist;
 
 				//Update total distance
-				total_distance += disk_summary[disk_found + ((n_samples + 2 * max_disk_segments) * i)].y - disk_summary[disk_found + ((n_samples + 2 * max_disk_segments) * i)].x;
+				total_distance += disk_summary[disk_found + ((n_samples + 2 * (1 + max_disk_segments)) * i)].y - disk_summary[disk_found + ((n_samples + 2 * (1 + max_disk_segments)) * i)].x;
 
 				//Update disk count
 				disk_found++;
 
 				//Calculate distance and save it in the low distance spot for the disk
-				disk_summary[disk_found + ((n_samples + 2 * max_disk_segments)* i)].x = dist;
+				disk_summary[disk_found + ((n_samples + 2 * (1 + max_disk_segments))* i)].x = dist;
 
 			}
 
-
-
 			//Walk over the grid while saving last step
 			gridB = gridA;
+			ray_length_B = ray_length_A;
 			pt = pt + mov_dir;
 			gridpt = { int(roundf(pt.x)), int(roundf(pt.y)) };
+			ray_length_A = vector_ops::sq_norm(disk_incident_grid[gridpt.x * GM + gridpt.y]);
 
 			//If either coord is oob break
 			if (gridpt.x > GN|| gridpt.x < 0 || gridpt.y > GM || gridpt.y < 0) {
@@ -434,31 +451,37 @@ __global__ void CreateDiskSummary(const int GM, const int GN, float2* disk_grid,
 		float2 temp;
 		for (int y = 0; y <= half; y++) {
 			//Swap inner and outer segments
-			temp = disk_summary[y + ((n_samples + 2 * max_disk_segments) * i)];
-			disk_summary[y + ((n_samples + 2 * max_disk_segments) * i)] = disk_summary[(disk_found - y) + ((n_samples + 2 * max_disk_segments) * i)];
- 			disk_summary[(disk_found - y) + ((n_samples + 2 * max_disk_segments) * i)] = temp;
+			temp = disk_summary[y + ((n_samples + 2 * (1 + max_disk_segments)) * i)];
+			disk_summary[y + ((n_samples + 2 * (1 + max_disk_segments)) * i)] = disk_summary[(disk_found - y) + ((n_samples + 2 * (1 + max_disk_segments)) * i)];
+ 			disk_summary[(disk_found - y) + ((n_samples + 2 * (1 + max_disk_segments)) * i)] = temp;
 
 		}
 
 		
 
 		//We also need to set the 0 values if the disk segement was not found to the minimum of the lower disk segment such that the interpolation does not go into the black hole but into the other disk segment
-		float2 value = { disk_summary[disk_found + ((n_samples + 2 * max_disk_segments) * i)].x, disk_summary[disk_found + ((n_samples + 2 * max_disk_segments) * i)].x };
+		float2 value = { disk_summary[disk_found + ((n_samples + 2 * (1 + max_disk_segments)) * i)].x, disk_summary[disk_found + ((n_samples + 2 * (1 + max_disk_segments)) * i)].x };
 		for (int y = disk_found + 1; y < max_disk_segments; y++) {
-			disk_summary[y + ((n_samples + 2 * max_disk_segments) * i)] = value;
+			disk_summary[y + ((n_samples + 2 * (1 + max_disk_segments)) * i)] = value;
 		}
 
 		//Now we need to sample each disk section based on the size;
 		int current_sample_count = 0;
-		
-	
-		
+
+
 		
 		for (int y = 0; y <= disk_found;y++) {
+			
+
 			//Find the number of samples for this segment
-			float2 disk_edges = disk_summary[y + ((n_samples + 2 * max_disk_segments) * i)];
+			float2 disk_edges = disk_summary[y + ((n_samples + 2 * (1 + max_disk_segments)) * i)];
 			float size_fraction = (disk_edges.y - disk_edges.x) / total_distance;
+			
+			size_fraction = fminf(1, size_fraction);
+
 			int n_segment_samples = size_fraction * n_samples;
+			
+		
 
 			//Intialize the grid_point and how much to move for each sanple
 			float2 grid_pt = bh_pt + disk_edges.x * mov_dir;
@@ -467,16 +490,18 @@ __global__ void CreateDiskSummary(const int GM, const int GN, float2* disk_grid,
 			int2 int_grid_pt = { (int)grid_pt.x, (int)grid_pt.y };
 
 			//Save the starting index of these segments
-			disk_summary[max_disk_segments + y + ((n_samples + 2 * max_disk_segments) * i)].x = current_sample_count;
+			disk_summary[(1 + max_disk_segments) + y + ((n_samples + 2 * (1 + max_disk_segments)) * i)].x = current_sample_count;
 					
 			for (int z = 0; z < n_segment_samples; z++){
 				int_grid_pt = { (int)grid_pt.x, (int)grid_pt.y };
 
 				//Find the of the sample by interpolating the disk to the requested theta-phi values
-				disk_summary[2 * max_disk_segments + current_sample_count + ((n_samples + 2 * max_disk_segments) * i)] =
+				
+				disk_summary[2 * (1 + max_disk_segments) + current_sample_count + ((n_samples + 2 * (1 + max_disk_segments)) * i)] =
 					interpolateGridCoord<float2, true>(GM, GN, disk_grid, grid_pt);
-
+					
 				//Find the incident angle as well
+				
 				disk_incident_summary[current_sample_count + (n_samples * i)] = 
 					interpolateGridCoord<float3, false>(GM, GN, disk_incident_grid, grid_pt);
 
@@ -486,12 +511,23 @@ __global__ void CreateDiskSummary(const int GM, const int GN, float2* disk_grid,
 			}
 
 			//Save the last index of these segments
-			disk_summary[max_disk_segments + y + ((n_samples + 2 * max_disk_segments) * i)].y = current_sample_count - 1;
+			disk_summary[(1 + max_disk_segments) + y + ((n_samples + 2 * (1 + max_disk_segments)) * i)].y = current_sample_count - 1;
 
 		}
+
+		if (!(ray_length_jumped)) {
+			for (int x = 0; x < max_disk_segments; x++) {
+				disk_summary[(max_disk_segments - x) + ((n_samples + 2 * (1 + max_disk_segments)) * i)] = disk_summary[(max_disk_segments - x - 1) + ((n_samples + 2 * (1 + max_disk_segments)) * i)];
+				disk_summary[(max_disk_segments + 1) + (max_disk_segments - x) + ((n_samples + 2 * (1 + max_disk_segments)) * i)] = disk_summary[(max_disk_segments + 1) + (max_disk_segments - x - 1) + ((n_samples + 2 * (1 + max_disk_segments)) * i)];
+
+			}
+
+			float outer_edge_value = disk_summary[1 + ((n_samples + 2 * (1 + max_disk_segments)) * i)].y;
+			disk_summary[((n_samples + 2 * (1 + max_disk_segments)) * i)] = { outer_edge_value ,outer_edge_value };
+		}
+
 	}
 }
-
 
 __global__ void makeDiskCheck(const float2* thphi, unsigned char* disk, const int M, const int N) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;

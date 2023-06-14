@@ -496,8 +496,15 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 		float2 disk_bottomLeft_out = disk_grid_vector[k_high * M + l_low];
 		float2 disk_bottomRight_out = disk_grid_vector[k_high * M + l_high];
 
+		float2 disk_topLeftLeft = disk_grid_vector[i * M + l_low];
+		float2 disk_bottomLeftLeft = disk_grid_vector[k * M + l_low];
+		float2 disk_topRightRight = disk_grid_vector[i * M + l_high];
+		float2 disk_bottomRightRight = disk_grid_vector[k * M + l_high];
+
+
 		//We only need to check for positive since we are not on the disk and values might be -2 and Nan / not on the disk returns false
-		if (disk_topLeft_out.x > 0 || disk_topRight_out.x > 0 || disk_bottomLeft_out.x > 0 || disk_bottomRight_out.x > 0) {
+		if (disk_topLeft_out.x > 0 || disk_topRight_out.x > 0 || disk_bottomLeft_out.x > 0 || disk_bottomRight_out.x > 0 ||
+			disk_topLeftLeft.x > 0 || disk_bottomLeftLeft.x > 0 || disk_topRightRight.x > 0 || disk_bottomRightRight.x > 0) {
 			return true;
 		}
 	}

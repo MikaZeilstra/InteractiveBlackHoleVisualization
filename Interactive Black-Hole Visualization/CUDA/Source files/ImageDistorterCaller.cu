@@ -340,8 +340,8 @@ void CUDA::memoryAllocationAndCopy(const Image& image, const CelestialSky& celes
 	allocate(dev_interpolatedDiskGrid, rastSize * sizeof(float4), "interpolatedGrid");
 	allocate(dev_interpolatedIncidentGrid, rastSize * sizeof(float3), "interpolatedGrid");
 
-	allocate(dev_disk_summary, 2 * param.n_disk_angles * (param.n_disk_sample + 2 *  param.max_disk_segments) * sizeof(float2), "grid_summary");
-	dev_disk_summary_2 = &dev_disk_summary[param.n_disk_angles * (param.n_disk_sample + 2 * param.max_disk_segments)];
+	allocate(dev_disk_summary, 2 * param.n_disk_angles * (param.n_disk_sample + 2 *  (1+param.max_disk_segments)) * sizeof(float2), "grid_summary");
+	dev_disk_summary_2 = &dev_disk_summary[param.n_disk_angles * (param.n_disk_sample + 2 * (1 + param.max_disk_segments))];
 
 	allocate(dev_disk_incident_summary, 2 * param.n_disk_angles * (param.n_disk_sample) * sizeof(float3), "grid_incident_summary");
 	dev_disk_incident_summary_2 = &dev_disk_incident_summary[param.n_disk_angles * (param.n_disk_sample)];
@@ -546,7 +546,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 	std::chrono::steady_clock::time_point frame_start_time;
 
 
-	while(q < 2 + startframe && !glfwWindowShouldClose(viewer->get_window())) {
+	while(q < param.nrOfFrames + startframe - 1 && !glfwWindowShouldClose(viewer->get_window())) {
  		frame_start_time = std::chrono::high_resolution_clock::now();
 
 
@@ -556,9 +556,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 		
 		
 		//Calculate phi offset due to camera movement
-		float camera_phi_offset = 0;
-		 
-		
+		float camera_phi_offset = 0;		
 
 		//Calculate the value of the grid we need for this frame
 		grid_value = q * (((float)param.gridNum -1) / (param.nrOfFrames-1));
@@ -961,6 +959,8 @@ void CUDA::requestGrid(double3 cam_pos, double3 cam_speed_dir, float speed, Blac
 
 	auto grid_time = std::chrono::high_resolution_clock::now();
 	
+	std::cout << "Grid requested : R = " << cam_pos.x << ", Theta =  " << cam_pos.y << ", phi = " << cam_pos.z << std::endl;
+
 	//make camera
 	Camera cam(cam_pos, cam_speed_dir, speed);
 

@@ -8,6 +8,8 @@
 
 #include <stdio.h>
 
+#define MIN_DISK_FRACTION_FOR_CONTRIBUTION 0.2
+
 /// <summary>
 /// Interpolated the vector while interpolating the length seperatly, the calculate area function is very sensitive to the vector length and thus needs to be taken extra care off,
 /// this is actually the exact oposite for when interpolating grid coordinates where we (obviously) not want to preserve length we can thus just use the CheckPi template parameter
@@ -111,12 +113,12 @@ __global__ void pixInterpolation(const float2* viewthing, const int M, const int
 
 __global__ void disk_pixInterpolation(const float2* viewthing, const int M, const int N, const bool should_interpolate_grids, float2* disk_thphi, float3* disk_incident, const float2* disk_grid, const float3* disk_incident_grid,
 	float2* disk_summary, float2* disk_summary_2, float3* disk_incident_summary, float3* disk_incident_summary_2, const int n_disk_angles, const int n_disk_sample, const int n_disk_segments, const int GM, const int GN, const float hor, const float ver, int* gapsave, int gridlvl,
-	const float2* bhBorder, const int angleNum, const float alpha) {
+	const float2* bhBorder, const int angleNum, float alpha) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 	if (i < N1 && j < M1) {
 		disk_thphi[i * M1 + j] = { nanf(""),0 };
-
+		
 		float theta = viewthing[i * M1 + j].x + ver;
 		float phi = fmodf(viewthing[i * M1 + j].y + hor + PI2, PI2);
 		if (should_interpolate_grids) {
@@ -139,14 +141,15 @@ __global__ void disk_pixInterpolation(const float2* viewthing, const int M, cons
 			float angle_alpha = ((angle / PI2) * n_disk_angles) - angleSlot;
 
 			//Find which band in the angleslot the disk falls in
-			for (int segment_slot = 0; segment_slot < n_disk_segments; segment_slot++) {
+			for (int segment_slot = 0; segment_slot < n_disk_segments + 1; segment_slot++) {
 				//Interpolate within each angle
-				float2 interp_edges_gr_1 = (1 - angle_alpha) * disk_summary[angleSlot * (n_disk_sample + 2 * n_disk_segments) + segment_slot] +
-					angle_alpha * disk_summary[angleSlot2 * (n_disk_sample + 2 * n_disk_segments) + segment_slot];
+
+				float2 interp_edges_gr_1 = (1 - angle_alpha) * disk_summary[angleSlot * (n_disk_sample + 2 * (1 + n_disk_segments)) + segment_slot] +
+					angle_alpha * disk_summary[angleSlot2 * (n_disk_sample + 2 * (1 + n_disk_segments)) + segment_slot];
 
 
-				float2 interp_edges_gr_2 = (1 - angle_alpha) * disk_summary_2[angleSlot * (n_disk_sample + 2 * n_disk_segments) + segment_slot] +
-					angle_alpha * disk_summary_2[angleSlot2 * (n_disk_sample + 2 * n_disk_segments) + segment_slot];
+				float2 interp_edges_gr_2 = (1 - angle_alpha) * disk_summary_2[angleSlot * (n_disk_sample + 2 * (1 + n_disk_segments)) + segment_slot] +
+					angle_alpha * disk_summary_2[angleSlot2 * (n_disk_sample + 2 * (1 + n_disk_segments)) + segment_slot];
 
 				//Interpolate between the grids
 				float2 interp_edges = (1 - alpha) * interp_edges_gr_1 + alpha * interp_edges_gr_2;
@@ -155,28 +158,37 @@ __global__ void disk_pixInterpolation(const float2* viewthing, const int M, cons
 					float segment_frac = (centerdist - interp_edges.x) / (interp_edges.y - interp_edges.x);
 
 					//Get index range for this segment on grid 1 and 2
-					float2 index_edges_G1_A1 = disk_summary[n_disk_segments + segment_slot + angleSlot * (n_disk_sample + 2 * n_disk_segments)];
-					float2 index_edges_G1_A2 = disk_summary[n_disk_segments + segment_slot + angleSlot2 * (n_disk_sample + 2 * n_disk_segments)];
+					float2 index_edges_G1_A1 = disk_summary[(1 + n_disk_segments) + segment_slot + angleSlot * (n_disk_sample + 2 * (1 + n_disk_segments))];
+					float2 index_edges_G1_A2 = disk_summary[(1 + n_disk_segments) + segment_slot + angleSlot2 * (n_disk_sample + 2 * (1 + n_disk_segments))];
 
-					float2 index_edges_G2_A1 = disk_summary_2[n_disk_segments + segment_slot + angleSlot * (n_disk_sample + 2 * n_disk_segments)];
-					float2 index_edges_G2_A2 = disk_summary_2[n_disk_segments + segment_slot + angleSlot2 * (n_disk_sample + 2 * n_disk_segments)];
+					float2 index_edges_G2_A1 = disk_summary_2[(1 + n_disk_segments) + segment_slot + angleSlot * (n_disk_sample + 2 * (1 + n_disk_segments))];
+					float2 index_edges_G2_A2 = disk_summary_2[(1 + n_disk_segments) + segment_slot + angleSlot2 * (n_disk_sample + 2 * (1 + n_disk_segments))];
 
+					//If either segment is zero on 1 grid we wont use its summary
+					if ((interp_edges_gr_1.y - interp_edges_gr_1.x) / (interp_edges_gr_2.y - interp_edges_gr_2.x) < MIN_DISK_FRACTION_FOR_CONTRIBUTION) {
+						alpha = 1;
+					}
+					else if ((interp_edges_gr_1.y - interp_edges_gr_1.x) / (interp_edges_gr_2.y - interp_edges_gr_2.x) > (1/ MIN_DISK_FRACTION_FOR_CONTRIBUTION)) {
+						alpha = 0;
+					}
 
 					//Calculate grid values
 					float2 grid_values[] = {
-						interpolate_summary<float2, true>(&disk_summary[2 * n_disk_segments + angleSlot * (n_disk_sample + 2 * n_disk_segments)],
-							&disk_summary[2 * n_disk_segments + angleSlot2 * (n_disk_sample + 2 * n_disk_segments)],
+						interpolate_summary<float2, true>(&disk_summary[2 * (1 + n_disk_segments) + angleSlot * (n_disk_sample + 2 * (1 + n_disk_segments))],
+							&disk_summary[2 * (1 + n_disk_segments) + angleSlot2 * (n_disk_sample + 2 * (1 + n_disk_segments))],
 							index_edges_G1_A1, index_edges_G1_A2, angle_alpha, segment_frac),
-						interpolate_summary<float2, true>(&disk_summary_2[2 * n_disk_segments + angleSlot * (n_disk_sample + 2 * n_disk_segments)],
-							&disk_summary_2[2 * n_disk_segments + angleSlot2 * (n_disk_sample + 2 * n_disk_segments)],
+						interpolate_summary<float2, true>(&disk_summary_2[2 * (1 + n_disk_segments) + angleSlot * (n_disk_sample + 2 * (1 + n_disk_segments))],
+							&disk_summary_2[2 * (1 + n_disk_segments) + angleSlot2 * (n_disk_sample + 2 * (1 + n_disk_segments))],
 							index_edges_G2_A1,index_edges_G2_A2, angle_alpha, segment_frac)
 					};
 
 					piCheckTot<float2, true>(grid_values, PI_CHECK_FACTOR, 2);
 
 					//Interpolate grids to get final value
-					disk_thphi[i * M1 + j] = (1 - alpha) * grid_values[0] + alpha * grid_values[1];
+					disk_thphi[i * M1 + j] = interpolate_vector_linearly<float2, true>(grid_values, alpha);
 					
+					
+
 					//Calulate the incident grid values
 					//Calculate grid values
 					float3 incident_grid_values[] = {
