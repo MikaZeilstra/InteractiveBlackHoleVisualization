@@ -35,9 +35,6 @@ __global__ void findArea(const float2* thphi, const float2* thphi_disk, const in
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 	int ind = i * M1 + j;
 	
-	float2 disk_vertices[4] = {thphi_disk[ind],thphi_disk[ind + 1],thphi_disk[ind + M1],thphi_disk[ind + M1 + 1]};
-
-
 	//Check if any pixel is on the accretion disk
 	if (i < N && j < M) {
 
@@ -76,6 +73,8 @@ __global__ void findArea(const float2* thphi, const float2* thphi_disk, const in
 			//		|__|_\
 			//		
 			//		(r-1)	1
+
+			float2 disk_vertices[4] = { thphi_disk[ind],thphi_disk[ind + 1],thphi_disk[ind + M1],thphi_disk[ind + M1 + 1] };
 
 			int accretion_vertices[4];
 			int celestial_vertices[3];

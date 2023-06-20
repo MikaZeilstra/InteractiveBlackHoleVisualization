@@ -393,6 +393,9 @@ namespace metric {
 				float factor = (thetaVar - PI1_2) / (thetaVar - varStart[theta_index]);
 				T r = (1 - factor) * rVar + factor * varStart[r_index];
 
+				//Store the r of the crossing in the phi coordinate for refinement, if it is a real hit it wil be overwritten, otherwise
+				disk_phi = r;
+
 				if (r > MIN_STABLE_ORBIT && r < BH_MAX_ACCRETION_RADIUS) {
 				
 					//Save location
@@ -417,11 +420,6 @@ namespace metric {
 
 					//Normalize incident light direction and scale it with the distance traversed for later use
 					disk_incident_r = (rsqrt(norm)  * z * lightdir);
-
-
-					//T orbit_speed = metric::calcSpeed<T>(r, PI1_2);
-					//disk_redshift = (1 + orbit_speed * cos_incident_angle) / sqrt(1 - sq(orbit_speed));					
-					//disk_distance = z;
 
 					disk_r = varStart[r_index];
 					disk_phi = varStart[phi_index];
@@ -516,7 +514,7 @@ namespace metric {
 		if (!isnan(varStart[theta_index])) {
 			wrapToPi(*bV, *qV);
 		}
-		if (!isnan(varStart[3])) {
+		if (!isnan(varStart[r_index])) {
 			wrapPhiToPi(*pThetaV);
 		}
 	}

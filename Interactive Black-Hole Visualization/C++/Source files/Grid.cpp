@@ -22,8 +22,8 @@
 #include "../../CUDA/Header files/Vector_operations.cuh"
 
 #define PRECCELEST 0.015
-#define DISK_PRECCELEST_RELAXATION 3
-#define ERROR 0.001//1e-6
+#define DISK_PRECCELEST_RELAXATION 1
+#define MIN_CHECK_ACCRETION_RADIUS 1.1
 
 #define MIN_GPU_INTEGRATION 50
 #define BLACK_HOLE_MAX_DIAGNAL 1e-10
@@ -435,13 +435,6 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 		return true;
 	}
 
-	//If the r coordinate on the disk is close enough to the max
-	/*
-	if (disk_topLeft.x > DISK_EDGE_REFINE_FRAC * param->accretionDiskMaxRadius || disk_topRight.x > DISK_EDGE_REFINE_FRAC * param->accretionDiskMaxRadius || disk_bottomLeft.x > DISK_EDGE_REFINE_FRAC * param->accretionDiskMaxRadius || disk_bottomRight.x > DISK_EDGE_REFINE_FRAC * param->accretionDiskMaxRadius) {
-		return true;
-	}
-	*/
-
 
 	//If all vertices are not either in the blackhole or out we need to refine
 	// Nan indicates 1 of the vertices was part of the black hole, meaning we want better resolution unless they were all BH.
@@ -478,33 +471,29 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 		// If phi change is too large refine
 		if (diag > PRECCELEST * DISK_PRECCELEST_RELAXATION || diag2 > PRECCELEST * DISK_PRECCELEST_RELAXATION) return true;
 
+		//Check maximum change in the R coordinate
+		float max_r_change = fmaxf(fabsf(disk_topLeft.x - disk_bottomLeft.x), fabsf(disk_topRight.x - disk_bottomLeft.x));
 
-		//if we are on the disk but a neighbour point is not refine
-		float2 disk_topLeft_out = disk_grid_vector[k_low * M + l_low];
-		float2 disk_topRight_out = disk_grid_vector[k_low * M + l_high];
-		float2 disk_bottomLeft_out = disk_grid_vector[k_high * M + l_low];
-		float2 disk_bottomRight_out = disk_grid_vector[k_high * M + l_high];
-
-		if (isnan(disk_topLeft_out.x) || isnan(disk_topRight_out.x) || isnan(disk_bottomLeft_out.x) || isnan(disk_bottomRight_out.x)) {
+		//If we are close enough to the edge refine
+		if (disk_topLeft.x + max_r_change > param->accretionDiskMaxRadius * (1/MIN_CHECK_ACCRETION_RADIUS) ||
+			disk_topRight.x + max_r_change > param->accretionDiskMaxRadius * (1 / MIN_CHECK_ACCRETION_RADIUS) ||
+			disk_bottomLeft.x + max_r_change > param->accretionDiskMaxRadius * (1 / MIN_CHECK_ACCRETION_RADIUS) ||
+			disk_bottomRight.x + max_r_change > param->accretionDiskMaxRadius * (1 / MIN_CHECK_ACCRETION_RADIUS)) {
+			
 			return true;
 		}
 	}
-	else {
-		//if we are not on the disk but a neighbour point is refine
-		float2 disk_topLeft_out = disk_grid_vector[k_low * M + l_low];
-		float2 disk_topRight_out = disk_grid_vector[k_low * M + l_high];
-		float2 disk_bottomLeft_out = disk_grid_vector[k_high * M + l_low];
-		float2 disk_bottomRight_out = disk_grid_vector[k_high * M + l_high];
+	//If not on disk we need to check if the disk could be within this block
+	else if(param->useAccretionDisk && !topLeftNan){
+		//Check maximum change in the R coordinate at theta = 0.5 pi, as stored in the phi coordinate if not on the disk
+		float max_r_change = fmaxf(fabsf(disk_topLeft.y - disk_bottomLeft.y), fabsf(disk_topRight.y - disk_bottomLeft.y));
 
-		float2 disk_topLeftLeft = disk_grid_vector[i * M + l_low];
-		float2 disk_bottomLeftLeft = disk_grid_vector[k * M + l_low];
-		float2 disk_topRightRight = disk_grid_vector[i * M + l_high];
-		float2 disk_bottomRightRight = disk_grid_vector[k * M + l_high];
-
-
-		//We only need to check for positive since we are not on the disk and values might be -2 and Nan / not on the disk returns false
-		if (disk_topLeft_out.x > 0 || disk_topRight_out.x > 0 || disk_bottomLeft_out.x > 0 || disk_bottomRight_out.x > 0 ||
-			disk_topLeftLeft.x > 0 || disk_bottomLeftLeft.x > 0 || disk_topRightRight.x > 0 || disk_bottomRightRight.x > 0) {
+		//If any corner is within this change of the disk + some slack refine.
+		if (disk_topLeft.y - max_r_change < param->accretionDiskMaxRadius * MIN_CHECK_ACCRETION_RADIUS ||
+			disk_topRight.y - max_r_change < param->accretionDiskMaxRadius * MIN_CHECK_ACCRETION_RADIUS ||
+			disk_bottomLeft.y - max_r_change < param->accretionDiskMaxRadius * MIN_CHECK_ACCRETION_RADIUS ||
+			disk_bottomRight.y - max_r_change < param->accretionDiskMaxRadius * MIN_CHECK_ACCRETION_RADIUS ) {
+			
 			return true;
 		}
 	}

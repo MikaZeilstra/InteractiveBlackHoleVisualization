@@ -337,15 +337,20 @@ void CUDA::memoryAllocationAndCopy(const Image& image, const CelestialSky& celes
 	dev_incident_grid_2 = &dev_incident_grid[gridsize];
 
 	allocate(dev_interpolatedGrid, rastSize * sizeof(float2), "interpolatedGrid");
-	allocate(dev_interpolatedDiskGrid, rastSize * sizeof(float4), "interpolatedGrid");
-	allocate(dev_interpolatedIncidentGrid, rastSize * sizeof(float3), "interpolatedGrid");
+	
+	if (param.useAccretionDisk) {
+		allocate(dev_interpolatedDiskGrid, rastSize * sizeof(float4), "interpolatedGrid");
+		allocate(dev_interpolatedIncidentGrid, rastSize * sizeof(float3), "interpolatedGrid");
 
-	allocate(dev_disk_summary, 2 * param.n_disk_angles * (param.n_disk_sample + 2 *  (1+param.max_disk_segments)) * sizeof(float2), "grid_summary");
-	dev_disk_summary_2 = &dev_disk_summary[param.n_disk_angles * (param.n_disk_sample + 2 * (1 + param.max_disk_segments))];
+		allocate(dev_disk_summary, 2 * param.n_disk_angles * (param.n_disk_sample + 2 * (1 + param.max_disk_segments)) * sizeof(float2), "grid_summary");
+		dev_disk_summary_2 = &dev_disk_summary[param.n_disk_angles * (param.n_disk_sample + 2 * (1 + param.max_disk_segments))];
 
-	allocate(dev_disk_incident_summary, 2 * param.n_disk_angles * (param.n_disk_sample) * sizeof(float3), "grid_incident_summary");
-	dev_disk_incident_summary_2 = &dev_disk_incident_summary[param.n_disk_angles * (param.n_disk_sample)];
+		allocate(dev_disk_incident_summary, 2 * param.n_disk_angles * (param.n_disk_sample) * sizeof(float3), "grid_incident_summary");
+		dev_disk_incident_summary_2 = &dev_disk_incident_summary[param.n_disk_angles * (param.n_disk_sample)];
 
+		allocate(temperatureLUT_device, param.accretionTemperatureLUTSize * sizeof(double), "temperature table");
+		allocate(dev_accretionDiskTexture, accretionTexture.width * accretionTexture.height * sizeof(float4), "AccretionTexture");
+	}
 
 	allocate(dev_gridGap, rastSize * sizeof(int), "gridGap");
 
@@ -380,8 +385,7 @@ void CUDA::memoryAllocationAndCopy(const Image& image, const CelestialSky& celes
 	allocate(dev_outputImage, image.N * image.M * sizeof(uchar4),"output")
 
 
-	allocate(temperatureLUT_device, param.accretionTemperatureLUTSize * sizeof(double),"temperature table");
-	allocate(dev_accretionDiskTexture, accretionTexture.width * accretionTexture.height * sizeof(float4), "AccretionTexture");
+	
 
 	std::cout << "Copying variables into CUDA memory..." << std::endl;
 	copyHostToDeviceAsync(dev_viewer, image.viewer, rastSize * sizeof(float2), "viewer");
@@ -586,19 +590,19 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 			//Request the new next grid
 			requestGrid(
 				{
-					param.getRadius(grid_nr +1 ),
+					param.getRadius(grid_nr + 1),
 					param.getInclination(grid_nr + 1),
 					0
-								},
+				},
 				{
 					param.br,
 					param.btheta,
 					param.bphi
 				},
-				metric::calcSpeed(param.getRadius(grid_nr + 1), param.getInclination(grid_nr + 1)), bh, & param, dev_cameras_2, dev_grid_2, dev_disk_grid_2, dev_incident_grid_2
+				metric::calcSpeed(param.getRadius(grid_nr + 1), param.getInclination(grid_nr + 1)), bh, &param, dev_cameras_2, dev_grid_2, dev_disk_grid_2, dev_incident_grid_2
 			);
 
-			
+
 			callKernelAsync("Find black-hole shadow center", findBhCenter, numBlocks_GN_GM_5_25, threadsPerBlock5_25, 0,
 				param.grid_M, param.grid_N, dev_grid, dev_grid_2, dev_blackHoleBorder0);
 
@@ -615,9 +619,12 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 			callKernelAsync("Smoothed shadow border 4/4", smoothBorder, numBlocks_bordersize, threadsPerBlock_32, 0,
 				dev_blackHoleBorder1, dev_blackHoleBorder0, bhproc.angleNum);
 
-			callKernelAsync("disk_edges", CreateDiskSummary, numBlocks_disk_edges, threadsPerBlock_32, 0, param.grid_M, param.grid_N, dev_disk_grid, dev_incident_grid, dev_disk_summary, dev_disk_incident_summary, dev_blackHoleBorder0, param.accretionDiskMaxRadius, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments);
-			callKernelAsync("disk_edges", CreateDiskSummary, numBlocks_disk_edges, threadsPerBlock_32, 0,  param.grid_M, param.grid_N, dev_disk_grid_2, dev_incident_grid_2, dev_disk_summary_2, dev_disk_incident_summary_2,  dev_blackHoleBorder0, param.accretionDiskMaxRadius, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments);
+			if (param.useAccretionDisk) {
+				callKernelAsync("disk_edges", CreateDiskSummary, numBlocks_disk_edges, threadsPerBlock_32, 0, param.grid_M, param.grid_N, dev_disk_grid, dev_incident_grid, dev_disk_summary, dev_disk_incident_summary, dev_blackHoleBorder0, param.accretionDiskMaxRadius, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments);
+				callKernelAsync("disk_edges", CreateDiskSummary, numBlocks_disk_edges, threadsPerBlock_32, 0, param.grid_M, param.grid_N, dev_disk_grid_2, dev_incident_grid_2, dev_disk_summary_2, dev_disk_incident_summary_2, dev_blackHoleBorder0, param.accretionDiskMaxRadius, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments);
 
+
+			}
 		}
 
 			
@@ -629,24 +636,21 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 			dev_viewer, image.M, image.N, should_interpolate_grids, dev_interpolatedGrid, dev_grid, dev_grid_2, param.grid_M, param.grid_N,
 			hor, ver, dev_gridGap, param.gridMaxLevel, dev_blackHoleBorder0, bhproc.angleNum, alpha);
 
+		if (param.useAccretionDisk) {
+			callKernelAsync("Interpolated disk grid", disk_pixInterpolation, numBlocks_N1_M1_5_25, threadsPerBlock5_25, 0,
+				dev_viewer, image.M, image.N, should_interpolate_grids, dev_interpolatedDiskGrid, dev_interpolatedIncidentGrid, dev_disk_grid, dev_incident_grid,
+				dev_disk_summary, dev_disk_summary_2, dev_disk_incident_summary, dev_disk_incident_summary_2, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments,
+				param.grid_M, param.grid_N,
+				hor, ver, dev_gridGap, param.gridMaxLevel, dev_blackHoleBorder0, bhproc.angleNum, alpha);
 
-		callKernelAsync("Interpolated disk grid", disk_pixInterpolation, numBlocks_N1_M1_5_25, threadsPerBlock5_25, 0,
-			dev_viewer, image.M, image.N, should_interpolate_grids, dev_interpolatedDiskGrid, dev_interpolatedIncidentGrid, dev_disk_grid,  dev_incident_grid,
-			dev_disk_summary, dev_disk_summary_2,dev_disk_incident_summary,dev_disk_incident_summary_2, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments,
-			param.grid_M, param.grid_N,
-			hor, ver, dev_gridGap, param.gridMaxLevel, dev_blackHoleBorder0, bhproc.angleNum, alpha);
-
+			callKernelAsync("Constructed disk mask", makeDiskCheck, numBlocks_N_M_5_25, threadsPerBlock5_25, 0,
+				dev_interpolatedDiskGrid, dev_diskMask, image.M, image.N);
+		}
 		
 
 		callKernelAsync("Constructed black-hole shadow mask", findBlackPixels, numBlocks_N_M_5_25, threadsPerBlock5_25, 0,
 			dev_interpolatedGrid, image.M, image.N, dev_blackHoleMask);
 
-
-		callKernelAsync("Constructed disk mask", makeDiskCheck, numBlocks_N_M_5_25, threadsPerBlock5_25, 0,
-			dev_interpolatedDiskGrid, dev_diskMask, image.M, image.N);
-
-
-		
 		callKernelAsync("Calculated solid angles", findArea, numBlocks_N_M_5_25, threadsPerBlock5_25, 0,
 			dev_interpolatedGrid,dev_interpolatedDiskGrid, image.M, image.N, dev_solidAngles0,param.accretionDiskMaxRadius, dev_diskMask, dev_interpolatedIncidentGrid);
 		
@@ -972,37 +976,6 @@ void CUDA::requestGrid(double3 cam_pos, double3 cam_speed_dir, float speed, Blac
 	//generate grid
 	Grid grid(&cam, bh, param);
 
-	//if in debug mode print grid output
-	
-
-	std::vector<float4> disk_grid_image(grid.disk_grid_vector.size());
-	for (int i = 0; i < grid.disk_grid_vector.size(); i++) {
-		if (grid.disk_grid_vector[i].x > -2.0 || isnan(grid.disk_grid_vector[i].x)) {
-			if (!isnan(grid.disk_grid_vector[i].x)) {
-				disk_grid_image[i].x = grid.disk_grid_vector[i].x / 40;
-				disk_grid_image[i].y = (grid.disk_grid_vector[i].y / PI2);
-				disk_grid_image[i].w = 1;
-			}
-			else {
-				disk_grid_image[i].x = 0;
-				disk_grid_image[i].y = 0;
-				disk_grid_image[i].z = 1;
-				disk_grid_image[i].w = 1;
-			}
-
-		}
-		else {
-
-			disk_grid_image[i] = { 0,0,0,1 };
-		}
-	}
-
-
-
-	cv::Mat disk_gridmat = cv::Mat((param->grid_N), (param->grid_M), CV_32FC4, (void*)disk_grid_image.data());
-	cv::Mat disk_gridUchar;
-	disk_gridmat.convertTo(disk_gridUchar, CV_8UC4, 255.0);
-	cv::imwrite(param->getGridResultFileName(1, 1, "_grid_disk_tmp"), disk_gridUchar);
 
 	//Save grid
 	copyHostToDeviceAsync(dev_grid, grid.grid_vector.data(), grid.grid_vector.size() * sizeof(float2), "Requested grid");
