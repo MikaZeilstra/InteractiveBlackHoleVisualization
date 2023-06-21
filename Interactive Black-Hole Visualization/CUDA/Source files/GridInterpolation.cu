@@ -69,9 +69,18 @@ __global__ void pixInterpolation(const float2* viewthing, const int M, const int
 				float angle = atan2(center.x - theta, phi - center.y);
 				angle = fmodf(angle + PI2, PI2);
 				int angleSlot = angle / PI2 * angleNum;
+				int angleSlot2 = (angleSlot + 1) % angleNum;
 
-				float2 bhBorderNew = { (1.f - alpha) * bhBorder[2 * angleSlot + 2].x + alpha * bhBorder[2 * angleSlot + 3].x,
+				float angle_alpha = ((angle / PI2) * angleNum) - angleSlot;
+
+				float2 bhBorderNew_a1 = { (1.f - alpha) * bhBorder[2 * angleSlot + 2].x + alpha * bhBorder[2 * angleSlot + 3].x,
 									   (1.f - alpha) * bhBorder[2 * angleSlot + 2].y + alpha * bhBorder[2 * angleSlot + 3].y };
+
+				float2 bhBorderNew_a2 = { (1.f - alpha) * bhBorder[2 * angleSlot + 2].x + alpha * bhBorder[2 * angleSlot + 3].x,
+									   (1.f - alpha) * bhBorder[2 * angleSlot + 2].y + alpha * bhBorder[2 * angleSlot + 3].y };
+
+
+				float2 bhBorderNew = (1 - angle_alpha) * bhBorderNew_a1 + (angle_alpha)*bhBorderNew_a2;
 
 				if (centerdist <= (bhBorderNew.x - center.x) * (bhBorderNew.x - center.x) + (bhBorderNew.y - center.y) * (bhBorderNew.y - center.y)) {
 					thphi[i * M1 + j] = { nanf(""), nanf("")};

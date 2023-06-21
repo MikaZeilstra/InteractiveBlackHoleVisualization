@@ -53,7 +53,7 @@ __global__ void findBhBorders(const int GM, const int GN, const float2* grid,con
 			pt.y += phiChange;
 			gridpt = { int(pt.x), int(pt.y) };
 
-			gridA = (i % 2) * grid[gridpt.x * GM + gridpt.y] + (1-(i%2)) * grid_2[gridpt.x * GM + gridpt.y];
+			gridA = (1 - (i % 2)) * grid[gridpt.x * GM + gridpt.y] + (i % 2) * grid_2[gridpt.x * GM + gridpt.y];
 
 			
 		}

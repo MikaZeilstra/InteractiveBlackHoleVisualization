@@ -602,9 +602,14 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 				metric::calcSpeed(param.getRadius(grid_nr + 1), param.getInclination(grid_nr + 1)), bh, &param, dev_cameras_2, dev_grid_2, dev_disk_grid_2, dev_incident_grid_2
 			);
 
-
-			callKernelAsync("Find black-hole shadow center", findBhCenter, numBlocks_GN_GM_5_25, threadsPerBlock5_25, 0,
-				param.grid_M, param.grid_N, dev_grid, dev_grid_2, dev_blackHoleBorder0);
+			if (q == 0) {
+				callKernelAsync("Find black-hole shadow center", findBhCenter, numBlocks_GN_GM_5_25, threadsPerBlock5_25, 0,
+					param.grid_M, param.grid_N, dev_grid, dev_grid_2, dev_blackHoleBorder0);
+				if (param.useAccretionDisk) {
+					callKernelAsync("disk_edges", CreateDiskSummary, numBlocks_disk_edges, threadsPerBlock_32, 0, param.grid_M, param.grid_N, dev_disk_grid, dev_incident_grid, dev_disk_summary, dev_disk_incident_summary, dev_blackHoleBorder0, param.accretionDiskMaxRadius, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments);
+				}
+			}
+			
 
 
 			callKernelAsync("Find black-hole shadow border", findBhBorders, numBlocks_bordersize, threadsPerBlock_32, 0,
@@ -620,10 +625,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 				dev_blackHoleBorder1, dev_blackHoleBorder0, bhproc.angleNum);
 
 			if (param.useAccretionDisk) {
-				callKernelAsync("disk_edges", CreateDiskSummary, numBlocks_disk_edges, threadsPerBlock_32, 0, param.grid_M, param.grid_N, dev_disk_grid, dev_incident_grid, dev_disk_summary, dev_disk_incident_summary, dev_blackHoleBorder0, param.accretionDiskMaxRadius, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments);
 				callKernelAsync("disk_edges", CreateDiskSummary, numBlocks_disk_edges, threadsPerBlock_32, 0, param.grid_M, param.grid_N, dev_disk_grid_2, dev_incident_grid_2, dev_disk_summary_2, dev_disk_incident_summary_2, dev_blackHoleBorder0, param.accretionDiskMaxRadius, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments);
-
-
 			}
 		}
 

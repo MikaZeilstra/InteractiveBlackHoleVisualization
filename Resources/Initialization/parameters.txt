@@ -15,13 +15,13 @@ offsetX = 0 // *PI
 offsetY = 0 // *PI
 
 //Frame settings
-nrOfFrames = 3
-nrOfGrids = 2
-n_black_hole_angles = 500;
+nrOfFrames = 250
+nrOfGrids = 4
+n_black_hole_angles = 50;
 
 //Effect settings
 useRedshift = true
-useLensing = false
+useLensing = true
 useStars = false
 
 //AccretionDisk
@@ -31,7 +31,7 @@ temperatureLUTSize = 500
 blackholeMass = 3.5e9 //Mass of the black hole in solar masses
 blackholeAccretionRate = 0.1 //The accretion rate of the black hole in solar masses per year
 
-useAccretionDiskTexture = true
+useAccretionDiskTexture = false
 accretionDiskTexture = "rainbow_alpha_transp.png"
 
 //AcretionDiskInterpolation
@@ -88,6 +88,6 @@ camRadiusFrom = 50.
 camRadiusTo = 60.
 
 camInclinationChange = true
-camInclinationFrom = 0.48 //*PI
-camInclinationTo = 0.49 //*PI
+camInclinationFrom = 0.40 //*PI
+camInclinationTo = 0.45 //*PI
 
