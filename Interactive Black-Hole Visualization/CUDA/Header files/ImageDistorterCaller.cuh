@@ -185,19 +185,6 @@ namespace CUDA {
 
 	};
 
-	struct BlackHoleProc {
-		BlackHoleProc(int anglenum) {
-			angleNum = anglenum;
-			bh = std::vector<float2>((angleNum + 1) * 2);
-			bh[0] = { 100, 0 };
-			bh[1] = { 100, 0 };
-			bhBorder = (float2*)&(bh[0]);
-		}
-		int angleNum;
-		float2* bhBorder;
-		std::vector<float2> bh;
-	};
-
 	cudaError_t cleanup();
 
 	//void setDeviceVariables(const Grids& grids, const Image& image, const CelestialSky& celestialSky, const Stars& stars);
@@ -215,15 +202,17 @@ namespace CUDA {
 
 
 	void memoryAllocationAndCopy(const Image& image, const CelestialSky& celestialSky,
-		const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis,const Texture accretionTexture, const Parameters& param);
+		const Stars& stars, const StarVis& starvis,const Texture accretionTexture, const Parameters& param);
 
 	void runKernels(BlackHole* bh, const Image& image, const CelestialSky& celestialSky,
-		const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis, const Texture& accretionDiskTexture, Parameters& param);
+		const Stars& stars, const StarVis& starvis, const Texture& accretionDiskTexture, Parameters& param);
 
 	template <class T> void integrateGrid(const T rV, const T thetaV, const T phiV, std::vector <T>& pRV,
 		std::vector <T>& bV, std::vector <T>& qV, std::vector <T>& pThetaV, float3* disk_incident);
 	template void integrateGrid<double>(const double rV, const double thetaV, const double phiV, std::vector <double>& pRV,
 		std::vector <double>& bV, std::vector <double>& qV, std::vector <double>& pThetaV, float3* disk_incident);
+	template void integrateGrid<float>(const float rV, const float thetaV, const float phiV, std::vector <float>& pRV,
+		std::vector <float>& bV, std::vector <float>& qV, std::vector <float>& pThetaV, float3* disk_incident);
 
 	ViewCamera* glfw_setup(int screen_width, int screen_height);
 

@@ -155,8 +155,6 @@ double* qs_device;
 double* pThetas_device;
 float3* disk_incident_device;
 
-
-
 double* temperatureLUT_device;
 float4* dev_accretionDiskTexture = 0;
 
@@ -260,10 +258,9 @@ void CUDA::call(BlackHole* bh, StarProcessor& stars_, Viewer& view, CelestialSky
 	Stars stars(stars_);
 	Image image(view);
 	StarVis starvis(stars, image, param);
-	BlackHoleProc bhproc(param.n_black_hole_angles);
 
-	memoryAllocationAndCopy( image, celestSky, stars, bhproc, starvis, accretionTexture,param);
-	runKernels(bh, image, celestSky, stars, bhproc, starvis, accretionTexture, param);
+	memoryAllocationAndCopy( image, celestSky, stars,  starvis, accretionTexture,param);
+	runKernels(bh, image, celestSky, stars,  starvis, accretionTexture, param);
 }
 
 void CUDA::allocateGridMemory(size_t size) {
@@ -305,7 +302,7 @@ template <class T> void CUDA::integrateGrid(const T rV, const T thetaV, const T 
 
 
 void CUDA::memoryAllocationAndCopy(const Image& image, const CelestialSky& celestialSky,
-	const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis,const Texture accretionTexture, const Parameters& param) {
+	const Stars& stars, const StarVis& starvis,const Texture accretionTexture, const Parameters& param) {
 
 	std::cout << "Allocating CUDA memory..." << std::endl;
 
@@ -338,8 +335,10 @@ void CUDA::memoryAllocationAndCopy(const Image& image, const CelestialSky& celes
 
 	allocate(dev_interpolatedGrid, rastSize * sizeof(float2), "interpolatedGrid");
 	
+	allocate(dev_interpolatedDiskGrid, rastSize * sizeof(float4), "interpolatedGrid");
+
+
 	if (param.useAccretionDisk) {
-		allocate(dev_interpolatedDiskGrid, rastSize * sizeof(float4), "interpolatedGrid");
 		allocate(dev_interpolatedIncidentGrid, rastSize * sizeof(float3), "interpolatedGrid");
 
 		allocate(dev_disk_summary, 2 * param.n_disk_angles * (param.n_disk_sample + 2 * (1 + param.max_disk_segments)) * sizeof(float2), "grid_summary");
@@ -359,8 +358,8 @@ void CUDA::memoryAllocationAndCopy(const Image& image, const CelestialSky& celes
 
 	allocate(dev_blackHoleMask, imageSize * sizeof(unsigned char), "blackHoleMask");
 	allocate(dev_diskMask, imageSize * sizeof(unsigned char), "blackHoleMask");
-	allocate(dev_blackHoleBorder0, (bhproc.angleNum + 1) * 2 * sizeof(float2), "blackHoleBorder0");
-	allocate(dev_blackHoleBorder1, (bhproc.angleNum + 1) * 2 * sizeof(float2), "BlackHOleBorder1");
+	allocate(dev_blackHoleBorder0, ((param.n_black_hole_angles * 2) +1)* sizeof(float2), "blackHoleBorder0");
+	allocate(dev_blackHoleBorder1, ((param.n_black_hole_angles * 2) +1) * sizeof(float2), "BlackHOleBorder1");
 
 	allocate(dev_solidAngles0, imageSize * sizeof(float), "solidAngles0");
 	allocate(dev_solidAngles1, imageSize * sizeof(float), "solidAngles1");
@@ -390,7 +389,7 @@ void CUDA::memoryAllocationAndCopy(const Image& image, const CelestialSky& celes
 	std::cout << "Copying variables into CUDA memory..." << std::endl;
 	copyHostToDeviceAsync(dev_viewer, image.viewer, rastSize * sizeof(float2), "viewer");
 
-	copyHostToDeviceAsync(dev_blackHoleBorder0, bhproc.bhBorder, (bhproc.angleNum + 1) * 2 * sizeof(float2), "blackHoleBorder0");
+	copyHostToDeviceAsync(dev_blackHoleBorder0, &param.bh_center, sizeof(float2), "blackHoleBorder0");
 
 	copyHostToDeviceAsync(dev_starTree, stars.tree, treeSize * sizeof(int), "starTree");
 	copyHostToDeviceAsync(dev_starPositions, stars.stars, stars.starSize * 2 * sizeof(float), "starPositions");
@@ -415,14 +414,14 @@ float ver = 0.0f;
 //bool lensingOn = true;
 
 void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& celestialSky,
-	const Stars& stars, const BlackHoleProc& bhproc, const StarVis& starvis, const Texture& accretionDiskTexture, Parameters& param) {
+	const Stars& stars, const StarVis& starvis, const Texture& accretionDiskTexture, Parameters& param) {
 	bool star = param.useStars;
 
 	
 
 	int threadsPerBlock_32 = 32;
 	int numBlocks_starsize = stars.starSize / threadsPerBlock_32 + 1;
-	int numBlocks_bordersize = (bhproc.angleNum * 2) / threadsPerBlock_32 + 1;
+	int numBlocks_bordersize = (param.n_black_hole_angles * 2) / threadsPerBlock_32 + 1;
 	int numBlocks_tempLUT = param.accretionTemperatureLUTSize / threadsPerBlock_32 + 1;
 	int numBlocks_disk_edges = (param.n_disk_angles) / threadsPerBlock_32 + 1;
 
@@ -603,8 +602,6 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 			);
 
 			if (q == 0) {
-				callKernelAsync("Find black-hole shadow center", findBhCenter, numBlocks_GN_GM_5_25, threadsPerBlock5_25, 0,
-					param.grid_M, param.grid_N, dev_grid, dev_grid_2, dev_blackHoleBorder0);
 				if (param.useAccretionDisk) {
 					callKernelAsync("disk_edges", CreateDiskSummary, numBlocks_disk_edges, threadsPerBlock_32, 0, param.grid_M, param.grid_N, dev_disk_grid, dev_incident_grid, dev_disk_summary, dev_disk_incident_summary, dev_blackHoleBorder0, param.accretionDiskMaxRadius, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments);
 				}
@@ -613,16 +610,16 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 
 
 			callKernelAsync("Find black-hole shadow border", findBhBorders, numBlocks_bordersize, threadsPerBlock_32, 0,
-				param.grid_M, param.grid_N, dev_grid, dev_grid_2, bhproc.angleNum, dev_blackHoleBorder0);
+				param.grid_M, param.grid_N, dev_grid, dev_grid_2, param.n_black_hole_angles, dev_blackHoleBorder0);
 
 			callKernelAsync("Smoothed shadow border 1/4", smoothBorder, numBlocks_bordersize, threadsPerBlock_32, 0,
-				dev_blackHoleBorder0, dev_blackHoleBorder1, bhproc.angleNum);
+				dev_blackHoleBorder0, dev_blackHoleBorder1, param.n_black_hole_angles);
 			callKernelAsync("Smoothed shadow border 2/4", smoothBorder, numBlocks_bordersize, threadsPerBlock_32, 0,
-				dev_blackHoleBorder1, dev_blackHoleBorder0, bhproc.angleNum);
+				dev_blackHoleBorder1, dev_blackHoleBorder0, param.n_black_hole_angles);
 			callKernelAsync("Smoothed shadow border 3/4", smoothBorder, numBlocks_bordersize, threadsPerBlock_32, 0,
-				dev_blackHoleBorder0, dev_blackHoleBorder1, bhproc.angleNum);
+				dev_blackHoleBorder0, dev_blackHoleBorder1, param.n_black_hole_angles);
 			callKernelAsync("Smoothed shadow border 4/4", smoothBorder, numBlocks_bordersize, threadsPerBlock_32, 0,
-				dev_blackHoleBorder1, dev_blackHoleBorder0, bhproc.angleNum);
+				dev_blackHoleBorder1, dev_blackHoleBorder0, param.n_black_hole_angles);
 
 			if (param.useAccretionDisk) {
 				callKernelAsync("disk_edges", CreateDiskSummary, numBlocks_disk_edges, threadsPerBlock_32, 0, param.grid_M, param.grid_N, dev_disk_grid_2, dev_incident_grid_2, dev_disk_summary_2, dev_disk_incident_summary_2, dev_blackHoleBorder0, param.accretionDiskMaxRadius, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments);
@@ -636,14 +633,14 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 
 		callKernelAsync("Interpolated grid", pixInterpolation,numBlocks_N1_M1_5_25, threadsPerBlock5_25, 0,
 			dev_viewer, image.M, image.N, should_interpolate_grids, dev_interpolatedGrid, dev_grid, dev_grid_2, param.grid_M, param.grid_N,
-			hor, ver, dev_gridGap, param.gridMaxLevel, dev_blackHoleBorder0, bhproc.angleNum, alpha);
+			hor, ver, dev_gridGap, param.gridMaxLevel, dev_blackHoleBorder0, param.n_black_hole_angles, alpha);
 
 		if (param.useAccretionDisk) {
 			callKernelAsync("Interpolated disk grid", disk_pixInterpolation, numBlocks_N1_M1_5_25, threadsPerBlock5_25, 0,
 				dev_viewer, image.M, image.N, should_interpolate_grids, dev_interpolatedDiskGrid, dev_interpolatedIncidentGrid, dev_disk_grid, dev_incident_grid,
 				dev_disk_summary, dev_disk_summary_2, dev_disk_incident_summary, dev_disk_incident_summary_2, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments,
 				param.grid_M, param.grid_N,
-				hor, ver, dev_gridGap, param.gridMaxLevel, dev_blackHoleBorder0, bhproc.angleNum, alpha);
+				hor, ver, dev_gridGap, param.gridMaxLevel, dev_blackHoleBorder0, param.n_black_hole_angles, alpha);
 
 			callKernelAsync("Constructed disk mask", makeDiskCheck, numBlocks_N_M_5_25, threadsPerBlock5_25, 0,
 				dev_interpolatedDiskGrid, dev_diskMask, image.M, image.N);

@@ -40,6 +40,7 @@ namespace metric {
 
 	template <class T> __host__ void setMetricParameters(T afactor, T accretionRadius, bool useDisk);
 	template __host__ void setMetricParameters<double>(double afactor, double accretionRadius, bool useDisk);
+	template __host__ void setMetricParameters<float>(float afactor, float accretionRadius, bool useDisk);
 
 	template <class T> __device__ __host__ T calcSpeed(T r, T theta);
 	template __device__ __host__ double calcSpeed < double > (double r, double theta);

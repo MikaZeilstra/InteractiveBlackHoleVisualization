@@ -108,10 +108,10 @@ __global__ void addAccretionDisk(const float2* thphi, const float3* disk_inciden
 			float orbit_speed = metric::calcSpeed(avg_thp.x, (float)PI1_2);
 			float doppler_redshift = (1 + orbit_speed * vector_ops::dot(norm_incident, { 0,0,1 }))/ sqrt(1 - (orbit_speed * orbit_speed));
 
-			//doppler_redshift = 1;
+			
 
 			float redshift = doppler_redshift * grav_redshift;
-
+			redshift = 1;
 			//Apply redshift and clip temperature to [100,29000] outside this range barely any change 
 			double observerd_temp = temp * redshift;
 
@@ -141,9 +141,9 @@ __global__ void addAccretionDisk(const float2* thphi, const float3* disk_inciden
 			float redshft = 1;
 			float frac = 1;
 			findLensingRedshift(M, ind, camParam, viewthing, frac, redshft, solidangle[ijc]);
-			if (lensingOn) P *= frac;
+			//if (lensingOn) P *= frac;
 
- 			P *= intensity_factor;
+ 			//P *= intensity_factor;
 
 			HSPtoRGB(H, S, fminf(1.f, P), color.x, color.y, color.z);
 
@@ -358,8 +358,7 @@ __global__ void CreateDiskSummary(const int GM, const int GN, float2* disk_grid,
 
 		float angle = PI2 / (1.f * n_angles) * 1.f * i;
 		float2 mov_dir = { -sinf(angle) , cosf(angle) };
-		float2 bh_pt = { .5f * bhBorder[0].x + .5f * bhBorder[0].y, .5f * bhBorder[1].x + .5f * bhBorder[1].y };
-		bh_pt = { bh_pt.x / (float)PI2 * GM, bh_pt.y / (float)PI2 * GM };
+		float2 bh_pt = bhBorder[0];
 		float2 pt = bh_pt;
 		int2 gridpt = { int(pt.x), int(pt.y) };
 
@@ -441,6 +440,10 @@ __global__ void CreateDiskSummary(const int GM, const int GN, float2* disk_grid,
 
 			gridA = disk_grid[gridpt.x * GM + gridpt.y];
 
+		}
+
+		if (i == 5) {
+			i;
 		}
 
 		// We trace a ray outwards over the image to detect disk segments, this means the most inner segment is inside, however the most inner segment varies per angle since it might be ocluded by the disk or the black hole.

@@ -152,8 +152,8 @@ private:
 	/// <param name="s">The size of the vectors.</param>
 	/// <param name="thetavals">The computed theta values (celestial sky).</param>
 	/// <param name="phivals">The computed phi values (celestial sky).</param>
-	void fillGridCam(const std::vector<uint64_t>& ijvals, const size_t s, std::vector<double>& thetavals,
-		std::vector<double>& phivals, std::vector<double>& disk_r, std::vector<double>& disk_phis, float3* disk_incidents, std::vector<int>& step);
+	template <class T> void fillGridCam(const std::vector<uint64_t>& ijvals, const size_t s, std::vector<T>& thetavals,
+		std::vector<T>& phivals, std::vector<T>& disk_r, std::vector<T>& disk_phis, float3* disk_incidents, std::vector<int>& step);
 
 	template <typename T, typename Compare>
 	std::vector<std::size_t> sort_permutation(
@@ -203,7 +203,7 @@ private:
 	/// <param name="theta">The theta positions.</param>
 	/// <param name="phi">The phi positions.</param>
 	/// <param name="n">The size of the vectors.</param>
-	void integration_wrapper(std::vector<double>& theta, std::vector<double>& phi, float3* disk_incidents, std::vector<double>& disk_r, std::vector<double>& disk_phi, const int n, std::vector<int>& step);
+	template <class T> void integration_wrapper(std::vector<T>& theta, std::vector<T>& phi, float3* disk_incidents, std::vector<T>& disk_r, std::vector<T>& disk_phi, const int n, std::vector<int>& step);
 
 	#pragma endregion private
 

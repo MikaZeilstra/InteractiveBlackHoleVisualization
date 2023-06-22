@@ -26,7 +26,6 @@
 #define MIN_CHECK_ACCRETION_RADIUS 1.1
 
 #define MIN_GPU_INTEGRATION 50
-#define BLACK_HOLE_MAX_DIAGNAL 1e-10
 
 
 
@@ -328,8 +327,8 @@ void Grid::integrateFirst(const int gap) {
 /// <param name="s">The size of the vectors.</param>
 /// <param name="thetavals">The computed theta values (celestial sky).</param>
 /// <param name="phivals">The computed phi values (celestial sky).</param>
-void Grid::fillGridCam(const std::vector<uint64_t>& ijvals, const size_t s, std::vector<double>& thetavals,
-	std::vector<double>& phivals, std::vector<double>& disk_r, std::vector<double>& disk_phis, float3* disk_incidents, std::vector<int>& step) {
+template <class T> void Grid::fillGridCam(const std::vector<uint64_t>& ijvals, const size_t s, std::vector<T>& thetavals,
+	std::vector<T>& phivals, std::vector<T>& disk_r, std::vector<T>& disk_phis, float3* disk_incidents, std::vector<int>& step) {
 	for (int k = 0; k < s; k++) {
 		uint64_t ij = ijvals[k];
 
@@ -368,7 +367,7 @@ std::vector<T> Grid::apply_permutation(
 /// <param name="ijvec">The ijvec.</param>
 void Grid::integrateCameraCoordinates(std::vector<uint64_t>& ijvec) {
 	size_t s = ijvec.size();
-	std::vector<double> theta(s), phi(s), disk_rs(s), disk_phis(s);
+	std::vector<INTEGRATION_PRECISION_MODE> theta(s), phi(s), disk_rs(s), disk_phis(s);
 	//std::vector<float3> disk_incidents(s, make_float3(0,0,0));
 	float3* disk_incidents;
 	disk_incidents = reinterpret_cast<float3*>(malloc(s * sizeof(float3)));
@@ -390,8 +389,8 @@ void Grid::integrateCameraCoordinates(std::vector<uint64_t>& ijvec) {
 	
 
 	auto start_time = std::chrono::high_resolution_clock::now();
-	integration_wrapper(theta, phi, disk_incidents, disk_rs,disk_phis, s, step);
-	fillGridCam(ijvec, s, theta, phi,  disk_rs, disk_phis,disk_incidents, step);
+	integration_wrapper<INTEGRATION_PRECISION_MODE>(theta, phi, disk_incidents, disk_rs,disk_phis, s, step);
+	fillGridCam<INTEGRATION_PRECISION_MODE>(ijvec, s, theta, phi,  disk_rs, disk_phis,disk_incidents, step);
 	auto end_time = std::chrono::high_resolution_clock::now();
 
 	free(disk_incidents);
@@ -581,11 +580,11 @@ void Grid::adaptiveBlockIntegration(int level) {
 /// /// <param name="disk_r">The r positions if on the disk otherwise nan. must be at least size n</param>
 /// /// <param name="disk_phi">The phi postions if on the disk if it was hit otherwise nan.  must be at least size n</param>
 /// <param name="n">The size of the vectors.</param>
-void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& phi, float3* disk_incidents, std::vector<double>& disk_r, std::vector<double>& disk_phi, const int n, std::vector<int>& step) {
-	double thetaS = cam->theta;
-	double phiS = cam->phi;
-	double rS = cam->r;
-	double sp = cam->speed;
+template <class T> void Grid::integration_wrapper(std::vector<T>& theta, std::vector<T>& phi, float3* disk_incidents, std::vector<T>& disk_r, std::vector<T>& disk_phi, const int n, std::vector<int>& step) {
+	T thetaS = cam->theta;
+	T phiS = cam->phi;
+	T rS = cam->r;
+	T sp = cam->speed;
 
 	//Update the count of traced rays and batches
 	ray_count += n;
@@ -603,27 +602,27 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 #pragma loop(ivdep)
 	for (int i = 0; i < n; i++) {
 		//Calculate starting paramaters
-		double xCam = sin(theta[i]) * cos(phi[i]);
-		double yCam = sin(theta[i]) * sin(phi[i]);
-		double zCam = cos(theta[i]);
+		T xCam = sin(theta[i]) * cos(phi[i]);
+		T yCam = sin(theta[i]) * sin(phi[i]);
+		T zCam = cos(theta[i]);
 
-		double yFido = (-yCam + sp) / (1 - sp * yCam);
-		double xFido = -sqrtf(1 - sp * sp) * xCam / (1 - sp * yCam);
-		double zFido = -sqrtf(1 - sp * sp) * zCam / (1 - sp * yCam);
+		T yFido = (-yCam + sp) / (1 - sp * yCam);
+		T xFido = -sqrtf(1 - sp * sp) * xCam / (1 - sp * yCam);
+		T zFido = -sqrtf(1 - sp * sp) * zCam / (1 - sp * yCam);
 
-		double k = sqrt(1 - cam->btheta * cam->btheta);
-		double rFido = xFido * cam->bphi / k + cam->br * yFido + cam->br * cam->btheta / k * zFido;
-		double thetaFido = cam->btheta * yFido - k * zFido;
-		double phiFido = -xFido * cam->br / k + cam->bphi * yFido + cam->bphi * cam->btheta / k * zFido;
+		T k = sqrt(1 - cam->btheta * cam->btheta);
+		T rFido = xFido * cam->bphi / k + cam->br * yFido + cam->br * cam->btheta / k * zFido;
+		T thetaFido = cam->btheta * yFido - k * zFido;
+		T phiFido = -xFido * cam->br / k + cam->bphi * yFido + cam->bphi * cam->btheta / k * zFido;
 
-		double eF = 1. / (cam->alpha + cam->w * cam->wbar * phiFido);
+		T eF = 1. / (cam->alpha + cam->w * cam->wbar * phiFido);
 
-		double pR = eF * cam->ro * rFido / sqrtf(cam->Delta);
-		double pTheta = eF * cam->ro * thetaFido;
-		double pPhi = eF * cam->wbar * phiFido;
+		T pR = eF * cam->ro * rFido / sqrtf(cam->Delta);
+		T pTheta = eF * cam->ro * thetaFido;
+		T pPhi = eF * cam->wbar * phiFido;
 
-		double b = pPhi;
-		double q = pTheta * pTheta + cos(thetaS) * cos(thetaS) * (b * b / (sin(thetaS) * sin(thetaS)) - metric::asq<double>);
+		T b = pPhi;
+		T q = pTheta * pTheta + cos(thetaS) * cos(thetaS) * (b * b / (sin(thetaS) * sin(thetaS)) - metric::asq<double>);
 
 
 		//Save the starting parameters in the places were they will be used for integration, the vectors are also reused as return values
@@ -638,7 +637,7 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 	#pragma loop(hint_parallel(8))
 		//CPU integration simply loop over all the required gedesics and save them
 		for (int i = 0; i < n; i++) {
-			metric::rkckIntegrate1<double>(rS, thetaS, phiS, &disk_r[i], &theta[i], &phi[i], &disk_phi[i], &disk_incidents[i], param->savePaths, reinterpret_cast<float3*>(&(paths.data()[i * 3 * (MAXSTP / STEP_SAVE_INTERVAL)])));
+			metric::rkckIntegrate1<T>(rS, thetaS, phiS, &disk_r[i], &theta[i], &phi[i], &disk_phi[i], &disk_incidents[i], param->savePaths, reinterpret_cast<float3*>(&(paths.data()[i * 3 * (MAXSTP / STEP_SAVE_INTERVAL)])));
 		}
 		if (param->savePaths) {
 			geodesics.insert(geodesics.end(), paths.begin(), paths.end());
@@ -647,7 +646,7 @@ void Grid::integration_wrapper(std::vector<double>& theta, std::vector<double>& 
 	}
 	else {
 		//GPU integration delegate GPU integration to function doing the GPU stuff
-		CUDA::integrateGrid<double>(rS, thetaS, phiS, disk_r, theta, phi, disk_phi,disk_incidents);
+		CUDA::integrateGrid<T>(rS, thetaS, phiS, disk_r, theta, phi, disk_phi,disk_incidents);
 		GPU_batches += 1;
 	}	
 

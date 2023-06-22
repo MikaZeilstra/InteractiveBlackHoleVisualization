@@ -57,45 +57,44 @@ __global__ void pixInterpolation(const float2* viewthing, const int M, const int
 	if (i < N1 && j < M1) {
 		float theta = viewthing[i * M1 + j].x + ver;
 		float phi = fmodf(viewthing[i * M1 + j].y + hor + PI2, PI2);
+		float2 grid_point = { (theta / (PI / ((float)GN))) ,  (phi / (PI2 / ((float)GM))) };
 
 
 
 		if (should_interpolate_grids) {
 			float2 A, B;
-			float2 center = { .5f * bhBorder[0].x + .5f * bhBorder[0].y, .5f * bhBorder[1].x + .5f * bhBorder[1].y };
-			float stretchRad = max(bhBorder[0].y - bhBorder[0].x, bhBorder[1].x - bhBorder[1].y) * 0.75f;
-			float centerdist = (theta - center.x) * (theta - center.x) + (phi - center.y) * (phi - center.y);
+			float2 center = bhBorder[0];
+			float stretchRad = sqrtf(fmaxf(vector_ops::sq_norm(bhBorder[1]), vector_ops::sq_norm(bhBorder[2])));//fmaxf(bhBorder[0].x, bhBorder[0].y) * 1.25f;
+			float centerdist = vector_ops::sq_norm(grid_point - center);
+			
 			if (centerdist < stretchRad * stretchRad) {
-				float angle = atan2(center.x - theta, phi - center.y);
+				float angle = atan2(center.x - grid_point.x, grid_point.y - center.y);
 				angle = fmodf(angle + PI2, PI2);
 				int angleSlot = angle / PI2 * angleNum;
 				int angleSlot2 = (angleSlot + 1) % angleNum;
 
 				float angle_alpha = ((angle / PI2) * angleNum) - angleSlot;
 
-				float2 bhBorderNew_a1 = { (1.f - alpha) * bhBorder[2 * angleSlot + 2].x + alpha * bhBorder[2 * angleSlot + 3].x,
-									   (1.f - alpha) * bhBorder[2 * angleSlot + 2].y + alpha * bhBorder[2 * angleSlot + 3].y };
-
-				float2 bhBorderNew_a2 = { (1.f - alpha) * bhBorder[2 * angleSlot + 2].x + alpha * bhBorder[2 * angleSlot + 3].x,
-									   (1.f - alpha) * bhBorder[2 * angleSlot + 2].y + alpha * bhBorder[2 * angleSlot + 3].y };
+				float2 bhBorder_g1 = (1.f - angle_alpha) * bhBorder[2 * angleSlot + 1] + angle_alpha * bhBorder[2 * angleSlot2 + 1];
+				float2 bhBorder_g2 = (1.f - angle_alpha) * bhBorder[2 * angleSlot + 2] + angle_alpha * bhBorder[2 * angleSlot2 + 2];
 
 
-				float2 bhBorderNew = (1 - angle_alpha) * bhBorderNew_a1 + (angle_alpha)*bhBorderNew_a2;
+				float2 bhBorderNew = (1 - alpha) * bhBorder_g1 + alpha * bhBorder_g2;
 
-				if (centerdist <= (bhBorderNew.x - center.x) * (bhBorderNew.x - center.x) + (bhBorderNew.y - center.y) * (bhBorderNew.y - center.y)) {
+				if (centerdist <= vector_ops::sq_norm(bhBorderNew)) {
 					thphi[i * M1 + j] = { nanf(""), nanf("")};
 					return;
 				}
 
-				float tStoB = (center.x - stretchRad * sinf(angle) - bhBorderNew.x);
-				float pStoB = (center.y + stretchRad * cosf(angle) - bhBorderNew.y);
+				float StoB = stretchRad -  sqrtf(vector_ops::sq_norm(bhBorderNew));
+	
 
-				float thetaPerc = fabsf(tStoB) < 1E-5 ? 0 : 1.f - (theta - bhBorderNew.x) / tStoB;
-				float phiPerc = fabsf(pStoB) < 1E-5 ? 0 : 1.f - (phi - bhBorderNew.y) / pStoB;
-				float thetaA = theta - thetaPerc * (bhBorderNew.x - bhBorder[2 * angleSlot + 2].x);
-				float phiA = phi - phiPerc * (bhBorderNew.y - bhBorder[2 * angleSlot + 2].y);
-				float thetaB = theta - thetaPerc * (bhBorderNew.x - bhBorder[2 * angleSlot + 3].x);
-				float phiB = phi - phiPerc * (bhBorderNew.y - bhBorder[2 * angleSlot + 3].y);
+				float Perc = fabsf(StoB) < 1E-5 ? 0 : (sqrtf(centerdist) - sqrtf(vector_ops::sq_norm(bhBorderNew))) / StoB;
+
+				float thetaA = (center.x + ((stretchRad * -sinf(angle) - bhBorder_g1.x) * Perc + bhBorder_g1.x)) * (PI / ((float)GN));
+				float phiA = (center.y + ((stretchRad * cosf(angle) - bhBorder_g1.y) * Perc + bhBorder_g1.y)) * (PI2 / ((float)GM));
+				float thetaB = (center.x + ((stretchRad * -sinf(angle) - bhBorder_g2.x) * Perc + bhBorder_g2.x)) * (PI / ((float)GN));
+				float phiB = (center.y + ((stretchRad * cosf(angle) - bhBorder_g2.y) * Perc + bhBorder_g2.y)) * (PI2 / ((float)GM));
 
 				A = interpolatePix<float2, true>(thetaA, phiA, M, N, gridlvl, grid, GM, GN, gapsave, i, j);
 				B = interpolatePix<float2, true>(thetaB, phiB, M, N, gridlvl, grid_2, GM, GN, gapsave, i, j);
@@ -131,16 +130,16 @@ __global__ void disk_pixInterpolation(const float2* viewthing, const int M, cons
 		float theta = viewthing[i * M1 + j].x + ver;
 		float phi = fmodf(viewthing[i * M1 + j].y + hor + PI2, PI2);
 		if (should_interpolate_grids) {
-			
 
 			//Calculate angle and angleslot from blackhole center.
-			float2 center = { .5f * bhBorder[0].x + .5f * bhBorder[0].y, .5f * bhBorder[1].x + .5f * bhBorder[1].y };
+			float2 center = bhBorder[0];
+			float2 grid_point = { (theta / (PI / ((float)GN))) ,  (phi / (PI2 / ((float)GM))) };
 
-			float angle = atan2(center.x - theta, phi - center.y);
+
+			float angle = atan2(center.x - grid_point.x, grid_point.y - center.y);
 			angle = fmodf(angle + PI2, PI2);
 			
 
-			center = { center.x / (float)PI2 * GM, center.y / (float)PI2 * GM };
 			float2 grid_coordinates = { theta / (float)PI2 * GM, phi / (float)PI2 * GM };
 			float centerdist = sqrt(vector_ops::sq_norm(grid_coordinates- center));
 

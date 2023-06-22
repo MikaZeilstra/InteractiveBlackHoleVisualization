@@ -15,8 +15,8 @@ offsetX = 0 // *PI
 offsetY = 0 // *PI
 
 //Frame settings
-nrOfFrames = 3
-nrOfGrids = 2
+nrOfFrames = 50
+nrOfGrids = 4
 n_black_hole_angles = 50;
 
 //Effect settings
@@ -25,7 +25,7 @@ useLensing = true
 useStars = false
 
 //AccretionDisk
-useAccretionDisk = true
+useAccretionDisk = false
 accretionDiskRadius = 40.
 temperatureLUTSize = 500
 blackholeMass = 3.5e9 //Mass of the black hole in solar masses
@@ -35,8 +35,8 @@ useAccretionDiskTexture = false
 accretionDiskTexture = "rainbow_alpha_transp.png"
 
 //AcretionDiskInterpolation
-n_disk_angles = 500;
-n_disk_sample = 400;
+n_disk_angles = 200;
+n_disk_sample = 200;
 max_disk_segments = 4;
 
 //Option to save the geodesics used to generate the image
@@ -69,7 +69,7 @@ afactor = 0.982;
 
 // Camera location, speed, direction
 camRadius = 50.
-camInclination = 0.485 //*PI
+camInclination = 0.4 //*PI
 // If a custom user speed is used.
 userSpeed = false
 camSpeed = 0.32001
@@ -84,10 +84,10 @@ camSpeedFrom = 0.32001
 camSpeedTo = 0.0001
 
 camRadiusChange = true
-camRadiusFrom = 50.
-camRadiusTo = 60.
+camRadiusFrom = 60.
+camRadiusTo = 30.
 
-camInclinationChange = true
+camInclinationChange = false
 camInclinationFrom = 0.40 //*PI
 camInclinationTo = 0.45 //*PI
 

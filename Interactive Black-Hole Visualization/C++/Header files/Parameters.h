@@ -4,6 +4,8 @@
 #include <libconfig.h++>
 #include "../../CUDA/Header files/Constants.cuh"
 
+#define INTEGRATION_PRECISION_MODE float
+
 struct Parameters {
 	
 	bool sphereView, angleView;
@@ -36,6 +38,7 @@ struct Parameters {
 	bool useRandomStars;
 	float randomStarSelectionChance;
 
+	float2 bh_center = {};
 
 	std::string getResourceFolder() const {
 		return "../Resources/";
@@ -246,6 +249,7 @@ struct Parameters {
 			grid_N = round(pow(2, gridMaxLevel) + 1);
 			grid_M = 2 * (grid_N - 1);
 
+			bh_center = { 512, 960 };
 
 			useAccretionDisk = config.lookup("useAccretionDisk");
 			if (useAccretionDisk) {

@@ -23,11 +23,10 @@ __global__ void findBhCenter(const int GM, const int GN, const float2* grid, con
 
 	if (i < GN && j < GM) {
 		if (isnan(grid[i * GM + j].x) || isnan(grid_2[ i * GM + j].x)) {
-			float gridsize = PI / (1.f * GN);
-			atomicMinFloat(&(bhBorder[0].x), gridsize * (float)i);
-			atomicMaxFloat(&(bhBorder[0].y), gridsize * (float)i);
-			atomicMinFloat(&(bhBorder[1].x), gridsize * (float)j);
-			atomicMaxFloat(&(bhBorder[1].y), gridsize * (float)j);
+			atomicMinFloat(&(bhBorder[0].x), (float)i);
+			atomicMaxFloat(&(bhBorder[0].y), (float)i);
+			atomicMinFloat(&(bhBorder[1].x), (float)j);
+			atomicMaxFloat(&(bhBorder[1].y), (float)j);
 		}
 	}
 }
@@ -38,10 +37,9 @@ __global__ void findBhBorders(const int GM, const int GN, const float2* grid,con
 	if (i < angleNum * 2) {
 		int ii = i / 2;
 		float angle = PI2 / (1.f * angleNum) * 1.f * ii;
-		float thetaChange = -sinf(angle);
-		float phiChange = cosf(angle);
-		float2 pt = { .5f * bhBorder[0].x + .5f * bhBorder[0].y, .5f * bhBorder[1].x + .5f * bhBorder[1].y };
-		pt = { pt.x / (float)PI2 * GM, pt.y / (float)PI2 * GM };
+		float2 change = { -sinf(angle), cosf(angle) };
+		float2 pt = bhBorder[0];
+		float2 center = pt;
 		int2 gridpt = { int(pt.x), int(pt.y) };
 
 		float2 gridB = { -2, -2 };
@@ -49,16 +47,19 @@ __global__ void findBhBorders(const int GM, const int GN, const float2* grid,con
 
 		while (!(gridA.x > 0 && isnan(gridB.x))) {
 			gridB = gridA;
-			pt.x += thetaChange;
-			pt.y += phiChange;
+			pt = pt + change;
 			gridpt = { int(pt.x), int(pt.y) };
+
+			if (gridpt.x > GN || gridpt.x < 0 || gridpt.y > GM || gridpt.y < 0) {
+				break;
+			}
 
 			gridA = (1 - (i % 2)) * grid[gridpt.x * GM + gridpt.y] + (i % 2) * grid_2[gridpt.x * GM + gridpt.y];
 
 			
 		}
 
-		bhBorder[2 + i] = { (pt.x - thetaChange) * (float)PI2 / (1.f * GM), (pt.y - phiChange) * (float)PI2 / (1.f * GM) };
+		bhBorder[1 + i] = pt - center - change;
 	}
 }
 
@@ -66,8 +67,8 @@ __global__ void displayborders(const int angleNum, float2* bhBorder, uchar4* out
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 
 	if (i < angleNum * 2) {
-		int x = int(bhBorder[i + 2].x / PI2 * 1.f * M);
-		int y = int(bhBorder[i + 2].y / PI2 * 1.f * M);
+		int x = int(bhBorder[i + 1].x);
+		int y = int(bhBorder[i + 1].y);
 		unsigned char outx = 255 * (i % 2);
 		unsigned char outy = 255 * (1 - i % 2);
 		out[x * M + y] = { outx, outy, 0, 255 };
@@ -76,15 +77,14 @@ __global__ void displayborders(const int angleNum, float2* bhBorder, uchar4* out
 
 __global__ void smoothBorder(const float2* bhBorder, float2* bhBorder2, const int angleNum) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
-	if (i < angleNum * 2) {
+	if (i < ((angleNum * 2) + 1)) {
 		if (i == 0) {
 			bhBorder2[0] = bhBorder[0];
-			bhBorder2[1] = bhBorder[1];
 		}
 		int prev = (i - 2 + 2 * angleNum) % (2 * angleNum);
 		int next = (i + 2) % (2 * angleNum);
-		bhBorder2[i + 2] = { 1.f / 3.f * (bhBorder[prev + 2].x + bhBorder[i + 2].x + bhBorder[next + 2].x),
-							 1.f / 3.f * (bhBorder[prev + 2].y + bhBorder[i + 2].y + bhBorder[next + 2].y) };
+		bhBorder2[i + 1] = { 1.f / 3.f * (bhBorder[prev + 1].x + bhBorder[i + 1].x + bhBorder[next + 1].x),
+							 1.f / 3.f * (bhBorder[prev + 1].y + bhBorder[i + 1].y + bhBorder[next + 1].y) };
 	}
 }
 
