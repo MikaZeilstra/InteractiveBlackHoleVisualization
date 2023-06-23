@@ -549,7 +549,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 	std::chrono::steady_clock::time_point frame_start_time;
 
 
-	while(q < param.nrOfFrames + startframe - 1 && !glfwWindowShouldClose(viewer->get_window())) {
+	while(q < param.nrOfFrames + startframe && !glfwWindowShouldClose(viewer->get_window())) {
  		frame_start_time = std::chrono::high_resolution_clock::now();
 
 

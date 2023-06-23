@@ -415,6 +415,9 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 	//If the block level is still lower than the minimum required number return 
 	if (level < param->gridMinLevel) return true;
 
+	//If we cross the border to the right refine
+	if (l < j) return true;
+
 	//Check if the points are well alligned
 	float2 topLeft = grid_vector[i * M + j];
 	float2 topRight = grid_vector[k * M + j];
