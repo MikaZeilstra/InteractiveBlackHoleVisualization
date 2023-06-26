@@ -23,8 +23,8 @@ struct Parameters {
 	bool userSpeed;
 	bool useStars, useRedshift, useLensing,useAccretionDisk;
 	bool savePaths;
-	bool camSpeedChange, camInclinationChange, camRadiusChange;
-	cv::Point2d camSpeedFromTo, camInclinationFromTo, camRadiusFromTo;
+	bool camSpeedChange, camInclinationChange, camRadiusChange, camPhiChange;
+	cv::Point2d camSpeedFromTo, camInclinationFromTo, camRadiusFromTo, camPhiFromTo;
 	double afactor;
 	double accretionDiskMaxRadius;
 	double blackholeMass, blackholeAccretion;
@@ -157,16 +157,42 @@ struct Parameters {
 		return ss.str();
 	}
 	
+	/// <summary>
+	/// Returns Phi for given frame
+	/// </summary>
+	/// <param name="step">Frame number</param>
+	/// <returns></returns>
+	double getPhi(int step) {
+		if (camPhiChange) return camPhiFromTo.x + step * ((camPhiFromTo.y - camPhiFromTo.x) / (nrOfFrames - 1.0));
+		return camPhiFromTo.x;
+	}
+
+	/// <summary>
+	/// Returns Radius for given grid
+	/// </summary>
+	/// <param name="step"> Grid number</param>
+	/// <returns></returns>
 	double getRadius(int step) {
 		if (camRadiusChange) return camRadiusFromTo.x + step * ((camRadiusFromTo.y - camRadiusFromTo.x) / (gridNum - 1.0));
 		return camRadiusFromTo.x;
 	}
 
+
+	/// <summary>
+	/// Returns Inclination for given grid
+	/// </summary>
+	/// <param name="step"> Grid number</param>
+	/// <returns></returns>
 	double getInclination(int step) {
 		if (camInclinationChange) return camInclinationFromTo.x + step * ((camInclinationFromTo.y - camInclinationFromTo.x) / (gridNum - 1.0));
 		return camInclinationFromTo.x;
 	}
 
+	/// <summary>
+/// Returns speed for given grid
+/// </summary>
+/// <param name="step"> Grid number</param>
+/// <returns></returns>
 	double getSpeed(int step) {
 		if (camSpeedChange) return camSpeedFromTo.x + step * ((camSpeedFromTo.y - camSpeedFromTo.x) / (gridNum - 1.0));
 		return camSpeedFromTo.x;
@@ -249,7 +275,7 @@ struct Parameters {
 			grid_N = round(pow(2, gridMaxLevel) + 1);
 			grid_M = 2 * (grid_N - 1);
 
-			bh_center = { 512, 960 };
+			bh_center = { (float) (grid_N - 1) / 2, (grid_N -1)  * 0.95f };
 
 			useAccretionDisk = config.lookup("useAccretionDisk");
 			if (useAccretionDisk) {
@@ -287,6 +313,13 @@ struct Parameters {
 				camInclinationFromTo.x = config.lookup("camInclinationFrom");
 				camInclinationFromTo.y = config.lookup("camInclinationTo");
 				camInclinationFromTo *= PI;
+			}
+
+			camPhiChange = config.lookup("camPhiChange");
+			if (camPhiChange) {
+				camPhiFromTo.x = config.lookup("camPhiFrom");
+				camPhiFromTo.y = config.lookup("camPhiTo");
+				camPhiFromTo *= PI;
 			}
 		}
 		catch (libconfig::SettingNotFoundException& e) {

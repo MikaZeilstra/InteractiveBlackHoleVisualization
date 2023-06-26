@@ -119,7 +119,6 @@ __global__ void addAccretionDisk(const float2* thphi, const float3* disk_inciden
 			if (observerd_temp < TEMP_SPLIT) {
 				float mix = (observerd_temp / TEMP_STEP_SMALL) - floor(observerd_temp / TEMP_STEP_SMALL);
 				color = (1-mix) * temperature_LUT[(int)(observerd_temp / TEMP_STEP_SMALL)] + mix * temperature_LUT[(int)(observerd_temp / TEMP_STEP_SMALL) + 1];
-				//temperature_sRGB = temperature_LUT[(int)(observerd_temp / 100)];
 			}
 			else if(observerd_temp < TEMP_MAX) {
 				color = temperature_LUT[(int)(((observerd_temp - TEMP_SPLIT) / TEMP_STEP_LARGE) + 99)];
@@ -129,7 +128,6 @@ __global__ void addAccretionDisk(const float2* thphi, const float3* disk_inciden
 			if (max_temp < TEMP_SPLIT) {
 				float mix = (max_temp / TEMP_STEP_SMALL) - floor(max_temp / TEMP_STEP_SMALL);
 				max_intensity = ((1 - mix) * temperature_LUT[(int)(max_temp / TEMP_STEP_SMALL)] + mix * temperature_LUT[(int)(max_temp / TEMP_STEP_SMALL) + 1]).w;
-				//temperature_sRGB = temperature_LUT[(int)(observerd_temp / 100)];
 			}
 			else if (max_intensity < TEMP_MAX) {
 				max_intensity = temperature_LUT[(int)(((max_temp - TEMP_SPLIT) / TEMP_STEP_LARGE) + 99)].w;
@@ -141,9 +139,9 @@ __global__ void addAccretionDisk(const float2* thphi, const float3* disk_inciden
 			float redshft = 1;
 			float frac = 1;
 			findLensingRedshift(M, ind, camParam, viewthing, frac, redshft, solidangle[ijc]);
-			//if (lensingOn) P *= frac;
+			if (lensingOn) P *= frac;
 
- 			//P *= intensity_factor;
+ 			P *= intensity_factor;
 
 			HSPtoRGB(H, S, fminf(1.f, P), color.x, color.y, color.z);
 

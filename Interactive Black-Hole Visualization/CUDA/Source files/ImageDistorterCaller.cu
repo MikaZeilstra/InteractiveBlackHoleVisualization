@@ -548,6 +548,8 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 
 	std::chrono::steady_clock::time_point frame_start_time;
 
+	//Calculate phi offset due to camera movement
+	float camera_phi_offset = 0;
 
 	while(q < param.nrOfFrames + startframe && !glfwWindowShouldClose(viewer->get_window())) {
  		frame_start_time = std::chrono::high_resolution_clock::now();
@@ -558,8 +560,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 		checkCudaStatus(cudaGraphicsResourceGetMappedPointer((void**)&dev_outputImage, &num_bytes, cuda_pbo_resource),"get_pointer");
 		
 		
-		//Calculate phi offset due to camera movement
-		float camera_phi_offset = 0;		
+		camera_phi_offset = param.getPhi(q);		
 
 		//Calculate the value of the grid we need for this frame
 		grid_value = q * (((float)param.gridNum -1) / (param.nrOfFrames-1));
