@@ -20,6 +20,8 @@
 #define dprdz varOut[3]
 #define dptdz varOut[4]
 
+//The datatype used for integration
+#define INTEGRATION_PRECISION_MODE double
 
 #define SAFETY 0.9
 #define PGROW -0.2

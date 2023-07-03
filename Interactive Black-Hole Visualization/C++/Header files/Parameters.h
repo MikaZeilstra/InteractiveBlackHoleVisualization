@@ -4,8 +4,6 @@
 #include <libconfig.h++>
 #include "../../CUDA/Header files/Constants.cuh"
 
-#define INTEGRATION_PRECISION_MODE float
-
 struct Parameters {
 	
 	bool sphereView, angleView;

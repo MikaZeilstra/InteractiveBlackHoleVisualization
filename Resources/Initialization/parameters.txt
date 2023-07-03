@@ -15,8 +15,8 @@ offsetX = 0 // *PI
 offsetY = 0 // *PI
 
 //Frame settings
-nrOfFrames = 250
-nrOfGrids = 4
+nrOfFrames = 1
+nrOfGrids = 1
 n_black_hole_angles = 50;
 
 //Effect settings
@@ -25,7 +25,7 @@ useLensing = true
 useStars = false
 
 //AccretionDisk
-useAccretionDisk = false
+useAccretionDisk = true
 accretionDiskRadius = 40.
 temperatureLUTSize = 500
 blackholeMass = 3.5e9 //Mass of the black hole in solar masses
@@ -68,7 +68,7 @@ gridMaxLevel = 10
 afactor = 0.982;
 
 // Camera location, speed, direction
-camRadius = 50.
+camRadius = 60.
 camInclination = 0.4 //*PI
 // If a custom user speed is used.
 userSpeed = false
@@ -87,11 +87,11 @@ camRadiusChange = false
 camRadiusFrom = 60.
 camRadiusTo = 30.
 
-camInclinationChange = true
+camInclinationChange = false
 camInclinationFrom = 0.55 //*PI
 camInclinationTo = 0.6 //*PI
 
-camPhiChange = true
+camPhiChange = false
 camPhiFrom = 0. //*PI
 camPhiTo = 0.5 //*PI
 

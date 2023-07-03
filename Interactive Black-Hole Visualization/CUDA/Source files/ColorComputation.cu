@@ -2,11 +2,12 @@
 #include "../../C++/Header files/IntegrationDefines.h"
 #include "../Header files/GridLookup.cuh"
 #include "../Header files/Constants.cuh"
+#include "../Header files/metric.cuh"
 #include "../Header files/vector_operations.cuh"
+//#include "../../C++/Header files/Parameters.h"
 
 #define VERTICAL_GAUSSIAN_BLUR_SIGMA 2.0f
 #define HORIZONTAL_GAUSSIAN_BLUR_SIGMA 0.5f
-
 
 //Lookup table for the position to which the first index needs to be copied if it is on the disk together with the second vertex
 __device__ __constant__ const int two_vertex_duplication_map[4][4] = {
@@ -89,8 +90,8 @@ __global__ void findArea(const float2* thphi, const float2* thphi_disk, const in
 
 			for (int k = 0; k < 4; k++) {
 				cartesian_vertices[k] = {
-					disk_vertices[k].x * cos(disk_vertices[k].y),
-					disk_vertices[k].x * sin(disk_vertices[k].y),
+					sqrtf(disk_vertices[k].x * disk_vertices[k].x + metric::asq_dev<INTEGRATION_PRECISION_MODE>)* cos(disk_vertices[k].y),
+					sqrtf(disk_vertices[k].x * disk_vertices[k].x + metric::asq_dev<INTEGRATION_PRECISION_MODE>)* sin(disk_vertices[k].y),
 					0
 				};
 				distance += 0.25f * sqrt(vector_ops::sq_norm(disk_incidents[k]));

@@ -782,7 +782,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 
 	cudaMemcpyAsync(&image.result[0], dev_outputImage, image.N* image.M * 4 * sizeof(uchar), cudaMemcpyDeviceToHost, stream);
 	cudaMemcpyAsync(grid.data(), dev_grid, (param.grid_N)* (param.grid_M) * sizeof(float2), cudaMemcpyDeviceToHost, stream);
-	cudaMemcpyAsync(disk_grid.data(), dev_disk_grid_2, (param.grid_N)* (param.grid_M) * sizeof(float2), cudaMemcpyDeviceToHost, stream);
+	cudaMemcpyAsync(disk_grid.data(), dev_disk_grid, (param.grid_N)* (param.grid_M) * sizeof(float2), cudaMemcpyDeviceToHost, stream);
 	cudaMemcpyAsync(area.data(), dev_solidAngles0, (image.N)* (image.M) * sizeof(float), cudaMemcpyDeviceToHost, stream);
 	cudaMemcpyAsync(interpolated_grid.data(), dev_interpolatedGrid, (image.N + 1)* (image.M + 1) * sizeof(float2), cudaMemcpyDeviceToHost, stream);
 	cudaMemcpyAsync(interpolated_disk_grid.data(), dev_interpolatedDiskGrid, (image.N + 1)* (image.M + 1) * sizeof(float2), cudaMemcpyDeviceToHost, stream);
@@ -794,10 +794,16 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 	//Write grid results to file
 	std::vector<float4> grid_image(grid.size());
 	for (int i = 0; i < grid.size(); i++) {
-		if (grid[i].x > -2.0) {
-			grid_image[i].x = grid[i].x / PI;
-			grid_image[i].y = (grid[i].y / PI2);
-			grid_image[i].w = 1;
+		if (grid[i].x > -2.0 || isnan(disk_grid[i].x)) {
+			if (!isnan(grid[i].x)) {
+				grid_image[i].x = grid[i].x / PI;
+				grid_image[i].y = (grid[i].y / PI2);
+				grid_image[i].w = 1;
+			}
+			else {
+				grid_image[i] = { 0,0,1,1 };
+			}
+			
 		}
 		else {
 			grid_image[i] = { 0,0,0,1 };

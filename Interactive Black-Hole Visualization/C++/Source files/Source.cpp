@@ -17,6 +17,7 @@
 #include "../Header files/StarProcessor.h"
 #include "../Header files/CelestialSkyProcessor.h"
 #include "../Header files/Archive.h"
+#include "../Header files/IntegrationDefines.h"
 
 /// <summary>
 /// Compares two images and gives the difference error.
