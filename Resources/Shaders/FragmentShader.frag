@@ -27,7 +27,7 @@ void main()
     
     vec2  center_frag = {
         (((float(gl_FragCoord.x) / float(screen_width)) - 0.5) * 2),
-        (((float(gl_FragCoord.y) / float(screen_height)) - 0.5) * 2)
+        (((float(gl_FragCoord.y) / float(screen_width)) - 0.5) * 2)
     };
 
     vec3 right_direction = normalize(cross(up_direction,camera_direction));
