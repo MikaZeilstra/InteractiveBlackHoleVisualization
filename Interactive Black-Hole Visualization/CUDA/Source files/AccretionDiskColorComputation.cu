@@ -16,6 +16,7 @@
 #define MAX_R_NEW_DISK_SEGMENT 0.5
 #define MIN_R_CHANGE_SEGMENT 0.4
 #define MAX_DISTANCE_JUMP_SEGMENT 5
+#define DISK_SOLIDANGLE_FADE 0.9
 
 /// <summary>
 /// Calculates the actual temperature of the disk at a given radius r in schwarschild radii and actual Mass M and accretion rate Ma.
@@ -71,7 +72,7 @@ __global__ void createTemperatureTable(const int size,double* table, const float
 }
 
 __global__ void addAccretionDisk(const float2* thphi, const float3* disk_incident, uchar4* out, double*temperature_table,const float temperature_table_step_size, const int temperature_table_size, const unsigned char* bh, const int M, const int N,
-	const float* camParam, const float* solidangle, float2* viewthing, bool lensingOn, const unsigned char* diskMask) {
+	const float* camParam, const float* solidangle, const float* solidangle_disk, float2* viewthing, float max_disk_r, bool lensingOn, const unsigned char* diskMask) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 	int ind = i * M1 + j;
@@ -137,9 +138,22 @@ __global__ void addAccretionDisk(const float2* thphi, const float3* disk_inciden
 			RGBtoHSP(color.x, color.y , color.z , H, S, P);
 			float intensity_factor = fminf(color.w / max_intensity,1.f);
 			float redshft = 1;
-			float frac = 1;
-			findLensingRedshift(M, ind, camParam, viewthing, frac, redshft, solidangle[ijc]);
-			if (lensingOn) P *= frac;
+			float frac_disk = 1;
+			float frac_sky = 1;
+
+			if (lensingOn) {
+				float lensing_alpha = 0;
+
+				if (avg_thp.x > DISK_SOLIDANGLE_FADE * max_disk_r) {
+					//lensing_alpha = (avg_thp.x - DISK_SOLIDANGLE_FADE * max_disk_r) / (max_disk_r - DISK_SOLIDANGLE_FADE * max_disk_r);
+
+				}
+
+				findLensingRedshift(M, ind, camParam, viewthing, frac_disk, redshft, solidangle_disk[ijc]);
+				//findLensingRedshift(M, ind, camParam, viewthing, frac_sky, redshft, solidangle[ijc]);
+				
+				P *= (1 - lensing_alpha) * frac_disk + lensing_alpha * frac_sky;
+			}
 
  			P *= intensity_factor;
 
@@ -300,10 +314,13 @@ __global__ void addAccretionDiskTexture(const float2* thphi, const int M, const 
 			float redshft = 1;
 			float frac = 1;
 			findLensingRedshift(M, ind, camParam, viewthing, frac, redshft, solidangle[ijc]);
-			if (lensingOn) P *= frac;
+			//if (lensingOn) P *= frac;
 			HSPtoRGB(H, S, min(1.f, P), out_color.z, out_color.y, out_color.x);
 		}
 
+		if (corners[0].x < MIN_STABLE_ORBIT || corners[1].x < MIN_STABLE_ORBIT || corners[2].x < MIN_STABLE_ORBIT || corners[3].x < MIN_STABLE_ORBIT) {
+			color.w = 0.0f;
+		}
 
 		out_color = {
 				fminf(out_color.x,1.0f), 
@@ -316,8 +333,9 @@ __global__ void addAccretionDiskTexture(const float2* thphi, const int M, const 
 
 		out_color = (1 - out_color.w) * prev_color + (out_color.w) * out_color;
 		out_color.w = 1;
+			out[ijc] = { (unsigned char)(out_color.x * 255),(unsigned char)(out_color.y * 255),(unsigned char)(out_color.z * 255), 255 };
 
- 		out[ijc] = {(unsigned char)(out_color.x * 255),(unsigned char)(out_color.y * 255),(unsigned char)(out_color.z * 255), 255};
+ 		
 	}
 }
 

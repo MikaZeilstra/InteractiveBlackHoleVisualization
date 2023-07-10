@@ -32,7 +32,7 @@ blackholeMass = 3.5e9 //Mass of the black hole in solar masses
 blackholeAccretionRate = 0.1 //The accretion rate of the black hole in solar masses per year
 
 useAccretionDiskTexture = false
-accretionDiskTexture = "rainbow_alpha_transp.png"
+accretionDiskTexture = "AcretionTest.png"
 
 //AcretionDiskInterpolation
 n_disk_angles = 500;
@@ -69,7 +69,7 @@ afactor = 0.982;
 
 // Camera location, speed, direction
 camRadius = 50.
-camInclination = 0.48 //*PI
+camInclination = 0.45 //*PI
 // If a custom user speed is used.
 userSpeed = false
 camSpeed = 0.32001

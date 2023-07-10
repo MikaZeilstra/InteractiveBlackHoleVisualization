@@ -484,6 +484,7 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 			return true;
 		}
 	}
+
 	//If not on disk we need to check if the disk could be within this block
 	else if(param->useAccretionDisk && !topLeftNan){
 		//Check maximum change in the R coordinate at theta = 0.5 pi, as stored in the phi coordinate if not on the disk

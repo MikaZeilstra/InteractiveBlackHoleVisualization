@@ -134,6 +134,8 @@ float2* dev_blackHoleBorder1 = 0;
 float* dev_solidAngles0 = 0;
 float* dev_solidAngles1 = 0;
 
+float* dev_solidAngles0_disk = 0;
+
 static float* dev_starPositions = 0;
 static int2* dev_starCache = 0;
 static int* dev_nrOfImagesPerStar = 0;
@@ -185,6 +187,8 @@ cudaError_t CUDA::cleanup() {
 
 	cudaFree(dev_solidAngles0);
 	cudaFree(dev_solidAngles1);
+
+	cudaFree(dev_solidAngles0_disk);
 
 	cudaFree(dev_starPositions);
 	cudaFree(dev_starCache);
@@ -363,6 +367,8 @@ void CUDA::memoryAllocationAndCopy(const Image& image, const CelestialSky& celes
 
 	allocate(dev_solidAngles0, imageSize * sizeof(float), "solidAngles0");
 	allocate(dev_solidAngles1, imageSize * sizeof(float), "solidAngles1");
+
+	allocate(dev_solidAngles0_disk, imageSize * sizeof(float), "solidAngles1");
 
 	allocate(dev_viewer, rastSize * sizeof(float2), "viewer");
 
@@ -652,7 +658,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 			dev_interpolatedGrid, image.M, image.N, dev_blackHoleMask);
 
 		callKernelAsync("Calculated solid angles", findArea, numBlocks_N_M_5_25, threadsPerBlock5_25, 0,
-			dev_interpolatedGrid,dev_interpolatedDiskGrid, image.M, image.N, dev_solidAngles0,param.accretionDiskMaxRadius, dev_diskMask, dev_interpolatedIncidentGrid);
+			dev_interpolatedGrid,dev_interpolatedDiskGrid, image.M, image.N, dev_solidAngles0, dev_solidAngles0_disk, param.accretionDiskMaxRadius, dev_diskMask, dev_interpolatedIncidentGrid);
 		
 		
 		callKernelAsync("Smoothed solid angles horizontally", smoothAreaH, numBlocks_N_M_5_25, threadsPerBlock5_25,0,
@@ -660,13 +666,21 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 
 		callKernelAsync("Smoothed solid angles vertically", smoothAreaV, numBlocks_N_M_5_25, threadsPerBlock5_25, 0,
 			dev_solidAngles0, dev_solidAngles1, dev_blackHoleMask, dev_gridGap, image.M, image.N, dev_diskMask);
+
+		
+
+		callKernelAsync("Smoothed solid angles horizontally", smoothAreaH, numBlocks_N_M_5_25, threadsPerBlock5_25, 0,
+			dev_solidAngles1, dev_solidAngles0_disk, dev_blackHoleMask, dev_gridGap, image.M, image.N, dev_diskMask);
+
+		callKernelAsync("Smoothed solid angles vertically", smoothAreaV, numBlocks_N_M_5_25, threadsPerBlock5_25, 0,
+			dev_solidAngles0_disk, dev_solidAngles1, dev_blackHoleMask, dev_gridGap, image.M, image.N, dev_diskMask);
 		
 		
 		
 
 
 		if (star) {
-			//TODO fix using correct camera (interpolate it)
+			// TODO fix using correct camera (interpolate it)
 			callKernelAsync("Cleared star cache", clearArrays, numBlocks_starsize, threadsPerBlock_32,0,
 				dev_nrOfImagesPerStar, dev_starCache, q, starvis.trailnum, stars.starSize);
 
@@ -717,7 +731,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 
 				callKernelAsync("Add accretion Disk", addAccretionDisk, numBlocks_N_M_4_4, threadsPerBlock4_4,0,
 					dev_interpolatedDiskGrid, dev_interpolatedIncidentGrid, dev_outputImage, temperatureLUT_device, (param.accretionDiskMaxRadius / param.accretionTemperatureLUTSize), param.accretionTemperatureLUTSize,
-					dev_blackHoleMask, image.M, image.N, dev_cameras, dev_solidAngles0, dev_viewer, param.useLensing, dev_diskMask);
+					dev_blackHoleMask, image.M, image.N, dev_cameras, dev_solidAngles0, dev_solidAngles0_disk, dev_viewer, param.accretionDiskMaxRadius, param.useLensing, dev_diskMask);
 			}
 			else {
 				callKernelAsync("Add accretion Disk Texture", addAccretionDiskTexture, numBlocks_N_M_4_4, threadsPerBlock4_4,0,
