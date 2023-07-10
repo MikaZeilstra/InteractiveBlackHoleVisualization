@@ -23,7 +23,7 @@
 
 #define PRECCELEST 0.015
 #define DISK_PRECCELEST_RELAXATION 1
-#define MIN_CHECK_ACCRETION_RADIUS 1.1
+#define MIN_CHECK_ACCRETION_RADIUS 1
 
 #define MIN_GPU_INTEGRATION 50
 
@@ -429,19 +429,18 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 	float2 disk_bottomLeft = disk_grid_vector[i * M + l ];
 	float2 disk_bottomRight = disk_grid_vector[k * M + l];
 
-	
-	bool topLeft_on_disk = !isnan(disk_topLeft.x);
-
-	//If all r coordinates are not either on accretion disk or off the accretion disk we need to refine (Edge of accretion disk)
-	if (!((topLeft_on_disk == !isnan(disk_topRight.x)) && (topLeft_on_disk == !isnan(disk_bottomLeft.x)) && (topLeft_on_disk == !isnan(disk_bottomRight.x)))) {
-		return true;
-	}
 
 
 	//If all vertices are not either in the blackhole or out we need to refine
 	// Nan indicates 1 of the vertices was part of the black hole, meaning we want better resolution unless they were all BH.
 	bool topLeftNan = isnan(topLeft.x);
 	if (!((topLeftNan == isnan(topRight.x)) && (topLeftNan == isnan(bottomLeft.x)) && (topLeftNan == isnan(bottomRight.x)))) {
+		return true;
+	}
+
+	bool topLeft_on_disk = !isnan(disk_topLeft.x);
+	//If all r coordinates are not either on accretion disk or off the accretion disk we need to refine (Edge of accretion disk)
+	if (!((topLeft_on_disk == !isnan(disk_topRight.x)) && (topLeft_on_disk == !isnan(disk_bottomLeft.x)) && (topLeft_on_disk == !isnan(disk_bottomRight.x)))) {
 		return true;
 	}
 
