@@ -193,7 +193,7 @@ __device__ int2 coord_min(int2* coords) {
 }
 
 __global__ void addAccretionDiskTexture(const float2* thphi, const int M, const unsigned char* bh, uchar4* out, float4* summed_texture, float  maxAccretionRadius, int tex_width, int tex_height,
-	const float* camParam, const float* solidangle, float2* viewthing, bool lensingOn, const unsigned char* diskMask) {
+	const float* camParam, const float* solidangle, const float* solidangle_disk, float2* viewthing, bool lensingOn, const unsigned char* diskMask) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 	int ind = i * M1 + j;
@@ -209,7 +209,6 @@ __global__ void addAccretionDiskTexture(const float2* thphi, const int M, const 
 			thphi[ind + M1],
 			thphi[ind + M1 + 1]
 		};
-
 
 		int2 tex_coord[4] = {};
 		//Calculate texture coordinates of the pixel corners
@@ -313,7 +312,7 @@ __global__ void addAccretionDiskTexture(const float2* thphi, const int M, const 
 
 			float redshft = 1;
 			float frac = 1;
-			findLensingRedshift(M, ind, camParam, viewthing, frac, redshft, solidangle[ijc]);
+			findLensingRedshift(M, ind, camParam, viewthing, frac, redshft, solidangle_disk[ijc]);
 			//if (lensingOn) P *= frac;
 			HSPtoRGB(H, S, min(1.f, P), out_color.z, out_color.y, out_color.x);
 		}

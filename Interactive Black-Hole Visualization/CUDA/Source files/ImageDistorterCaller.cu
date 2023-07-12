@@ -736,7 +736,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 			else {
 				callKernelAsync("Add accretion Disk Texture", addAccretionDiskTexture, numBlocks_N_M_4_4, threadsPerBlock4_4,0,
 					dev_interpolatedDiskGrid, image.M, dev_blackHoleMask, dev_outputImage, dev_accretionDiskTexture, param.accretionDiskMaxRadius,
-					accretionDiskTexture.width, accretionDiskTexture.height, dev_cameras, dev_solidAngles0, dev_viewer, param.useLensing, dev_diskMask
+					accretionDiskTexture.width, accretionDiskTexture.height, dev_cameras, dev_solidAngles0, dev_solidAngles0_disk, dev_viewer, param.useLensing, dev_diskMask
 				)
 			}
 		}
