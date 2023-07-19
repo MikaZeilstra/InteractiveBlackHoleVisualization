@@ -727,15 +727,15 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 		if (param.useAccretionDisk) {
 			if (!param.useAccretionDiskTexture) {
 				callKernelAsync("Calculate temperature LUT", createTemperatureTable, numBlocks_tempLUT, threadsPerBlock_32,0,
-					param.accretionTemperatureLUTSize, temperatureLUT_device, (param.accretionDiskMaxRadius - 3) / (param.accretionTemperatureLUTSize - 1), param.blackholeMass, param.blackholeAccretion);
+					param.accretionTemperatureLUTSize, temperatureLUT_device, param.accretionDiskMinRadius/2, (param.accretionDiskMaxRadius - 3) / (param.accretionTemperatureLUTSize - 1), param.blackholeMass, param.blackholeAccretion);
 
 				callKernelAsync("Add accretion Disk", addAccretionDisk, numBlocks_N_M_4_4, threadsPerBlock4_4,0,
 					dev_interpolatedDiskGrid, dev_interpolatedIncidentGrid, dev_outputImage, temperatureLUT_device, (param.accretionDiskMaxRadius / param.accretionTemperatureLUTSize), param.accretionTemperatureLUTSize,
-					dev_blackHoleMask, image.M, image.N, dev_cameras, dev_solidAngles0, dev_solidAngles0_disk, dev_viewer, param.accretionDiskMaxRadius, param.useLensing, dev_diskMask);
+					dev_blackHoleMask, image.M, image.N, dev_cameras, dev_solidAngles0, dev_solidAngles0_disk, dev_viewer, param.accretionDiskMinRadius, param.accretionDiskMaxRadius, param.useLensing, dev_diskMask);
 			}
 			else {
 				callKernelAsync("Add accretion Disk Texture", addAccretionDiskTexture, numBlocks_N_M_4_4, threadsPerBlock4_4,0,
-					dev_interpolatedDiskGrid, image.M, dev_blackHoleMask, dev_outputImage, dev_accretionDiskTexture, param.accretionDiskMaxRadius,
+					dev_interpolatedDiskGrid, image.M, dev_blackHoleMask, dev_outputImage, dev_accretionDiskTexture, param.accretionDiskMinRadius, param.accretionDiskMaxRadius,
 					accretionDiskTexture.width, accretionDiskTexture.height, dev_cameras, dev_solidAngles0, dev_solidAngles0_disk, dev_viewer, param.useLensing, dev_diskMask
 				)
 			}

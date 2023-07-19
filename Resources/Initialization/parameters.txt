@@ -26,16 +26,18 @@ useStars = false
 
 //AccretionDisk
 useAccretionDisk = true
-accretionDiskRadius = 40.
+//Minimum and maximum accretion disk radius 6 is the minimum stable orbit around the black hole and lower values for the minimum will cause issues
+accretionDiskMinRadius = 9.
+accretionDiskMaxRadius = 18.
 temperatureLUTSize = 500
 blackholeMass = 3.5e9 //Mass of the black hole in solar masses
 blackholeAccretionRate = 0.1 //The accretion rate of the black hole in solar masses per year
 
-useAccretionDiskTexture = true
+useAccretionDiskTexture = false
 accretionDiskTexture = "AcretionTest.png"
 
 //AcretionDiskInterpolation
-n_disk_angles = 500;
+n_disk_angles = 200;
 n_disk_sample = 200;
 max_disk_segments = 4;
 
@@ -62,14 +64,14 @@ diffractionImg = "0s1.png"
 // Grid Settings
 gridStartLevel = 1
 gridMinLevel = 2
-gridMaxLevel = 10
+gridMaxLevel = 11
 
 // Blackhole angular velocity
 afactor = 0.982;
 
 // Camera location, speed, direction
-camRadius = 50.
-camInclination = 0.49 //*PI
+camRadius = 30.
+camInclination = 0.496 //*PI
 // If a custom user speed is used.
 userSpeed = false
 camSpeed = 0.32001
@@ -88,8 +90,8 @@ camRadiusFrom = 60.
 camRadiusTo = 30.
 
 camInclinationChange = false
-camInclinationFrom = 0.55 //*PI
-camInclinationTo = 0.6 //*PI
+camInclinationFrom = 0.445 //*PI
+camInclinationTo = 0.455 //*PI
 
 camPhiChange = false
 camPhiFrom = 0. //*PI

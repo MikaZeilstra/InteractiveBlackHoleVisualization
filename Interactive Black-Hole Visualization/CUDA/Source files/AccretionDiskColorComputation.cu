@@ -18,6 +18,9 @@
 #define MAX_DISTANCE_JUMP_SEGMENT 5
 #define DISK_SOLIDANGLE_FADE 0.9
 
+//The location the temperature function reaches its maximum
+#define MAX_TEMPERATURE_R 4.8
+
 /// <summary>
 /// Calculates the actual temperature of the disk at a given radius r in schwarschild radii and actual Mass M and accretion rate Ma.
 /// Uses the formula descibed in thesis
@@ -39,18 +42,19 @@ __device__ double getRealTemperature(const float& M, const float& Ma, const floa
 /// Looks up temperature in provided lookup table
 /// </summary>
 /// <param name="table">Array containing lookup table</param>
+/// <param name="min_radius">Min radius of accretion disk in schwarzschild radii</param>
 /// <param name="step_size">Size of the steps between r values</param>
 /// <param name="size">Ampount of entries in the table</param>
 /// <param name="r">r in schwarschild radii (r/2 if r is in boyler-linqiust)</param>
 /// <returns></returns>
-__device__ double lookUpTemperature(double* table, const float step_size, const int size, const float r) {
-	if (r < 3 || r >= (size * step_size + 3)) {
+__device__ double lookUpTemperature(double* table, const double min_radius, const float step_size, const int size, const float r) {
+	if (r < min_radius || r >= (size * step_size + 3)) {
 		return 0;
 	}
 
-	float r_low = floor(r-3);
-	float r_high = ceil(r - 3);
-	float mix = (r-3 - r_low);
+	float r_low = floor(r - min_radius);
+	float r_high = ceil(r - min_radius);
+	float mix = (r - min_radius - r_low);
 
 	return (1-mix) * table[(int) (r_low/step_size)] + mix * table[(int) (r_high / step_size)];
 }
@@ -60,19 +64,20 @@ __device__ double lookUpTemperature(double* table, const float step_size, const 
 /// </summary>
 /// <param name="size">Number of entries to generate</param>
 /// <param name="table">Pointer to array to store the table</param>
+/// <param name="min_radius">Min radius of accretion disk in schwarzschild radii</param>
 /// <param name="step_size">Size of the steps between r values</param>
 /// <param name="M">Mass of the black hole in solar masses</param>
 /// <param name="Ma">Accretion rate of the black hole in solar masses per year</param>
 /// <returns></returns>
-__global__ void createTemperatureTable(const int size,double* table, const float step_size, float M, float Ma) {
+__global__ void createTemperatureTable(const int size,double* table, const float min_radius, const float step_size, float M, float Ma) {
 	int id = (blockIdx.x * blockDim.x) + threadIdx.x;
 	if (id < size) {
-		table[id] = getRealTemperature(M, Ma, 3 + step_size * id);
+		table[id] = getRealTemperature(M, Ma, min_radius + step_size * id);
 	}
 }
 
 __global__ void addAccretionDisk(const float2* thphi, const float3* disk_incident, uchar4* out, double*temperature_table,const float temperature_table_step_size, const int temperature_table_size, const unsigned char* bh, const int M, const int N,
-	const float* camParam, const float* solidangle, const float* solidangle_disk, float2* viewthing, float max_disk_r, bool lensingOn, const unsigned char* diskMask) {
+	const float* camParam, const float* solidangle, const float* solidangle_disk, float2* viewthing, float min_disk_r, float max_disk_r, bool lensingOn, const unsigned char* diskMask) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 	int ind = i * M1 + j;
@@ -99,8 +104,8 @@ __global__ void addAccretionDisk(const float2* thphi, const float3* disk_inciden
 			avg_thp = 0.25 * avg_thp;
 			avg_incident = 0.25 * avg_incident;
 
-			double temp = lookUpTemperature(temperature_table, temperature_table_step_size, temperature_table_size, fmaxf(avg_thp.x / 2,MIN_STABLE_ORBIT/2));
-			double max_temp = lookUpTemperature(temperature_table, temperature_table_step_size, temperature_table_size, 4.8);
+			double temp = lookUpTemperature(temperature_table, min_disk_r/2, temperature_table_step_size, temperature_table_size, fmaxf(avg_thp.x / 2, min_disk_r/2));
+			double max_temp = lookUpTemperature(temperature_table, min_disk_r/2, temperature_table_step_size, temperature_table_size, MAX_TEMPERATURE_R);
 
 
 			float grav_redshift = metric::calculate_gravitational_redshift<float>(avg_thp.x, avg_thp.x * avg_thp.x);
@@ -152,7 +157,7 @@ __global__ void addAccretionDisk(const float2* thphi, const float3* disk_inciden
 				findLensingRedshift(M, ind, camParam, viewthing, frac_disk, redshft, solidangle_disk[ijc]);
 				//findLensingRedshift(M, ind, camParam, viewthing, frac_sky, redshft, solidangle[ijc]);
 				
-				P *= (1 - lensing_alpha) * frac_disk + lensing_alpha * frac_sky;
+				//P *= (1 - lensing_alpha) * frac_disk + lensing_alpha * frac_sky;
 			}
 
  			P *= intensity_factor;
@@ -192,7 +197,7 @@ __device__ int2 coord_min(int2* coords) {
 	};
 }
 
-__global__ void addAccretionDiskTexture(const float2* thphi, const int M, const unsigned char* bh, uchar4* out, float4* summed_texture, float  maxAccretionRadius, int tex_width, int tex_height,
+__global__ void addAccretionDiskTexture(const float2* thphi, const int M, const unsigned char* bh, uchar4* out, float4* summed_texture, float  minAccretionRadius, float  maxAccretionRadius, int tex_width, int tex_height,
 	const float* camParam, const float* solidangle, const float* solidangle_disk, float2* viewthing, bool lensingOn, const unsigned char* diskMask) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
@@ -215,7 +220,7 @@ __global__ void addAccretionDiskTexture(const float2* thphi, const int M, const 
 		for (int k = 0; k < 4; k++) {
 			tex_coord[k] = {
 				((int)(((corners[k].y / PI2) * (tex_width - 1)) + tex_width) % tex_width),
-				(int)(fmaxf(fminf((corners[k].x - MIN_STABLE_ORBIT) / (maxAccretionRadius - MIN_STABLE_ORBIT), 1.0f), 0.0f) * (tex_height - 1))
+				(int)(fmaxf(fminf((corners[k].x - minAccretionRadius) / (maxAccretionRadius - minAccretionRadius), 1.0f), 0.0f) * (tex_height - 1))
 			};
 		}
 		
@@ -317,7 +322,7 @@ __global__ void addAccretionDiskTexture(const float2* thphi, const int M, const 
 			HSPtoRGB(H, S, min(1.f, P), out_color.z, out_color.y, out_color.x);
 		}
 
-		if (corners[0].x < MIN_STABLE_ORBIT || corners[1].x < MIN_STABLE_ORBIT || corners[2].x < MIN_STABLE_ORBIT || corners[3].x < MIN_STABLE_ORBIT) {
+		if (corners[0].x < minAccretionRadius || corners[1].x < minAccretionRadius || corners[2].x < minAccretionRadius || corners[3].x < minAccretionRadius) {
 			color.w = 0.0f;
 		}
 

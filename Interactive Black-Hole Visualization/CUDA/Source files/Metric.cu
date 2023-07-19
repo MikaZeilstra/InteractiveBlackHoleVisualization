@@ -25,15 +25,17 @@ namespace metric {
 	/// <param name="afactor"></param> The factor of angular momentum over mass
 	/// <param name="accretionRadius"></param> The maximum radius of the accretion disk 
 	/// <returns></returns>
-	template <class T> __host__ void setMetricParameters(T afactor, T accretionRadius, bool useDisk) {
+	template <class T> __host__ void setMetricParameters(T afactor, T accretionMinRadius, T accretionMaxRadius, bool useDisk) {
 		metric::a<T> = afactor;
 		metric::asq<T> = afactor * afactor;
-		metric::accretionDiskRadius<T> = accretionRadius;
+		metric::accretionDiskMaxRadius<T> = accretionMaxRadius;
+		metric::accretionDiskMinRadius<T> = accretionMinRadius;
 		metric::useAccretionDisk = useDisk;
 
 		cudaMemcpyToSymbol(metric::a_dev<T>, &a<T>, sizeof(T));
 		cudaMemcpyToSymbol(metric::asq_dev<T>, &asq<T>, sizeof(T));
-		cudaMemcpyToSymbol(metric::accretionDiskRadius_dev<T>, &accretionDiskRadius<T>, sizeof(T));
+		cudaMemcpyToSymbol(metric::accretionDiskMaxRadius_dev<T>, &accretionDiskMaxRadius<T>, sizeof(T));
+		cudaMemcpyToSymbol(metric::accretionDiskMinRadius_dev<T>, &accretionDiskMinRadius<T>, sizeof(T));
 		cudaMemcpyToSymbol(metric::useAccretionDisk_dev, &useAccretionDisk, sizeof(bool));
 	}
 
@@ -396,7 +398,7 @@ namespace metric {
 				//Store the r of the crossing in the phi coordinate for refinement, if it is a real hit it wil be overwritten, otherwise
 				disk_phi = r;
 
-				if (r > MIN_STABLE_ORBIT && r < BH_MAX_ACCRETION_RADIUS) {
+				if (r > BH_MIN_ACCRETION_RADIUS && r < BH_MAX_ACCRETION_RADIUS) {
 				
 					//Save location
 					T var_disk_tmp[NUMBER_OF_EQUATIONS];

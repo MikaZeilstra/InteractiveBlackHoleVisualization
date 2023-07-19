@@ -21,7 +21,7 @@
 #define dptdz varOut[4]
 
 //The datatype used for integration
-#define INTEGRATION_PRECISION_MODE double
+#define INTEGRATION_PRECISION_MODE float
 
 #define SAFETY 0.9
 #define PGROW -0.2
@@ -58,19 +58,18 @@ c1 = 37.0 / 378.0, c3 = 250.0 / 621.0, c4 = 125.0 / 594.0, c6 = 512.0 / 1771.0
 #define BUTCHER_ERROR dc1 = 37.0 / 378.0 - 2825.0 / 27648.0, dc3 = 250.0 / 621.0 - 18575.0 / 48384.0,\
 dc4 = 125.0 / 594.0 - 13525.0 / 55296.0, dc5 = -277.00 / 14336.0, dc6 = 512.0 / 1771.0 - 0.25
 
-//The minimum radius of the accretion disk
-#define MIN_STABLE_ORBIT 6
-
 
 //Macros for variables which have a Device and host version
 #ifndef __CUDA_ARCH__
 #define BH_A metric::a<T>
 #define BH_ASQ metric::asq<T>
-#define BH_MAX_ACCRETION_RADIUS metric::accretionDiskRadius<T>
+#define BH_MAX_ACCRETION_RADIUS metric::accretionDiskMaxRadius<T>
+#define BH_MIN_ACCRETION_RADIUS metric::accretionDiskMinRadius<T>
 #define BH_USE_ACCRETION_DISK metric::useAccretionDisk
 #else
 #define BH_A metric::a_dev<T>
 #define BH_ASQ metric::asq_dev<T>
-#define BH_MAX_ACCRETION_RADIUS metric::accretionDiskRadius_dev<T>
+#define BH_MAX_ACCRETION_RADIUS metric::accretionDiskMaxRadius_dev<T>
+#define BH_MIN_ACCRETION_RADIUS metric::accretionDiskMinRadius_dev<T>
 #define BH_USE_ACCRETION_DISK metric::useAccretionDisk_dev
 #endif // !__CUDA_ARCH__

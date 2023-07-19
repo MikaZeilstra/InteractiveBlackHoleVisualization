@@ -7,12 +7,14 @@
 namespace metric {
 	template <class T> static T a = 0;
 	template <class T> static T asq = 0;
-	template <class T> static T accretionDiskRadius = 0;
+	template <class T> static T accretionDiskMaxRadius = 0;
+	template <class T> static T accretionDiskMinRadius = 0;
 	static bool useAccretionDisk  = false;
 
 	template <class T> __device__ __constant__  static T a_dev = 0;
 	template <class T> __device__ __constant__  static T asq_dev = 0;
-	template <class T> __device__ __constant__  static T accretionDiskRadius_dev = 0;
+	template <class T> __device__ __constant__  static T accretionDiskMaxRadius_dev = 0;
+	template <class T> __device__ __constant__  static T accretionDiskMinRadius_dev = 0;
 	static bool __device__ __constant__ useAccretionDisk_dev = false;
 
 	template <class T> __device__ __host__ __forceinline__ T sq(T x);
@@ -38,9 +40,9 @@ namespace metric {
 	template <class T> __device__ __host__ __forceinline__ T calculate_gravitational_redshift(T r, T rsq);
 	template __device__ __host__ __forceinline__ float calculate_gravitational_redshift<float>(float r, float rsq);
 
-	template <class T> __host__ void setMetricParameters(T afactor, T accretionRadius, bool useDisk);
-	template __host__ void setMetricParameters<double>(double afactor, double accretionRadius, bool useDisk);
-	template __host__ void setMetricParameters<float>(float afactor, float accretionRadius, bool useDisk);
+	template <class T> __host__ void setMetricParameters(T afactor, T accretionMinRadius, T accretionMaxRadius, bool useDisk);
+	template __host__ void setMetricParameters<double>(double afactor, double accretionMimRadius, double accretionMaxRadius, bool useDisk);
+	template __host__ void setMetricParameters<float>(float afactor, float accretionMinRadius, float accretionMaxRadius, bool useDisk);
 
 	template <class T> __device__ __host__ T calcSpeed(T r, T theta);
 	template __device__ __host__ double calcSpeed < double > (double r, double theta);

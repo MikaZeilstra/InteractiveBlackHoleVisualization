@@ -75,7 +75,7 @@ int main()
 	/* --------------------- INITIALIZATION BLACK HOLE -------------------- */
 
 	BlackHole black = BlackHole(param.afactor);
-	metric::setMetricParameters<INTEGRATION_PRECISION_MODE>(param.afactor,param.accretionDiskMaxRadius,param.useAccretionDisk);
+	metric::setMetricParameters<INTEGRATION_PRECISION_MODE>(param.afactor,param.accretionDiskMinRadius,param.accretionDiskMaxRadius,param.useAccretionDisk);
 	std::cout << "Initialized Black Hole " << std::endl << std::endl;
 
 	/* ----------------------- SETUP CUDA -------------------------- */

@@ -24,7 +24,7 @@ struct Parameters {
 	bool camSpeedChange, camInclinationChange, camRadiusChange, camPhiChange;
 	cv::Point2d camSpeedFromTo, camInclinationFromTo, camRadiusFromTo, camPhiFromTo;
 	double afactor;
-	double accretionDiskMaxRadius;
+	double accretionDiskMinRadius, accretionDiskMaxRadius;
 	double blackholeMass, blackholeAccretion;
 	int accretionTemperatureLUTSize = 0;
 	bool useAccretionDiskTexture = false;
@@ -283,7 +283,8 @@ struct Parameters {
 					accretionDiskTexture = str;
 				}
 
-				accretionDiskMaxRadius = config.lookup("accretionDiskRadius");
+				accretionDiskMaxRadius = config.lookup("accretionDiskMaxRadius");
+				accretionDiskMinRadius = config.lookup("accretionDiskMinRadius");
 				accretionTemperatureLUTSize = config.lookup("temperatureLUTSize");
 				blackholeMass = config.lookup("blackholeMass");
 				blackholeAccretion = config.lookup("blackholeAccretionRate");

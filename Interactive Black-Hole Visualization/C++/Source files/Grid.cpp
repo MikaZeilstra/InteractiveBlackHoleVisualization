@@ -23,7 +23,7 @@
 
 #define PRECCELEST 0.015
 #define DISK_PRECCELEST_RELAXATION 1
-#define MIN_CHECK_ACCRETION_RADIUS 1
+#define MIN_CHECK_ACCRETION_RADIUS 1.1
 
 #define MIN_GPU_INTEGRATION 50
 
@@ -407,6 +407,10 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 	int k = i + gap;
 	int l = (j + gap) % M;
 
+	if (i == 1024 && j == 1792) {
+		int q = i;
+	}
+
 	int k_low = std::max((int) i - gap, 0);
 	int k_high = std::min(k + gap, N-1);
 	int l_low = ((j - gap) + M) % M;
@@ -486,16 +490,27 @@ bool Grid::refineCheck(const uint32_t i, const uint32_t j, const int gap, const 
 	}
 
 	//If not on disk we need to check if the disk could be within this block
-	else if(param->useAccretionDisk && !topLeftNan){
+	else if(param->useAccretionDisk && !topLeft_on_disk){
 		//Check maximum change in the R coordinate at theta = 0.5 pi, as stored in the phi coordinate if not on the disk
 		float max_r_change = fmaxf(fabsf(disk_topLeft.y - disk_bottomLeft.y), fabsf(disk_topRight.y - disk_bottomLeft.y));
+		float min_r = fminf(fminf(disk_topLeft.y, disk_topRight.y), fminf(disk_bottomLeft.y, disk_bottomRight.y));
+		float max_r = fmaxf(fmaxf(disk_topLeft.y, disk_topRight.y), fmaxf(disk_bottomLeft.y, disk_bottomRight.y));
 
-		//If any corner is within this change of the disk + some slack refine.
-		if (disk_topLeft.y - max_r_change < param->accretionDiskMaxRadius * MIN_CHECK_ACCRETION_RADIUS ||
-			disk_topRight.y - max_r_change < param->accretionDiskMaxRadius * MIN_CHECK_ACCRETION_RADIUS ||
-			disk_bottomLeft.y - max_r_change < param->accretionDiskMaxRadius * MIN_CHECK_ACCRETION_RADIUS ||
-			disk_bottomRight.y - max_r_change < param->accretionDiskMaxRadius * MIN_CHECK_ACCRETION_RADIUS ) {
-			
+		//If the minimum corner is within this range of the maximum refine
+		if (min_r - max_r_change < param->accretionDiskMaxRadius * MIN_CHECK_ACCRETION_RADIUS && min_r > param->accretionDiskMinRadius ) {
+			return true;
+		}
+
+
+		//If any corner is within this range of the minimum refine
+		if (max_r + max_r_change > param->accretionDiskMinRadius * MIN_CHECK_ACCRETION_RADIUS && max_r < param->accretionDiskMaxRadius) {
+			return true;
+		}
+
+		
+
+		//If the block is contains the disk refine 
+		if (max_r > param->accretionDiskMaxRadius && min_r < param->accretionDiskMinRadius) {
 			return true;
 		}
 	}
