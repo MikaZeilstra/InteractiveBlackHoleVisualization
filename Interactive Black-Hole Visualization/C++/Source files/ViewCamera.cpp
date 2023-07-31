@@ -4,6 +4,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtx/rotate_vector.hpp>
+#include "../Header files/Parameters.h"
 //#include <glm/gtx/ma>
 
 #define MOUSE_SENSITIVITY 0.01
@@ -12,13 +13,22 @@ ViewCamera::ViewCamera(GLFWwindow* pWindow)
     : m_pWindow(pWindow)
 {}
 
-ViewCamera::ViewCamera(GLFWwindow* pWindow, glm::vec3 CameraDirection, glm::vec3 upDirection, int window_width, int window_height, float Fov) {
-    m_pWindow = pWindow;
+ViewCamera::ViewCamera(Parameters* param, glm::vec3 CameraDirection, glm::vec3 upDirection) {
     m_CameraDirection = glm::normalize(CameraDirection);
     m_UpDirection = glm::normalize(upDirection);
-    m_CameraFov = 1/tan(Fov);
-    inv_project_matrix = glm::inverse(glm::perspective(Fov, window_width / (float)window_height, 1.0f, 10.0f));
+    m_CameraFov = 1 / tan(param->fov);
 
+
+    screen_width = param->windowWidth;
+    screen_height = param->windowHeight;
+
+    m_param = param;
+
+    world_pos = {
+        param->camRadiusFromTo.x,
+        param->camInclinationFromTo.x,
+        param->camPhiFromTo.x
+    };
 }
 
 GLFWwindow* ViewCamera::get_window() {
@@ -92,4 +102,21 @@ void ViewCamera::rotatePitch(float angle)
 void ViewCamera::rotateRoll(float angle)
 {
     m_UpDirection = glm::normalize(glm::angleAxis(angle, m_CameraDirection) * m_UpDirection);
+}
+
+void ViewCamera::set_window(GLFWwindow* window) {
+    m_pWindow = window;
+}
+
+double3 ViewCamera::getCameraPos(int grid_nr) {
+    if (m_param->movementMode == 0) {
+        return world_pos;
+    }
+    else if (m_param->movementMode == 1) {
+        return {
+                    m_param->getRadius(grid_nr),
+                    m_param->getInclination(grid_nr),
+                    0
+        };
+    }
 }

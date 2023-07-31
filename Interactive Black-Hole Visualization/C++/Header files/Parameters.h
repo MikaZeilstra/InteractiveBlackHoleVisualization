@@ -2,13 +2,14 @@
 #include "opencv2/imgcodecs/imgcodecs.hpp"
 #include <iostream>
 #include <libconfig.h++>
+#include <iomanip>
 #include "../../CUDA/Header files/Constants.cuh"
 
 struct Parameters {
 	
-	bool sphereView, angleView;
+	bool sphereView;
 	int windowWidth, windowHeight = 1920;
-	float focalLength = 5;
+	float fov = 70;
 	int texWidth, texHeight;
 	double viewAngle;
 	cv::Point2i viewOffset;
@@ -35,6 +36,8 @@ struct Parameters {
 	int n_disk_angles, n_disk_sample, max_disk_segments;
 	bool useRandomStars;
 	float randomStarSelectionChance;
+
+	int movementMode = -1;
 
 	float2 bh_center = {};
 
@@ -156,7 +159,7 @@ struct Parameters {
 	}
 	
 	/// <summary>
-	/// Returns Phi for given frame
+	/// Returns Phi for given grid number
 	/// </summary>
 	/// <param name="step">Frame number</param>
 	/// <returns></returns>
@@ -255,15 +258,24 @@ struct Parameters {
 			useRandomStars = config.lookup("randomStarSelection");
 			randomStarSelectionChance = config.lookup("randomSelectionChance");
 
+			movementMode = config.lookup("movementMode");
+
 			userSpeed = config.lookup("userSpeed");
 			br = config.lookup("br");
 			bphi = config.lookup("bphi");
 			btheta = config.lookup("btheta");
+
+			fov = config.lookup("cameraFov");
+
+			//Lookup (initial) camera position
 			camSpeedFromTo.x = config.lookup("camSpeed");
 			camRadiusFromTo.x = config.lookup("camRadius");
 			camInclinationFromTo.x = config.lookup("camInclination");
-			angleView = camInclinationFromTo.x != 0.5;
-			camInclinationFromTo *= PI;
+			camPhiFromTo.x = config.lookup("camPhi");
+			camInclinationFromTo.x *= PI;
+			camPhiFromTo.x *= PI;
+
+			
 
 			afactor = config.lookup("afactor");
 
@@ -294,32 +306,38 @@ struct Parameters {
 				max_disk_segments = config.lookup("max_disk_segments");
 
 			}
+			
+			//If we move allong a path lookup the ending locations
+			if (movementMode = 1) {
+				camSpeedChange = config.lookup("camSpeedChange");
+				if (camSpeedChange) {
+					camSpeedFromTo.y = config.lookup("camSpeedTo");
+				}
 
-			camSpeedChange = config.lookup("camSpeedChange");
-			if (camSpeedChange) {
-				camSpeedFromTo.x = config.lookup("camSpeedFrom");
-				camSpeedFromTo.y = config.lookup("camSpeedTo");
+				camRadiusChange = config.lookup("camRadiusChange");
+				if (camRadiusChange) {
+					camRadiusFromTo.y = config.lookup("camRadiusTo");
+				}
+
+				camInclinationChange = config.lookup("camInclinationChange");
+				if (camInclinationChange) {
+					camInclinationFromTo.y = config.lookup("camInclinationTo");
+					camInclinationFromTo.y *= PI;
+				}
+
+				camPhiChange = config.lookup("camPhiChange");
+				if (camPhiChange) {
+					camPhiFromTo.y = config.lookup("camPhiTo");
+					camPhiFromTo.y *= PI;
+				}
+			}
+			//If we dont move allong the path set frames and grids to 1
+			else {
+				nrOfFrames = 1;
+				gridNum = 1;
 			}
 
-			camRadiusChange = config.lookup("camRadiusChange");
-			if (camRadiusChange) {
-				camRadiusFromTo.x = config.lookup("camRadiusFrom");
-				camRadiusFromTo.y = config.lookup("camRadiusTo");
-			}
-
-			camInclinationChange = config.lookup("camInclinationChange");
-			if (camInclinationChange) {
-				camInclinationFromTo.x = config.lookup("camInclinationFrom");
-				camInclinationFromTo.y = config.lookup("camInclinationTo");
-				camInclinationFromTo *= PI;
-			}
-
-			camPhiChange = config.lookup("camPhiChange");
-			if (camPhiChange) {
-				camPhiFromTo.x = config.lookup("camPhiFrom");
-				camPhiFromTo.y = config.lookup("camPhiTo");
-				camPhiFromTo *= PI;
-			}
+			
 		}
 		catch (libconfig::SettingNotFoundException& e) {
 			std::cerr << "Incorrect setting(s) in configuration file." << std::endl;

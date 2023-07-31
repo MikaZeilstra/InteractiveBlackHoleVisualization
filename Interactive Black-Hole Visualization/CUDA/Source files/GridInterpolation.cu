@@ -48,15 +48,15 @@ __global__ void camUpdate(const float alpha, const int g, const float* camParam,
 
 
 __global__ void pixInterpolation(const float2* viewthing, const int M, const int N, const bool should_interpolate_grids, float2* thphi, const float2* grid, const float2* grid_2,
-	const int GM, const int GN, const float hor, const float ver, int* gapsave, int gridlvl,
+	const int GM, const int GN, int* gapsave, int gridlvl,
 	const float2* bhBorder, const int angleNum, const float alpha) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 
 
 	if (i < N1 && j < M1) {
-		float theta = viewthing[i * M1 + j].x + ver;
-		float phi = fmodf(viewthing[i * M1 + j].y + hor + PI2, PI2);
+		float theta = viewthing[i * M1 + j].x;
+		float phi = fmodf(viewthing[i * M1 + j].y + PI2, PI2);
 		float2 grid_point = { (theta / (PI / ((float)GN))) ,  (phi / (PI2 / ((float)GM))) };
 
 
@@ -120,15 +120,15 @@ __global__ void pixInterpolation(const float2* viewthing, const int M, const int
 }
 
 __global__ void disk_pixInterpolation(const float2* viewthing, const int M, const int N, const bool should_interpolate_grids, float2* disk_thphi, float3* disk_incident, const float2* disk_grid, const float3* disk_incident_grid,
-	float2* disk_summary, float2* disk_summary_2, float3* disk_incident_summary, float3* disk_incident_summary_2, const int n_disk_angles, const int n_disk_sample, const int n_disk_segments, const int GM, const int GN, const float hor, const float ver, int* gapsave, int gridlvl,
+	float2* disk_summary, float2* disk_summary_2, float3* disk_incident_summary, float3* disk_incident_summary_2, const int n_disk_angles, const int n_disk_sample, const int n_disk_segments, const int GM, const int GN, int* gapsave, int gridlvl,
 	const float2* bhBorder, const int angleNum, float alpha) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 	if (i < N1 && j < M1) {
 		disk_thphi[i * M1 + j] = { nanf(""),0 };
 		
-		float theta = viewthing[i * M1 + j].x + ver;
-		float phi = fmodf(viewthing[i * M1 + j].y + hor + PI2, PI2);
+		float theta = viewthing[i * M1 + j].x;
+		float phi = fmodf(viewthing[i * M1 + j].y + PI2, PI2);
 		if (should_interpolate_grids) {
 
 			//Calculate angle and angleslot from blackhole center.

@@ -14,9 +14,10 @@ viewAngle = 0.5 //*PI
 offsetX = 0 // *PI
 offsetY = 0 // *PI
 
-//Frame settings
-nrOfFrames = 1
-nrOfGrids = 1
+//Frame settings if not movement mode 1 they are automatically overwritten to 1
+nrOfFrames = 250
+nrOfGrids = 2
+
 n_black_hole_angles = 50;
 
 //Effect settings
@@ -27,8 +28,8 @@ useStars = false
 //AccretionDisk
 useAccretionDisk = true
 //Minimum and maximum accretion disk radius 6 is the minimum stable orbit around the black hole and lower values for the minimum will cause issues
-accretionDiskMinRadius = 9.
-accretionDiskMaxRadius = 18.
+accretionDiskMinRadius = 6.
+accretionDiskMaxRadius = 40.
 temperatureLUTSize = 500
 blackholeMass = 3.5e9 //Mass of the black hole in solar masses
 blackholeAccretionRate = 0.1 //The accretion rate of the black hole in solar masses per year
@@ -69,31 +70,38 @@ gridMaxLevel = 11
 // Blackhole angular velocity
 afactor = 0.982;
 
-// Camera location, speed, direction
-camRadius = 30.
-camInclination = 0.496 //*PI
+// Movement mode determines what should happen
+// 0 = single frame
+// 1 = Move along path
+// 2 = Free movement
+movementMode = 1
+
+// Camera (starting) location, speed, direction
+cameraFov = 70.
+
+camRadius = 50.
+camInclination = 0.4 //*PI
+camPhi = 0. //*PI
+camSpeed = 0.32001
+
 // If a custom user speed is used.
 userSpeed = false
-camSpeed = 0.32001
+
 // Camera Direction Vector
 br = 0.
 bphi = 1.
 btheta = 0.
 
-// Changing parameters
+// if movement mode 1 the final value of the parameters
 camSpeedChange = false
-camSpeedFrom = 0.32001
 camSpeedTo = 0.0001
 
 camRadiusChange = false
-camRadiusFrom = 60.
 camRadiusTo = 30.
 
-camInclinationChange = false
-camInclinationFrom = 0.445 //*PI
-camInclinationTo = 0.455 //*PI
+camInclinationChange = true
+camInclinationTo = 0.45 //*PI
 
 camPhiChange = false
-camPhiFrom = 0. //*PI
 camPhiTo = 0.5 //*PI
 

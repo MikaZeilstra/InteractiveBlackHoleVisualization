@@ -8,6 +8,7 @@
 //#include <cuda_gl_interop.h>
 #include <chrono>
 #include <vector>
+#include <vector_types.h>
 
 #include "GridLookup.cuh"
 #include "intellisense_cuda_intrinsics.cuh"
@@ -17,6 +18,7 @@
 #include "StarDeformation.cuh"
 #include "ShadowComputation.cuh"
 #include "ImageDeformation.cuh"
+#include "glad.h"
 
 #include "../../C++/Header files/CelestialSkyProcessor.h"
 #include "../../C++/Header files/Grid.h"
@@ -174,6 +176,9 @@ namespace CUDA {
 			trailnum = 30;
 			diffusionFilter = gaussian * 2 + 1;
 			searchNr = (int)powf(2, stars.treeLevel / 3 * 2);
+
+			starSize = stars.starSize;
+			treeLevel = stars.treeLevel;
 		}
 		cv::Mat diffImgSmall;
 		int gaussian;
@@ -183,6 +188,49 @@ namespace CUDA {
 		uchar3* diffraction;
 		int diffSize;
 
+		int starSize;
+		int treeLevel;
+
+	};
+
+	struct GPUBlocks {
+		GPUBlocks(Parameters& param, const Stars& stars,const Image image) {
+			numBlocks_starsize = stars.starSize / threadsPerBlock_32 + 1;
+			numBlocks_bordersize = (param.n_black_hole_angles * 2) / threadsPerBlock_32 + 1;
+			numBlocks_tempLUT = param.accretionTemperatureLUTSize / threadsPerBlock_32 + 1;
+			numBlocks_disk_edges = (param.n_disk_angles) / threadsPerBlock_32 + 1;
+
+			numBlocks_N_M_4_4 = { (image.N - 1) / threadsPerBlock4_4.x + 1, (image.M - 1) / threadsPerBlock4_4.y + 1 };
+			numBlocks_N1_M1_4_4 = { image.N / threadsPerBlock4_4.x + 1, image.M / threadsPerBlock4_4.y + 1 };
+			numBlocks_GN_GM_4_4 = { (param.grid_N - 1) / threadsPerBlock4_4.x + 1, (param.grid_M - 1) / threadsPerBlock4_4.y + 1 };
+
+			numBlocks_GN_GM_5_25 = { (param.grid_N - 1) / threadsPerBlock5_25.x + 1, (param.grid_M - 1) / threadsPerBlock5_25.y + 1 };
+			numBlocks_N_M_5_25 = { (image.N - 1) / threadsPerBlock5_25.x + 1, (image.M - 1) / threadsPerBlock5_25.y + 1 };
+			numBlocks_N1_M1_5_25 = { image.N / threadsPerBlock5_25.x + 1, image.M / threadsPerBlock5_25.y + 1 };
+
+			numBlocks_N_M_1_24 = { (image.N - 1) / threadsPerBlock1_24.x + 1, (image.M - 1) / threadsPerBlock1_24.y + 1 };
+
+		}
+
+		int threadsPerBlock_32 = 32;
+
+		int numBlocks_starsize;
+		int numBlocks_bordersize;
+		int numBlocks_tempLUT;
+		int numBlocks_disk_edges;
+
+		dim3 threadsPerBlock4_4 = { 4, 4 };
+		dim3 numBlocks_N_M_4_4;
+		dim3 numBlocks_N1_M1_4_4;
+		dim3 numBlocks_GN_GM_4_4;
+
+		dim3 threadsPerBlock5_25 = { 5, 25 };
+		dim3 numBlocks_GN_GM_5_25;
+		dim3 numBlocks_N_M_5_25;
+		dim3 numBlocks_N1_M1_5_25;
+
+		dim3 threadsPerBlock1_24 = { 1, 24 };
+		dim3 numBlocks_N_M_1_24;
 	};
 
 	cudaError_t cleanup();
@@ -195,7 +243,7 @@ namespace CUDA {
 
 	void init();
 
-	void call(BlackHole* bh, StarProcessor& stars, Viewer& view, CelestialSkyProcessor& celestialSky, Texture& accretionTexture, Parameters& param);
+	void call(BlackHole* bh, StarProcessor& stars, Viewer& view, CelestialSkyProcessor& celestialSky, Texture& accretionTexture, Parameters& param, ViewCamera* viewer);
 
 	//unsigned char* getDiffractionImage(const int size);
 	void allocateGridMemory(size_t size);
@@ -205,7 +253,7 @@ namespace CUDA {
 		const Stars& stars, const StarVis& starvis,const Texture accretionTexture, const Parameters& param);
 
 	void runKernels(BlackHole* bh, const Image& image, const CelestialSky& celestialSky,
-		const Stars& stars, const StarVis& starvis, const Texture& accretionDiskTexture, Parameters& param);
+		const Stars& stars, const StarVis& starvis, const Texture& accretionDiskTexture, Parameters& param, ViewCamera* viewer);
 
 	template <class T> void integrateGrid(const T rV, const T thetaV, const T phiV, std::vector <T>& pRV,
 		std::vector <T>& bV, std::vector <T>& qV, std::vector <T>& pThetaV, float3* disk_incident);
@@ -214,7 +262,7 @@ namespace CUDA {
 	template void integrateGrid<float>(const float rV, const float thetaV, const float phiV, std::vector <float>& pRV,
 		std::vector <float>& bV, std::vector <float>& qV, std::vector <float>& pThetaV, float3* disk_incident);
 
-	ViewCamera* glfw_setup(int screen_width, int screen_height);
+	void glfw_setup(ViewCamera* camera);
 
 	/// <summary>
 	/// Requests a grid to be generated and send to the GPU
@@ -230,6 +278,14 @@ namespace CUDA {
 	/// <param name="dev_inc">GPU pointer to store generated disk incident angles</param>
 	void requestGrid(double3 cam_pos, double3 cam_speed_dir, float speed, BlackHole* bh, Parameters* param, float* dev_cam, float2* dev_grid, float2* dev_disk, float3* dev_inc);
 
+	void CreateTexture(Parameters& param, const Image& image, const StarVis& starvis, const Texture accretionDiskTexture, const CelestialSky& celestialsky, const GPUBlocks& gpublocks,
+		float camera_phi_offset, int q, bool should_interpolate_grids, float grid_alpha);
+
+	void projectTextureToWindow(Parameters& param, const Image& image, ViewCamera* viewer, GLuint gl_PBO, GLuint gl_Tex, GLuint shaderProgram);
+
+
+	void saveImages(Parameters& param, const Image& image, float grid_value, int q);
+
 	/// <summary>
 	/// Swaps grid and related variables with grid_2 and related
 	/// </summary>
@@ -238,6 +294,7 @@ namespace CUDA {
 	std::string readFile(const char* filePath);
 
 	void gridLevelCount(Grid& grid);
+
 
 }
 

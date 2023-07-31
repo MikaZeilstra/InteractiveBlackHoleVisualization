@@ -143,8 +143,10 @@ int main()
 	Viewer view = Viewer(param);
 	std::cout << "Initialized Viewer " << std::endl << std::endl;
 
+
+	ViewCamera* camera = new ViewCamera(&param,{ -1,0,0 }, { 0,0,1 });
 	/* ----------------------- CALL CUDA ----------------------- */
 	//Distorter spacetime(&grids, &view, &starProcessor, &cams, &celestialProcessor);
-	CUDA::call(&black, starProcessor, view, celestialSkyProcessor, accretionTexture, param);
+	CUDA::call(&black, starProcessor, view, celestialSkyProcessor, accretionTexture, param, camera);
 
 }

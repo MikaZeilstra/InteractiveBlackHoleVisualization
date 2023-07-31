@@ -4,6 +4,7 @@
 #define GLFW_INCLUDE_NONE
 #include <glfw3.h>
 #include "../../CUDA/Header files/Constants.cuh"
+#include "../Header files/Parameters.h"
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
 void mouse_cursor_callback(GLFWwindow* window, double xpos, double ypos);
@@ -11,9 +12,8 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
 class ViewCamera {
 public:
-
     ViewCamera(GLFWwindow* pWindow);
-    ViewCamera(GLFWwindow* pWindow, glm::vec3 CameraDirection, glm::vec3 up_direction, int window_width, int window_height, float Fov);
+    ViewCamera(Parameters* param, glm::vec3 CameraDirection, glm::vec3 upDirection);
 
     GLFWwindow* get_window();
 
@@ -25,19 +25,29 @@ public:
     
     GLFWwindow* m_pWindow;
     glm::dvec2 m_prevCursorPos{ 0 };
-    
-    glm::mat4 inv_project_matrix;
 
-    float m_CameraFov = {};
+    float m_CameraFov = 70;
+    int screen_width = 0;
+    int screen_height = 0;
 
     bool mouse_pressed = false;
+
+    Parameters* m_param = nullptr;
+
+    /// <summary>
+    /// Returns the position of the camera
+    /// </summary>
+    /// <param name="angle">The number of the grid we want the position for. Ignored if movementmode != 1</param>
+    double3 getCameraPos(int grid_nr);
 
     void updateInput();
     void rotateYaw(float angle);
     void rotatePitch(float angle);
     void rotateRoll(float angle);
 
+    void set_window(GLFWwindow* window);
+
 private:
-  
+    double3 world_pos;
     
 };
