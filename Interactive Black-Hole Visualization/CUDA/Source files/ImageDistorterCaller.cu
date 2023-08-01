@@ -131,9 +131,10 @@ unsigned char* dev_blackHoleMask = 0;
 unsigned char* dev_diskMask = 0;
 float2* dev_blackHoleBorder0 = 0;
 float2* dev_blackHoleBorder1 = 0;
+float2* dev_blackHoleBorder_temp = 0;
 
 float* dev_solidAngles0 = 0;
-float* dev_solidAngles1 = 0;
+float* dev_solidAngles_temp = 0;
 
 float* dev_solidAngles0_disk = 0;
 
@@ -185,9 +186,10 @@ cudaError_t CUDA::cleanup() {
 	cudaFree(dev_diskMask);
 	cudaFree(dev_blackHoleBorder0);
 	cudaFree(dev_blackHoleBorder1);
+	cudaFree(dev_blackHoleBorder_temp);
 
 	cudaFree(dev_solidAngles0);
-	cudaFree(dev_solidAngles1);
+	cudaFree(dev_solidAngles_temp);
 
 	cudaFree(dev_solidAngles0_disk);
 
@@ -363,11 +365,12 @@ void CUDA::memoryAllocationAndCopy(const Image& image, const CelestialSky& celes
 
 	allocate(dev_blackHoleMask, imageSize * sizeof(unsigned char), "blackHoleMask");
 	allocate(dev_diskMask, imageSize * sizeof(unsigned char), "blackHoleMask");
-	allocate(dev_blackHoleBorder0, ((param.n_black_hole_angles * 2) +1)* sizeof(float2), "blackHoleBorder0");
-	allocate(dev_blackHoleBorder1, ((param.n_black_hole_angles * 2) +1) * sizeof(float2), "BlackHOleBorder1");
+	allocate(dev_blackHoleBorder0, ((param.n_black_hole_angles * 2))* sizeof(float2), "blackHoleBorder0");
+	allocate(dev_blackHoleBorder1, ((param.n_black_hole_angles * 2)) * sizeof(float2), "BlackHOleBorder1");
+	allocate(dev_blackHoleBorder_temp, ((param.n_black_hole_angles * 2)) * sizeof(float2), "BlackHOleBorder1");
 
 	allocate(dev_solidAngles0, imageSize * sizeof(float), "solidAngles0");
-	allocate(dev_solidAngles1, imageSize * sizeof(float), "solidAngles1");
+	allocate(dev_solidAngles_temp, imageSize * sizeof(float), "solidAngles1");
 
 	allocate(dev_solidAngles0_disk, imageSize * sizeof(float), "solidAngles1");
 
@@ -395,8 +398,6 @@ void CUDA::memoryAllocationAndCopy(const Image& image, const CelestialSky& celes
 
 	std::cout << "Copying variables into CUDA memory..." << std::endl;
 	copyHostToDeviceAsync(dev_viewer, image.viewer, rastSize * sizeof(float2), "viewer");
-
-	copyHostToDeviceAsync(dev_blackHoleBorder0, &param.bh_center, sizeof(float2), "blackHoleBorder0");
 
 	copyHostToDeviceAsync(dev_starTree, stars.tree, treeSize * sizeof(int), "starTree");
 	copyHostToDeviceAsync(dev_starPositions, stars.stars, stars.starSize * 2 * sizeof(float), "starPositions");
@@ -584,26 +585,26 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 
 			if (q == 0) {
 				if (param.useAccretionDisk) {
-					callKernelAsync("disk_edges", CreateDiskSummary, gpuBlocks.numBlocks_disk_edges, gpuBlocks.threadsPerBlock_32, 0, param.grid_M, param.grid_N, dev_disk_grid, dev_incident_grid, dev_disk_summary, dev_disk_incident_summary, dev_blackHoleBorder0, param.accretionDiskMaxRadius, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments);
+					callKernelAsync("disk_edges", CreateDiskSummary, gpuBlocks.numBlocks_disk_edges, gpuBlocks.threadsPerBlock_32, 0, param.grid_M, param.grid_N, dev_disk_grid, dev_incident_grid, dev_disk_summary, dev_disk_incident_summary, param.bh_center, param.accretionDiskMaxRadius, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments);
 				}
 			}
 			
 
 
 			callKernelAsync("Find black-hole shadow border", findBhBorders, gpuBlocks.numBlocks_bordersize, gpuBlocks.threadsPerBlock_32, 0,
-				param.grid_M, param.grid_N, dev_grid, dev_grid_2, param.n_black_hole_angles, dev_blackHoleBorder0);
+				param.grid_M, param.grid_N, param.bh_center, dev_grid, dev_grid_2, param.n_black_hole_angles, dev_blackHoleBorder0);
 
 			callKernelAsync("Smoothed shadow border 1/4", smoothBorder, gpuBlocks.numBlocks_bordersize, gpuBlocks.threadsPerBlock_32, 0,
-				dev_blackHoleBorder0, dev_blackHoleBorder1, param.n_black_hole_angles);
+				dev_blackHoleBorder0, dev_blackHoleBorder_temp , param.n_black_hole_angles);
 			callKernelAsync("Smoothed shadow border 2/4", smoothBorder, gpuBlocks.numBlocks_bordersize, gpuBlocks.threadsPerBlock_32, 0,
-				dev_blackHoleBorder1, dev_blackHoleBorder0, param.n_black_hole_angles);
+				dev_blackHoleBorder_temp, dev_blackHoleBorder0, param.n_black_hole_angles);
 			callKernelAsync("Smoothed shadow border 3/4", smoothBorder, gpuBlocks.numBlocks_bordersize, gpuBlocks.threadsPerBlock_32, 0,
-				dev_blackHoleBorder0, dev_blackHoleBorder1, param.n_black_hole_angles);
+				dev_blackHoleBorder0, dev_blackHoleBorder_temp, param.n_black_hole_angles);
 			callKernelAsync("Smoothed shadow border 4/4", smoothBorder, gpuBlocks.numBlocks_bordersize, gpuBlocks.threadsPerBlock_32, 0,
-				dev_blackHoleBorder1, dev_blackHoleBorder0, param.n_black_hole_angles);
+				dev_blackHoleBorder_temp, dev_blackHoleBorder0, param.n_black_hole_angles);
 
 			if (param.useAccretionDisk) {
-				callKernelAsync("disk_edges", CreateDiskSummary, gpuBlocks.numBlocks_disk_edges, gpuBlocks.threadsPerBlock_32, 0, param.grid_M, param.grid_N, dev_disk_grid_2, dev_incident_grid_2, dev_disk_summary_2, dev_disk_incident_summary_2, dev_blackHoleBorder0, param.accretionDiskMaxRadius, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments);
+				callKernelAsync("disk_edges", CreateDiskSummary, gpuBlocks.numBlocks_disk_edges, gpuBlocks.threadsPerBlock_32, 0, param.grid_M, param.grid_N, dev_disk_grid_2, dev_incident_grid_2, dev_disk_summary_2, dev_disk_incident_summary_2, param.bh_center, param.accretionDiskMaxRadius, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments);
 			}
 		}
 
@@ -879,14 +880,14 @@ void CUDA::CreateTexture(Parameters& param, const Image& image, const StarVis&  
 
 	callKernelAsync("Interpolated grid", pixInterpolation, gpublocks.numBlocks_N1_M1_5_25, gpublocks.threadsPerBlock5_25, 0,
 		dev_viewer, image.M, image.N, should_interpolate_grids, dev_interpolatedGrid, dev_grid, dev_grid_2, param.grid_M, param.grid_N,
-		dev_gridGap, param.gridMaxLevel, dev_blackHoleBorder0, param.n_black_hole_angles, grid_alpha);
+		dev_gridGap, param.gridMaxLevel, dev_blackHoleBorder0, param.bh_center, param.n_black_hole_angles, grid_alpha);
 
 	if (param.useAccretionDisk) {
 		callKernelAsync("Interpolated disk grid", disk_pixInterpolation, gpublocks.numBlocks_N1_M1_5_25, gpublocks.threadsPerBlock5_25, 0,
 			dev_viewer, image.M, image.N, should_interpolate_grids, dev_interpolatedDiskGrid, dev_interpolatedIncidentGrid, dev_disk_grid, dev_incident_grid,
 			dev_disk_summary, dev_disk_summary_2, dev_disk_incident_summary, dev_disk_incident_summary_2, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments,
 			param.grid_M, param.grid_N,
-			dev_gridGap, param.gridMaxLevel, dev_blackHoleBorder0, param.n_black_hole_angles, grid_alpha);
+			dev_gridGap, param.gridMaxLevel, param.bh_center, param.n_black_hole_angles, grid_alpha);
 
 		callKernelAsync("Constructed disk mask", makeDiskCheck, gpublocks.numBlocks_N_M_5_25, gpublocks.threadsPerBlock5_25, 0,
 			dev_interpolatedDiskGrid, dev_diskMask, image.M, image.N);
@@ -897,14 +898,14 @@ void CUDA::CreateTexture(Parameters& param, const Image& image, const StarVis&  
 		dev_interpolatedGrid, image.M, image.N, dev_blackHoleMask);
 
 	callKernelAsync("Calculated solid angles", findArea, gpublocks.numBlocks_N_M_5_25, gpublocks.threadsPerBlock5_25, 0,
-		dev_interpolatedGrid, dev_interpolatedDiskGrid, image.M, image.N, dev_solidAngles0, dev_solidAngles0_disk, param.accretionDiskMaxRadius, dev_diskMask, dev_interpolatedIncidentGrid);
+		dev_interpolatedGrid, dev_interpolatedDiskGrid, image.M, image.N, param.useAccretionDisk, dev_solidAngles0, dev_solidAngles0_disk, param.accretionDiskMaxRadius, dev_diskMask, dev_interpolatedIncidentGrid);
 
 
 	callKernelAsync("Smoothed solid angles horizontally", smoothAreaH, gpublocks.numBlocks_N_M_5_25, gpublocks.threadsPerBlock5_25, 0,
-		dev_solidAngles1, dev_solidAngles0, dev_blackHoleMask, dev_gridGap, image.M, image.N, dev_diskMask);
+		dev_solidAngles_temp, dev_solidAngles0, dev_blackHoleMask, dev_gridGap, image.M, image.N, dev_diskMask);
 
 	callKernelAsync("Smoothed solid angles vertically", smoothAreaV, gpublocks.numBlocks_N_M_5_25, gpublocks.threadsPerBlock5_25, 0,
-		dev_solidAngles0, dev_solidAngles1, dev_blackHoleMask, dev_gridGap, image.M, image.N, dev_diskMask);
+		dev_solidAngles0, dev_solidAngles_temp, dev_blackHoleMask, dev_gridGap, image.M, image.N, dev_diskMask);
 
 
 

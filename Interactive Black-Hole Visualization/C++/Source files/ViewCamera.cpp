@@ -9,6 +9,8 @@
 
 #define MOUSE_SENSITIVITY 0.01
 
+#define PHI_THETA_SENSITIVITY 0.01
+
 ViewCamera::ViewCamera(GLFWwindow* pWindow)
     : m_pWindow(pWindow)
 {}
@@ -51,6 +53,12 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     else if (key == GLFW_KEY_E)
     {
         camera->rotateRoll(-MOUSE_SENSITIVITY);
+    }
+    else if (key == GLFW_KEY_D) {
+        camera->movePhi(PHI_THETA_SENSITIVITY);
+    }
+    else if (key == GLFW_KEY_A) {
+        camera->movePhi(-PHI_THETA_SENSITIVITY);
     }
 
 }
@@ -102,6 +110,15 @@ void ViewCamera::rotatePitch(float angle)
 void ViewCamera::rotateRoll(float angle)
 {
     m_UpDirection = glm::normalize(glm::angleAxis(angle, m_CameraDirection) * m_UpDirection);
+}
+
+
+void ViewCamera::movePhi(float phiChange) {
+    //Only update if we do free movement
+    if (m_param->movementMode == 2) {
+        world_pos.z += phiChange;
+        world_pos.z = fmodf(world_pos.z, 2 * PI);
+    }
 }
 
 void ViewCamera::set_window(GLFWwindow* window) {

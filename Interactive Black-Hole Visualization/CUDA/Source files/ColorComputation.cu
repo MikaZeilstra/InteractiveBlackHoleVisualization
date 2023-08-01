@@ -31,7 +31,7 @@ __device__ float getDeterminant(const float3& center,const float3& v1, const flo
 /// <param name="N"></param>
 /// <param name="area"></param>
 /// <returns></returns>
-__global__ void findArea(const float2* thphi, const float2* thphi_disk, const int M, const int N, float* area,float* area_disk, float max_accretion_radius, const unsigned char* diskMask, float3* incident_dirs) {
+__global__ void findArea(const float2* thphi, const float2* thphi_disk, const int M, const int N, bool use_disk, float* area,float* area_disk, float max_accretion_radius, const unsigned char* diskMask, float3* incident_dirs) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 	int ind = i * M1 + j;
@@ -39,11 +39,11 @@ __global__ void findArea(const float2* thphi, const float2* thphi_disk, const in
 	//Check if any pixel is on the accretion disk
 	if (i < N && j < M) {
 
-		
+
 		bool picheck = false;
 		float t[4];
 		float p[4];
-		
+
 		int lookup_ind = ind;
 		retrievePixelCorners(thphi, t, p, lookup_ind, M, picheck, 0.0f);
 
@@ -57,7 +57,7 @@ __global__ void findArea(const float2* thphi, const float2* thphi_disk, const in
 		float ph1[3] = { p[0], p[1], p[2] };
 		float th2[3] = { t[0], t[2], t[3] };
 		float ph2[3] = { p[0], p[2], p[3] };
-		
+
 		float a1 = calcAreax(th1, ph1);
 		float a2 = calcAreax(th2, ph2);
 		if (a1 == 0 || a2 == 0) {
@@ -67,80 +67,81 @@ __global__ void findArea(const float2* thphi, const float2* thphi_disk, const in
 			area[ijc] = INFINITY;
 			area[ijc] = a1 + a2;
 		}
-		
 
-		//If any pixel is on the accretion disk we cant simply calculate the "Naive" solidangle since it might be zero for example when the disk is at phi = pi.
-		//Therefore we calculate the area the pixel acctually covers and compare it to the area it should cover 
-		// We save the area normalized as if it was 1 away from the pinhole camera which we can simply calculate using right angled triangles as shown below 
-		//  p_a |\
-		//		| \
-		//		|  |\
-		//		|__|_\
-		//		
-		//		(r-1)	1
+		if (use_disk) {
+			//If any pixel is on the accretion disk we cant simply calculate the "Naive" solidangle since it might be zero for example when the disk is at phi = pi.
+			//Therefore we calculate the area the pixel acctually covers and compare it to the area it should cover 
+			// We save the area normalized as if it was 1 away from the pinhole camera which we can simply calculate using right angled triangles as shown below 
+			//  p_a |\
+			//		| \
+			//		|  |\
+			//		|__|_\
+			//		
+			//		(r-1)	1
 
-		float2 disk_vertices[4] = { thphi_disk[ind],thphi_disk[ind + 1],thphi_disk[ind + M1],thphi_disk[ind + M1 + 1] };
+			float2 disk_vertices[4] = { thphi_disk[ind],thphi_disk[ind + 1],thphi_disk[ind + M1],thphi_disk[ind + M1 + 1] };
 
-		int accretion_vertices[4];
-		int celestial_vertices[3];
-		int n_accretion_vertices = 0;
+			int accretion_vertices[4];
+			int celestial_vertices[3];
+			int n_accretion_vertices = 0;
 
-		float3 disk_incidents[4] = { incident_dirs[ind],incident_dirs[ind + 1],incident_dirs[ind + M1],incident_dirs[ind + M1 + 1] };
+			float3 disk_incidents[4] = { incident_dirs[ind],incident_dirs[ind + 1],incident_dirs[ind + M1],incident_dirs[ind + M1 + 1] };
 
-		//If we have four correct vertices we can simply calculate the area 
+			//If we have four correct vertices we can simply calculate the area 
 
-		float3 cartesian_vertices[4];
-		float distance = 0;
+			float3 cartesian_vertices[4];
+			float distance = 0;
 
-		for (int k = 0; k < 4; k++) {
-			cartesian_vertices[k] = {
-				sqrtf(disk_vertices[k].x * disk_vertices[k].x + metric::asq_dev<INTEGRATION_PRECISION_MODE>)* cos(disk_vertices[k].y),
-				sqrtf(disk_vertices[k].x * disk_vertices[k].x + metric::asq_dev<INTEGRATION_PRECISION_MODE>)* sin(disk_vertices[k].y),
-				0
-			};
-			distance += 0.25f * sqrt(vector_ops::sq_norm(disk_incidents[k]));
+			for (int k = 0; k < 4; k++) {
+				cartesian_vertices[k] = {
+					sqrtf(disk_vertices[k].x * disk_vertices[k].x + metric::asq_dev<INTEGRATION_PRECISION_MODE>) * cos(disk_vertices[k].y),
+					sqrtf(disk_vertices[k].x * disk_vertices[k].x + metric::asq_dev<INTEGRATION_PRECISION_MODE>) * sin(disk_vertices[k].y),
+					0
+				};
+				distance += 0.25f * sqrt(vector_ops::sq_norm(disk_incidents[k]));
+			}
+
+			//Calculate area of triangle 1
+			float3 e1 = cartesian_vertices[1] - cartesian_vertices[0];
+			float3 e2 = cartesian_vertices[2] - cartesian_vertices[0];
+			float3 cross1 = vector_ops::cross(e1, e2);
+			float a1_disk = sqrtf(vector_ops::dot(cross1, cross1)) / 2;
+
+			if (a1_disk == 0) {
+				area_disk[ijc] = -1;
+				return;
+			}
+
+			//Calculate area of triangle 2
+			float3 e3 = cartesian_vertices[1] - cartesian_vertices[3];
+			float3 e4 = cartesian_vertices[2] - cartesian_vertices[3];
+			float3 cross2 = vector_ops::cross(e3, e4);
+			float a2_disk = sqrtf(vector_ops::dot(cross2, cross2)) / 2;
+
+			if (a2_disk == 0 || (a1_disk + a2_disk) / a1_disk < 1.1 || (a1_disk + a2_disk) / a2_disk < 1.1) {
+				area_disk[ijc] = -1;
+				return;
+			}
+
+			//Normalize area as tangent square to unit-sphere around camera
+			float normalized_area = (a1_disk + a2_disk) / (distance * distance);
+
+
+
+			//calcute solid angle by getting the area of the circle inside the pyramid of the tangent square and the camera position see 1d projection below
+			//	  |\
+			//	  | \
+			//	  | (\
+			//x/2 |(  \
+			//	  |(___\ alpha
+	// 			//		 1	
+			float x = sqrtf(normalized_area);
+			float alpha = 2 * atanf(x / 2);
+			float sphere_area = alpha * alpha / PI;
+			area_disk[ijc] = sphere_area;
+
+
 		}
-
-		//Calculate area of triangle 1
-		float3 e1 = cartesian_vertices[1] - cartesian_vertices[0];
-		float3 e2 = cartesian_vertices[2] - cartesian_vertices[0];
-		float3 cross1 = vector_ops::cross(e1, e2);
-		float a1_disk = sqrtf(vector_ops::dot(cross1, cross1)) / 2;
-
-		if (a1_disk == 0) {
-			area_disk[ijc] = -1;
-			return;
-		}
-
-		//Calculate area of triangle 2
-		float3 e3 = cartesian_vertices[1] - cartesian_vertices[3];
-		float3 e4 = cartesian_vertices[2] - cartesian_vertices[3];
-		float3 cross2 = vector_ops::cross(e3, e4);
-		float a2_disk = sqrtf(vector_ops::dot(cross2, cross2)) / 2;
-
-		if (a2_disk == 0 || (a1_disk + a2_disk) / a1_disk < 1.1 || (a1_disk + a2_disk) / a2_disk < 1.1) {
-			area_disk[ijc] = -1;
-			return;
-		}
-
-		//Normalize area as tangent square to unit-sphere around camera
-		float normalized_area = (a1_disk + a2_disk) / (distance * distance);
-
-
-
-		//calcute solid angle by getting the area of the circle inside the pyramid of the tangent square and the camera position see 1d projection below
-		//	  |\
-		//	  | \
-		//	  | (\
-		//x/2 |(  \
-		//	  |(___\ alpha
-// 			//		 1	
-		float x = sqrtf(normalized_area);
-		float alpha = 2 * atanf(x / 2);
-		float sphere_area = alpha * alpha / PI;
-		area_disk[ijc] = sphere_area;
-		
-		
 	}
 
 }

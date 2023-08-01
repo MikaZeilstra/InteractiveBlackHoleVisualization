@@ -31,15 +31,14 @@ __global__ void findBhCenter(const int GM, const int GN, const float2* grid, con
 	}
 }
 
-__global__ void findBhBorders(const int GM, const int GN, const float2* grid,const float2* grid_2, const int angleNum, float2* bhBorder) {
+__global__ void findBhBorders(const int GM, const int GN, const float2 bh_center, const float2* grid,const float2* grid_2, const int angleNum, float2* bhBorder) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 
 	if (i < angleNum * 2) {
 		int ii = i / 2;
 		float angle = PI2 / (1.f * angleNum) * 1.f * ii;
 		float2 change = { -sinf(angle), cosf(angle) };
-		float2 pt = bhBorder[0];
-		float2 center = pt;
+		float2 pt = bh_center;
 		int2 gridpt = { int(pt.x), int(pt.y) };
 
 		float2 gridB = { -2, -2 };
@@ -59,7 +58,7 @@ __global__ void findBhBorders(const int GM, const int GN, const float2* grid,con
 			
 		}
 
-		bhBorder[1 + i] = pt - center - change;
+		bhBorder[i] = pt - bh_center - change;
 	}
 }
 
@@ -77,14 +76,11 @@ __global__ void displayborders(const int angleNum, float2* bhBorder, uchar4* out
 
 __global__ void smoothBorder(const float2* bhBorder, float2* bhBorder2, const int angleNum) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
-	if (i < ((angleNum * 2) + 1)) {
-		if (i == 0) {
-			bhBorder2[0] = bhBorder[0];
-		}
+	if (i < ((angleNum * 2))) {
 		int prev = (i - 2 + 2 * angleNum) % (2 * angleNum);
 		int next = (i + 2) % (2 * angleNum);
-		bhBorder2[i + 1] = { 1.f / 3.f * (bhBorder[prev + 1].x + bhBorder[i + 1].x + bhBorder[next + 1].x),
-							 1.f / 3.f * (bhBorder[prev + 1].y + bhBorder[i + 1].y + bhBorder[next + 1].y) };
+		bhBorder2[i] = { 1.f / 3.f * (bhBorder[prev].x + bhBorder[i].x + bhBorder[next].x),
+							 1.f / 3.f * (bhBorder[prev].y + bhBorder[i].y + bhBorder[next].y) };
 	}
 }
 

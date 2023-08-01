@@ -4,7 +4,7 @@
 
 __global__ void findBhCenter(const int GM, const int GN, const float2* grid,const float2* grid2, float2* bhBorder);
 
-__global__ void findBhBorders(const int GM, const int GN, const float2* grid, const float2* grid2, const int angleNum, float2* bhBorder);
+__global__ void findBhBorders(const int GM, const int GN, const float2 bh_center, const float2* grid, const float2* grid2, const int angleNum, float2* bhBorder);
 
 __global__ void displayborders(const int angleNum, float2* bhBorder, uchar4* out, const int M);
 

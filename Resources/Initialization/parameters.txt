@@ -26,7 +26,7 @@ useLensing = true
 useStars = false
 
 //AccretionDisk
-useAccretionDisk = true
+useAccretionDisk = false
 //Minimum and maximum accretion disk radius 6 is the minimum stable orbit around the black hole and lower values for the minimum will cause issues
 accretionDiskMinRadius = 6.
 accretionDiskMaxRadius = 40.

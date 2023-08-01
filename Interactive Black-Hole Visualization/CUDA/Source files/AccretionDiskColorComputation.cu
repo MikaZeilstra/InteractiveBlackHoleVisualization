@@ -356,7 +356,7 @@ __global__ void addAccretionDiskTexture(const float2* thphi, const int M, const 
 /// <param name="n_samples">Number of samples per angle</param>
 /// <param name="max_disk_segments">Maximum number of segments to keep track of</param>
 /// <returns></returns>
-__global__ void CreateDiskSummary(const int GM, const int GN, float2* disk_grid, float3* disk_incident_grid, float2* disk_summary, float3* disk_incident_summary,  float2* bhBorder, float max_r, int n_angles, int n_samples, int max_disk_segments) {
+__global__ void CreateDiskSummary(const int GM, const int GN, float2* disk_grid, float3* disk_incident_grid, float2* disk_summary, float3* disk_incident_summary,  float2 bh_center, float max_r, int n_angles, int n_samples, int max_disk_segments) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 
 
@@ -378,7 +378,7 @@ __global__ void CreateDiskSummary(const int GM, const int GN, float2* disk_grid,
 
 		float angle = PI2 / (1.f * n_angles) * 1.f * i;
 		float2 mov_dir = { -sinf(angle) , cosf(angle) };
-		float2 bh_pt = bhBorder[0];
+		float2 bh_pt = bh_center;
 		float2 pt = bh_pt;
 		int2 gridpt = { int(pt.x), int(pt.y) };
 

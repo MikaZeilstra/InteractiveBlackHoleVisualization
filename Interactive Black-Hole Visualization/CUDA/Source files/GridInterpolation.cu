@@ -49,7 +49,7 @@ __global__ void camUpdate(const float alpha, const int g, const float* camParam,
 
 __global__ void pixInterpolation(const float2* viewthing, const int M, const int N, const bool should_interpolate_grids, float2* thphi, const float2* grid, const float2* grid_2,
 	const int GM, const int GN, int* gapsave, int gridlvl,
-	const float2* bhBorder, const int angleNum, const float alpha) {
+	const float2* bhBorder, float2 bh_center, const int angleNum, const float alpha) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 
@@ -63,8 +63,8 @@ __global__ void pixInterpolation(const float2* viewthing, const int M, const int
 
 		if (should_interpolate_grids) {
 			float2 A, B;
-			float2 center = bhBorder[0];
-			float stretchRad = sqrtf(fmaxf(vector_ops::sq_norm(bhBorder[1]), vector_ops::sq_norm(bhBorder[2])));//fmaxf(bhBorder[0].x, bhBorder[0].y) * 1.25f;
+			float2 center = bh_center;
+			float stretchRad = sqrtf(fmaxf(vector_ops::sq_norm(bhBorder[0]), vector_ops::sq_norm(bhBorder[1])));//fmaxf(bhBorder[0].x, bhBorder[0].y) * 1.25f;
 			float centerdist = vector_ops::sq_norm(grid_point - center);
 			
 			if (centerdist < stretchRad * stretchRad) {
@@ -75,8 +75,8 @@ __global__ void pixInterpolation(const float2* viewthing, const int M, const int
 
 				float angle_alpha = ((angle / PI2) * angleNum) - angleSlot;
 
-				float2 bhBorder_g1 = (1.f - angle_alpha) * bhBorder[2 * angleSlot + 1] + angle_alpha * bhBorder[2 * angleSlot2 + 1];
-				float2 bhBorder_g2 = (1.f - angle_alpha) * bhBorder[2 * angleSlot + 2] + angle_alpha * bhBorder[2 * angleSlot2 + 2];
+				float2 bhBorder_g1 = (1.f - angle_alpha) * bhBorder[2 * angleSlot ] + angle_alpha * bhBorder[2 * angleSlot2];
+				float2 bhBorder_g2 = (1.f - angle_alpha) * bhBorder[2 * angleSlot + 1] + angle_alpha * bhBorder[2 * angleSlot2 + 1];
 
 
 				float2 bhBorderNew = (1 - alpha) * bhBorder_g1 + alpha * bhBorder_g2;
@@ -121,7 +121,7 @@ __global__ void pixInterpolation(const float2* viewthing, const int M, const int
 
 __global__ void disk_pixInterpolation(const float2* viewthing, const int M, const int N, const bool should_interpolate_grids, float2* disk_thphi, float3* disk_incident, const float2* disk_grid, const float3* disk_incident_grid,
 	float2* disk_summary, float2* disk_summary_2, float3* disk_incident_summary, float3* disk_incident_summary_2, const int n_disk_angles, const int n_disk_sample, const int n_disk_segments, const int GM, const int GN, int* gapsave, int gridlvl,
-	const float2* bhBorder, const int angleNum, float alpha) {
+	const float2 bh_center, const int angleNum, float alpha) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 	if (i < N1 && j < M1) {
@@ -132,7 +132,7 @@ __global__ void disk_pixInterpolation(const float2* viewthing, const int M, cons
 		if (should_interpolate_grids) {
 
 			//Calculate angle and angleslot from blackhole center.
-			float2 center = bhBorder[0];
+			float2 center = bh_center;
 			float2 grid_point = { (theta / (PI / ((float)GN))) ,  (phi / (PI2 / ((float)GM))) };
 
 

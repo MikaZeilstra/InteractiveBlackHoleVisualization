@@ -45,6 +45,12 @@ public:
     void rotatePitch(float angle);
     void rotateRoll(float angle);
 
+    /// <summary>
+    /// Updates camera Phi position does noting if movement mode != 2
+    /// </summary>
+    /// <param name="phiChange"></param>
+    void movePhi(float phiChange);
+
     void set_window(GLFWwindow* window);
 
 private:
