@@ -5,7 +5,7 @@ __global__ void camUpdate(const float alpha, const int g, const float* camParam,
 
 __global__ void pixInterpolation(const float2* viewthing, const int M, const int N, const bool should_interpolate_grids, float2* thphi, const float2* grid, const float2* grid_2,
 	const int GM, const int GN, int* gapsave, int gridlvl,
-	const float2* bhBorder, const float2 bh_center, const int angleNum, const float alpha);
+	const float2* bhBorder_1, const float2* bhBorder_2, const float2 bh_center, const int angleNum, const float alpha);
 
 __global__ void disk_pixInterpolation(const float2* viewthing, const int M, const int N, const bool should_interpolate_grids, float2* disk_thphi, float3* disk_incident, const float2* disk_grid, const float3* disk_incident_grid,
 	float2* disk_summary, float2* disk_summary_2, float3* disk_incident_summary, float3* disk_incident_summary_2, const int n_disk_angles, const int n_disk_sample, const int n_disk_segments, const int GM, const int GN, int* gapsave, int gridlvl,

@@ -31,12 +31,11 @@ __global__ void findBhCenter(const int GM, const int GN, const float2* grid, con
 	}
 }
 
-__global__ void findBhBorders(const int GM, const int GN, const float2 bh_center, const float2* grid,const float2* grid_2, const int angleNum, float2* bhBorder) {
+__global__ void findBhBorders(const int GM, const int GN, const float2 bh_center, const float2* grid, const int angleNum, float2* bhBorder) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 
-	if (i < angleNum * 2) {
-		int ii = i / 2;
-		float angle = PI2 / (1.f * angleNum) * 1.f * ii;
+	if (i < angleNum ) {
+		float angle = PI2 / (1.f * angleNum) * 1.f * i;
 		float2 change = { -sinf(angle), cosf(angle) };
 		float2 pt = bh_center;
 		int2 gridpt = { int(pt.x), int(pt.y) };
@@ -53,10 +52,11 @@ __global__ void findBhBorders(const int GM, const int GN, const float2 bh_center
 				break;
 			}
 
-			gridA = (1 - (i % 2)) * grid[gridpt.x * GM + gridpt.y] + (i % 2) * grid_2[gridpt.x * GM + gridpt.y];
+			gridA = grid[gridpt.x * GM + gridpt.y];
 
-			
+
 		}
+
 
 		bhBorder[i] = pt - bh_center - change;
 	}
@@ -65,22 +65,24 @@ __global__ void findBhBorders(const int GM, const int GN, const float2 bh_center
 __global__ void displayborders(const int angleNum, float2* bhBorder, uchar4* out, const int M) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 
-	if (i < angleNum * 2) {
-		int x = int(bhBorder[i + 1].x);
-		int y = int(bhBorder[i + 1].y);
-		unsigned char outx = 255 * (i % 2);
-		unsigned char outy = 255 * (1 - i % 2);
+	if (i < angleNum) {
+		int x = int(bhBorder[i].x);
+		int y = int(bhBorder[i].y);
+		unsigned char outx = 255 * (i);
+		unsigned char outy = 255 * (1 - i);
 		out[x * M + y] = { outx, outy, 0, 255 };
 	}
 }
 
 __global__ void smoothBorder(const float2* bhBorder, float2* bhBorder2, const int angleNum) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
-	if (i < ((angleNum * 2))) {
-		int prev = (i - 2 + 2 * angleNum) % (2 * angleNum);
-		int next = (i + 2) % (2 * angleNum);
+	if (i < angleNum) {
+		int prev = (i - 1 + angleNum) % angleNum;
+		int next = (i + 1) % angleNum;
+	
 		bhBorder2[i] = { 1.f / 3.f * (bhBorder[prev].x + bhBorder[i].x + bhBorder[next].x),
 							 1.f / 3.f * (bhBorder[prev].y + bhBorder[i].y + bhBorder[next].y) };
+
 	}
 }
 

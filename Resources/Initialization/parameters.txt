@@ -15,14 +15,14 @@ offsetX = 0 // *PI
 offsetY = 0 // *PI
 
 //Frame settings if not movement mode 1 they are automatically overwritten to 1
-nrOfFrames = 250
+nrOfFrames = 10
 nrOfGrids = 2
 
 n_black_hole_angles = 50;
 
 //Effect settings
 useRedshift = true
-useLensing = true
+useLensing = false
 useStars = false
 
 //AccretionDisk

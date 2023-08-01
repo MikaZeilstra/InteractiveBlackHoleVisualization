@@ -49,7 +49,7 @@ __global__ void camUpdate(const float alpha, const int g, const float* camParam,
 
 __global__ void pixInterpolation(const float2* viewthing, const int M, const int N, const bool should_interpolate_grids, float2* thphi, const float2* grid, const float2* grid_2,
 	const int GM, const int GN, int* gapsave, int gridlvl,
-	const float2* bhBorder, float2 bh_center, const int angleNum, const float alpha) {
+	const float2* bhBorder_1, const float2* bhBorder_2, float2 bh_center, const int angleNum, const float alpha) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 
@@ -60,23 +60,25 @@ __global__ void pixInterpolation(const float2* viewthing, const int M, const int
 		float2 grid_point = { (theta / (PI / ((float)GN))) ,  (phi / (PI2 / ((float)GM))) };
 
 
-
 		if (should_interpolate_grids) {
 			float2 A, B;
 			float2 center = bh_center;
-			float stretchRad = sqrtf(fmaxf(vector_ops::sq_norm(bhBorder[0]), vector_ops::sq_norm(bhBorder[1])));//fmaxf(bhBorder[0].x, bhBorder[0].y) * 1.25f;
+			//The longest stretch is to the "right" of the black hole at 0PI 
+			float stretchRad = sqrtf(fmaxf(vector_ops::sq_norm(bhBorder_1[0]), vector_ops::sq_norm(bhBorder_2[0]))) * 1.25;
 			float centerdist = vector_ops::sq_norm(grid_point - center);
 			
-			if (centerdist < stretchRad * stretchRad) {
+			if (centerdist < (stretchRad * stretchRad)) {
+
 				float angle = atan2(center.x - grid_point.x, grid_point.y - center.y);
 				angle = fmodf(angle + PI2, PI2);
-				int angleSlot = angle / PI2 * angleNum;
+				int angleSlot = (angle / PI2) * angleNum;
 				int angleSlot2 = (angleSlot + 1) % angleNum;
 
-				float angle_alpha = ((angle / PI2) * angleNum) - angleSlot;
+				float angle_alpha = ((((float) angle) / PI2) * angleNum) - angleSlot;
 
-				float2 bhBorder_g1 = (1.f - angle_alpha) * bhBorder[2 * angleSlot ] + angle_alpha * bhBorder[2 * angleSlot2];
-				float2 bhBorder_g2 = (1.f - angle_alpha) * bhBorder[2 * angleSlot + 1] + angle_alpha * bhBorder[2 * angleSlot2 + 1];
+
+				float2 bhBorder_g1 = (1.f - angle_alpha) * bhBorder_1[angleSlot ] + angle_alpha * bhBorder_1[angleSlot2];
+				float2 bhBorder_g2 = (1.f - angle_alpha) * bhBorder_2[angleSlot] + angle_alpha * bhBorder_2[angleSlot2];
 
 
 				float2 bhBorderNew = (1 - alpha) * bhBorder_g1 + alpha * bhBorder_g2;

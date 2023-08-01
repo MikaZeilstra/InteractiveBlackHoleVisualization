@@ -365,9 +365,9 @@ void CUDA::memoryAllocationAndCopy(const Image& image, const CelestialSky& celes
 
 	allocate(dev_blackHoleMask, imageSize * sizeof(unsigned char), "blackHoleMask");
 	allocate(dev_diskMask, imageSize * sizeof(unsigned char), "blackHoleMask");
-	allocate(dev_blackHoleBorder0, ((param.n_black_hole_angles * 2))* sizeof(float2), "blackHoleBorder0");
-	allocate(dev_blackHoleBorder1, ((param.n_black_hole_angles * 2)) * sizeof(float2), "BlackHOleBorder1");
-	allocate(dev_blackHoleBorder_temp, ((param.n_black_hole_angles * 2)) * sizeof(float2), "BlackHOleBorder1");
+	allocate(dev_blackHoleBorder0, (param.n_black_hole_angles)* sizeof(float2), "blackHoleBorder0");
+	allocate(dev_blackHoleBorder1, (param.n_black_hole_angles) * sizeof(float2), "BlackHOleBorder1");
+	allocate(dev_blackHoleBorder_temp, (param.n_black_hole_angles ) * sizeof(float2), "BlackHOleBorder1");
 
 	allocate(dev_solidAngles0, imageSize * sizeof(float), "solidAngles0");
 	allocate(dev_solidAngles_temp, imageSize * sizeof(float), "solidAngles1");
@@ -445,9 +445,8 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 	float alpha = 0.f;
 	int grid_nr = -1;
 	int prev_grid_nr = -2;
-	int startframe = 0;
 
-	int q = startframe;
+	int q = 0;
 
 	CUDA::glfw_setup(viewer);
 
@@ -535,7 +534,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 	//Calculate phi offset due to camera movement
 	float camera_phi_offset = 0;
 
-	while(q < param.nrOfFrames + startframe && !glfwWindowShouldClose(viewer->get_window())) {
+	while(q < param.nrOfFrames && !glfwWindowShouldClose(viewer->get_window())) {
  		frame_start_time = std::chrono::high_resolution_clock::now();
 
 
@@ -592,16 +591,23 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 
 
 			callKernelAsync("Find black-hole shadow border", findBhBorders, gpuBlocks.numBlocks_bordersize, gpuBlocks.threadsPerBlock_32, 0,
-				param.grid_M, param.grid_N, param.bh_center, dev_grid, dev_grid_2, param.n_black_hole_angles, dev_blackHoleBorder0);
+				param.grid_M, param.grid_N, param.bh_center, dev_grid, param.n_black_hole_angles, dev_blackHoleBorder0);
+			callKernelAsync("Find black-hole shadow border", findBhBorders, gpuBlocks.numBlocks_bordersize, gpuBlocks.threadsPerBlock_32, 0,
+				param.grid_M, param.grid_N, param.bh_center, dev_grid_2, param.n_black_hole_angles, dev_blackHoleBorder1);
 
+			/*/
 			callKernelAsync("Smoothed shadow border 1/4", smoothBorder, gpuBlocks.numBlocks_bordersize, gpuBlocks.threadsPerBlock_32, 0,
 				dev_blackHoleBorder0, dev_blackHoleBorder_temp , param.n_black_hole_angles);
 			callKernelAsync("Smoothed shadow border 2/4", smoothBorder, gpuBlocks.numBlocks_bordersize, gpuBlocks.threadsPerBlock_32, 0,
 				dev_blackHoleBorder_temp, dev_blackHoleBorder0, param.n_black_hole_angles);
+			
+
+			
 			callKernelAsync("Smoothed shadow border 3/4", smoothBorder, gpuBlocks.numBlocks_bordersize, gpuBlocks.threadsPerBlock_32, 0,
-				dev_blackHoleBorder0, dev_blackHoleBorder_temp, param.n_black_hole_angles);
+				dev_blackHoleBorder1, dev_blackHoleBorder_temp, param.n_black_hole_angles);
 			callKernelAsync("Smoothed shadow border 4/4", smoothBorder, gpuBlocks.numBlocks_bordersize, gpuBlocks.threadsPerBlock_32, 0,
-				dev_blackHoleBorder_temp, dev_blackHoleBorder0, param.n_black_hole_angles);
+				dev_blackHoleBorder_temp, dev_blackHoleBorder1, param.n_black_hole_angles);
+			*/
 
 			if (param.useAccretionDisk) {
 				callKernelAsync("disk_edges", CreateDiskSummary, gpuBlocks.numBlocks_disk_edges, gpuBlocks.threadsPerBlock_32, 0, param.grid_M, param.grid_N, dev_disk_grid_2, dev_incident_grid_2, dev_disk_summary_2, dev_disk_incident_summary_2, param.bh_center, param.accretionDiskMaxRadius, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments);
@@ -880,7 +886,7 @@ void CUDA::CreateTexture(Parameters& param, const Image& image, const StarVis&  
 
 	callKernelAsync("Interpolated grid", pixInterpolation, gpublocks.numBlocks_N1_M1_5_25, gpublocks.threadsPerBlock5_25, 0,
 		dev_viewer, image.M, image.N, should_interpolate_grids, dev_interpolatedGrid, dev_grid, dev_grid_2, param.grid_M, param.grid_N,
-		dev_gridGap, param.gridMaxLevel, dev_blackHoleBorder0, param.bh_center, param.n_black_hole_angles, grid_alpha);
+		dev_gridGap, param.gridMaxLevel, dev_blackHoleBorder0, dev_blackHoleBorder1, param.bh_center, param.n_black_hole_angles, grid_alpha);
 
 	if (param.useAccretionDisk) {
 		callKernelAsync("Interpolated disk grid", disk_pixInterpolation, gpublocks.numBlocks_N1_M1_5_25, gpublocks.threadsPerBlock5_25, 0,
