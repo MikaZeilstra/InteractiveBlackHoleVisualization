@@ -414,10 +414,9 @@ void CUDA::memoryAllocationAndCopy(const Image& image, const CelestialSky& celes
 
 }
 
-float hor = 0.0f;
-float ver = 0.0f;
-//bool redshiftOn = true;
-//bool lensingOn = true;
+bool should_interpolate_grids = false;
+float alpha = 0.f;
+int prev_grid_nr = -2;
 
 void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& celestialSky,
 	const Stars& stars, const StarVis& starvis, const Texture& accretionDiskTexture, Parameters& param, ViewCamera* viewer) {
@@ -434,17 +433,14 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 			param.btheta,
 			param.bphi
 		},
-		metric::calcSpeed(initial_pos.x, initial_pos.y), bh, &param, dev_cameras_2, dev_grid_2, dev_disk_grid_2, dev_incident_grid_2
+		metric::calcSpeed(initial_pos.x, initial_pos.y),gpuBlocks, bh, &param, dev_cameras, dev_grid, dev_disk_grid, dev_incident_grid,
+		dev_blackHoleBorder0, dev_disk_summary, dev_disk_incident_summary
 	);
 
 
 
 
-	bool should_interpolate_grids = false;
-	float grid_value = 0.f;
-	float alpha = 0.f;
-	int grid_nr = -1;
-	int prev_grid_nr = -2;
+
 
 	int q = 0;
 
@@ -531,95 +527,17 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 
 	std::chrono::steady_clock::time_point frame_start_time;
 
-	//Calculate phi offset due to camera movement
-	float camera_phi_offset = 0;
-
-	while(q < param.nrOfFrames && !glfwWindowShouldClose(viewer->get_window())) {
+	while(!glfwWindowShouldClose(viewer->get_window())) {
  		frame_start_time = std::chrono::high_resolution_clock::now();
 
 
 		//Map the PBO to cuda and set the outputimage pointer to that location
 		checkCudaStatus( cudaGraphicsMapResources(1, &cuda_pbo_resource, 0),"map_resource");
 		checkCudaStatus(cudaGraphicsResourceGetMappedPointer((void**)&dev_outputImage, &num_bytes, cuda_pbo_resource),"get_pointer");
-		
-		
-		camera_phi_offset = param.getPhi(q);		
 
-		//Calculate the value of the grid we need for this frame
-		grid_value = q * (((float)param.gridNum -1) / (param.nrOfFrames-1));
-		std::cout << "Computing grid: " << grid_value << " for frame " << q << std::endl;
+		manageGrids(param, viewer, gpuBlocks, bh, q);
 
-		//Get the blending between lower and higher grid
-		alpha = fmodf(grid_value, 1.f);
-
-			
-
-		//Get the lower grid nr
-		grid_nr = (int)grid_value;
-		should_interpolate_grids = alpha > FLT_EPSILON;
-		//if it is the last frame we dont need to interpolate but do need to swap grids and not load a new grid
-		if (q == (param.nrOfFrames - 1)) {
-			should_interpolate_grids = false;
-			grid_nr = prev_grid_nr;
-			swap_grids();
-		}
-			
-
-
-		//If a new grid is required and we need to interpolate this grid
-		if (grid_nr != prev_grid_nr) {
-			//Move the grids further
-			swap_grids();
-			//Request the new next grid
-			double3 next_grid_pos = viewer->getCameraPos(grid_nr + 1);
-			requestGrid(
-				next_grid_pos,
-				{
-					param.br,
-					param.btheta,
-					param.bphi
-				},
-				metric::calcSpeed(next_grid_pos.x, next_grid_pos.y), bh, &param, dev_cameras_2, dev_grid_2, dev_disk_grid_2, dev_incident_grid_2
-			);
-
-			if (q == 0) {
-				if (param.useAccretionDisk) {
-					callKernelAsync("disk_edges", CreateDiskSummary, gpuBlocks.numBlocks_disk_edges, gpuBlocks.threadsPerBlock_32, 0, param.grid_M, param.grid_N, dev_disk_grid, dev_incident_grid, dev_disk_summary, dev_disk_incident_summary, param.bh_center, param.accretionDiskMaxRadius, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments);
-				}
-			}
-			
-
-
-			callKernelAsync("Find black-hole shadow border", findBhBorders, gpuBlocks.numBlocks_bordersize, gpuBlocks.threadsPerBlock_32, 0,
-				param.grid_M, param.grid_N, param.bh_center, dev_grid, param.n_black_hole_angles, dev_blackHoleBorder0);
-			callKernelAsync("Find black-hole shadow border", findBhBorders, gpuBlocks.numBlocks_bordersize, gpuBlocks.threadsPerBlock_32, 0,
-				param.grid_M, param.grid_N, param.bh_center, dev_grid_2, param.n_black_hole_angles, dev_blackHoleBorder1);
-
-			/*/
-			callKernelAsync("Smoothed shadow border 1/4", smoothBorder, gpuBlocks.numBlocks_bordersize, gpuBlocks.threadsPerBlock_32, 0,
-				dev_blackHoleBorder0, dev_blackHoleBorder_temp , param.n_black_hole_angles);
-			callKernelAsync("Smoothed shadow border 2/4", smoothBorder, gpuBlocks.numBlocks_bordersize, gpuBlocks.threadsPerBlock_32, 0,
-				dev_blackHoleBorder_temp, dev_blackHoleBorder0, param.n_black_hole_angles);
-			
-
-			
-			callKernelAsync("Smoothed shadow border 3/4", smoothBorder, gpuBlocks.numBlocks_bordersize, gpuBlocks.threadsPerBlock_32, 0,
-				dev_blackHoleBorder1, dev_blackHoleBorder_temp, param.n_black_hole_angles);
-			callKernelAsync("Smoothed shadow border 4/4", smoothBorder, gpuBlocks.numBlocks_bordersize, gpuBlocks.threadsPerBlock_32, 0,
-				dev_blackHoleBorder_temp, dev_blackHoleBorder1, param.n_black_hole_angles);
-			*/
-
-			if (param.useAccretionDisk) {
-				callKernelAsync("disk_edges", CreateDiskSummary, gpuBlocks.numBlocks_disk_edges, gpuBlocks.threadsPerBlock_32, 0, param.grid_M, param.grid_N, dev_disk_grid_2, dev_incident_grid_2, dev_disk_summary_2, dev_disk_incident_summary_2, param.bh_center, param.accretionDiskMaxRadius, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments);
-			}
-		}
-
-			
-
-		prev_grid_nr = grid_nr;
-		//cudaEventRecord(start);
-
-		CreateTexture(param, image, starvis, accretionDiskTexture, celestialSky, gpuBlocks, camera_phi_offset, q, should_interpolate_grids, alpha);
+		CreateTexture(param, image, starvis, accretionDiskTexture, celestialSky, gpuBlocks, viewer->getPhiOffset(q), q, should_interpolate_grids, alpha);
 				
 		cudaStreamSynchronize(stream);
 		cudaGraphicsUnmapResources(1, &cuda_pbo_resource, 0);
@@ -635,16 +553,10 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 			std::endl << std::endl;
 	}
 	 
-	saveImages(param, image, grid_value, q);
+	saveImages(param, image, prev_grid_nr, q);
 	
 	std::cout << "total time spend generating grids " << total_time << " total ray count " << total_rays << std::endl;
 	std::cout << "total integration batches " << total_batches << " of which on the GPU " << gpu_batches << std::endl;
-
-
-	while (!glfwWindowShouldClose(viewer->get_window())) {
-
-		projectTextureToWindow(param, image, viewer, gl_PBO, gl_Tex, shaderProgram);
-	};
 
 	//Cleanup
 	CUDA::cleanup();
@@ -847,7 +759,143 @@ void CUDA::projectTextureToWindow(Parameters& param, const Image& image, ViewCam
 	glfwPollEvents();
 }
 
-void CUDA::requestGrid(double3 cam_pos, double3 cam_speed_dir, float speed, BlackHole* bh, Parameters* param, float* dev_cam, float2* dev_grid, float2* dev_disk, float3* dev_inc){
+void CUDA::manageGrids(Parameters& param, ViewCamera* viewer, GPUBlocks gpuBlocks, BlackHole* bh, int q) {
+	if (param.movementMode == 1 && q < param.nrOfFrames) {
+		//Calculate the value of the grid we need for this frame
+		float grid_value = q * (((float)param.gridNum - 1) / (param.nrOfFrames - 1));
+		std::cout << "Computing grid: " << grid_value << " for frame " << q << std::endl;
+
+		//Get the blending between lower and higher grid
+		alpha = fmodf(grid_value, 1.f);
+
+
+
+		//Get the lower grid nr
+		int grid_nr = (int)grid_value;
+		should_interpolate_grids = alpha > FLT_EPSILON;
+		//if it is the last frame we dont need to interpolate but do need to swap grids and not load a new grid
+		if (q == (param.nrOfFrames - 1)) {
+			should_interpolate_grids = false;
+			grid_nr = prev_grid_nr;
+			swap_grids();
+		}
+
+
+
+		//If a new grid is required and we need to interpolate this grid
+		if (grid_nr != prev_grid_nr) {
+
+			//Move the grids further if not first frame
+			if (q != 0) {
+				swap_grids();
+			}
+			//Request the new next grid
+			double3 next_grid_pos = viewer->getCameraPos(grid_nr + 1);
+			requestGrid(
+				next_grid_pos,
+				{
+					param.br,
+					param.btheta,
+					param.bphi
+				},
+				metric::calcSpeed(next_grid_pos.x, next_grid_pos.y), gpuBlocks, bh, &param, dev_cameras_2, dev_grid_2, dev_disk_grid_2, dev_incident_grid_2,
+				dev_blackHoleBorder1, dev_disk_summary_2, dev_disk_incident_summary_2
+			);
+		}
+
+
+
+		prev_grid_nr = grid_nr;
+	}
+	else if (param.movementMode == 2) {		
+		//If we dont need to move we dont need to update
+		if (viewer->current_move.x == 0 && viewer->current_move.y == 0) {
+			return;
+		}
+		
+		//If the move is in the same direction as previous we just need to update the alpha and possibly swap grids
+		else if (abs(viewer->current_move.x) == abs(viewer->grid_move_dir.x) && abs(viewer->current_move.y) == abs(viewer->grid_move_dir.y)) {
+			
+			//Calculate alpha by subtracting lower grid from current position, correcting for possible backwards movement and taking euclidian norm to correct for diagonal movement
+			alpha = sqrt(vector_ops::sq_norm_no_nan((((viewer->lower_grid - viewer->getCameraPos(-1)) / viewer->grid_distance) * viewer->grid_move_dir)));
+			
+			//Request new grids if we move out of range
+			if (alpha > 1) {
+				swap_grids();
+				viewer->lower_grid = viewer->higher_grid;
+				viewer->higher_grid = viewer->higher_grid + (viewer->grid_distance * viewer->grid_move_dir);
+
+				requestGrid(
+					viewer->higher_grid,
+					{
+						param.br,
+						param.btheta,
+						param.bphi
+					},
+					metric::calcSpeed(viewer->higher_grid.x, viewer->higher_grid.y), gpuBlocks, bh, &param, dev_cameras_2, dev_grid_2, dev_disk_grid_2, dev_incident_grid_2,
+					dev_blackHoleBorder1, dev_disk_summary_2, dev_disk_incident_summary_2
+				);
+
+				alpha = alpha - 1;
+			}
+			else if (alpha < 0) {
+				swap_grids();
+				viewer->higher_grid = viewer->lower_grid;
+				viewer->lower_grid = viewer->lower_grid - (viewer->grid_distance * viewer->grid_move_dir);
+
+				CUDA::requestGrid(
+					viewer->lower_grid,
+					{
+						param.br,
+						param.btheta,
+						param.bphi
+					},
+					metric::calcSpeed(viewer->lower_grid.x, viewer->lower_grid.y), gpuBlocks, bh, &param, dev_cameras, dev_grid, dev_disk_grid, dev_incident_grid,
+					dev_blackHoleBorder0, dev_disk_summary, dev_disk_incident_summary
+				);
+
+
+			}
+			should_interpolate_grids = true;
+
+
+		}
+		//Otherwise we changed direction and need to find both grid
+		else {
+			double3 initial_pos = viewer->getCameraPos(-1);
+			CUDA::requestGrid(
+				initial_pos,
+				{
+					param.br,
+					param.btheta,
+					param.bphi
+				},
+				metric::calcSpeed(initial_pos.x, initial_pos.y), gpuBlocks, bh, &param, dev_cameras, dev_grid, dev_disk_grid, dev_incident_grid,
+				dev_blackHoleBorder0, dev_disk_summary, dev_disk_incident_summary
+			);
+			viewer->lower_grid = initial_pos;
+
+			double3 next_grid_pos = viewer->getCameraPos(-1) + (viewer->grid_distance * viewer->current_move);
+			requestGrid(
+				next_grid_pos,
+				{
+					param.br,
+					param.btheta,
+					param.bphi
+				},
+				metric::calcSpeed(next_grid_pos.x, next_grid_pos.y), gpuBlocks, bh, &param, dev_cameras_2, dev_grid_2, dev_disk_grid_2, dev_incident_grid_2,
+				dev_blackHoleBorder1, dev_disk_summary_2, dev_disk_incident_summary_2
+			);
+			viewer->higher_grid = next_grid_pos;
+			should_interpolate_grids = false;
+
+			viewer->grid_move_dir = viewer->current_move;
+		}
+	}
+}
+
+void CUDA::requestGrid(double3 cam_pos, double3 cam_speed_dir, float speed, GPUBlocks& gpuBlocks, BlackHole* bh, Parameters* param, float* dev_cam, float2* dev_grid, float2* dev_disk, float3* dev_inc,
+		float2* dev_bh_border, float2* dev_disk_sum, float3* dev_disk_sum_inc){
 
 	auto grid_time = std::chrono::high_resolution_clock::now();
 	
@@ -869,6 +917,14 @@ void CUDA::requestGrid(double3 cam_pos, double3 cam_speed_dir, float speed, Blac
 	copyHostToDeviceAsync(dev_grid, grid.grid_vector.data(), grid.grid_vector.size() * sizeof(float2), "Requested grid");
 	copyHostToDeviceAsync(dev_disk, grid.disk_grid_vector.data(), grid.disk_grid_vector.size() *sizeof(float2), "Requested grid");
 	copyHostToDeviceAsync(dev_inc, grid.disk_incident_vector.data(), grid.disk_incident_vector.size() *sizeof(float3), "Requested grid");
+
+	callKernelAsync("Find black-hole shadow border", findBhBorders, gpuBlocks.numBlocks_bordersize, gpuBlocks.threadsPerBlock_32, 0,
+		param->grid_M, param->grid_N, param->bh_center, dev_grid, param->n_black_hole_angles, dev_bh_border);
+
+	if (param->useAccretionDisk) {
+		callKernelAsync("disk_edges", CreateDiskSummary, gpuBlocks.numBlocks_disk_edges, gpuBlocks.threadsPerBlock_32, 0, param->grid_M, param->grid_N, dev_disk, dev_inc, dev_disk_sum, dev_disk_sum_inc,
+			param->bh_center, param->accretionDiskMaxRadius, param->n_disk_angles, param->n_disk_sample, param->max_disk_segments);
+	}
 
 
 	CUDA::gridLevelCount(grid);
@@ -996,6 +1052,10 @@ void CUDA::swap_grids() {
 	float3* disk_incident_tmp = dev_disk_incident_summary;
 	dev_disk_incident_summary = dev_disk_incident_summary_2;
 	dev_disk_incident_summary_2 = disk_incident_tmp;
+
+	float2* bh_border_tmp = dev_blackHoleBorder0;
+	dev_blackHoleBorder0 = dev_blackHoleBorder1;
+	dev_blackHoleBorder1 = bh_border_tmp;
 }
 
 

@@ -22,12 +22,46 @@ inline __host__ __device__ float2 operator*(float b, float2 a)
 	return make_float2(b * (float)a.x, b * (float)a.y);
 }
 
+
 inline __host__ __device__  float3 operator+ (float3 a, float3 b) {
 	return make_float3(a.x + b.x, a.y + b.y, a.z + b.z);
 }
 
+
+inline __host__ __device__  double3 operator+ (double3 a, float3 b) {
+	return make_double3(a.x + b.x, a.y + b.y, a.z + b.z);
+}
+
 inline __host__ __device__  float3 operator- (float3 a, float3 b) {
 	return make_float3(a.x - b.x, a.y - b.y, a.z - b.z);
+}
+
+inline __host__ __device__  double3 operator- (double3 a, double3 b) {
+	return make_double3(a.x - b.x, a.y - b.y, a.z - b.z);
+}
+
+inline __host__ __device__  double3 operator- (double3 a, float3 b) {
+	return make_double3(a.x - b.x, a.y - b.y, a.z - b.z);
+}
+
+inline __host__ __device__  double3 operator/ (double3 a, float3 b) {
+	return make_double3(a.x / b.x, a.y / b.y, a.z / b.z);
+}
+
+inline __host__ __device__  double3 operator* (double3 a, float3 b) {
+	return make_double3(a.x * b.x, a.y * b.y, a.z * b.z);
+}
+
+inline __host__ __device__  float3 operator* (float3 a, float3 b) {
+	return make_float3(a.x * b.x, a.y * b.y, a.z * b.z);
+}
+
+inline __host__ __device__  float3 operator* (float3 a, int3 b) {
+	return make_float3(a.x * b.x, a.y * b.y, a.z * b.z);
+}
+
+inline __host__ __device__  double3 operator* (double3 a, int3 b) {
+	return make_double3(a.x * b.x, a.y * b.y, a.z * b.z);
 }
 
 inline __host__ __device__ float3 operator*(float b, float3 a)
@@ -74,6 +108,10 @@ namespace vector_ops {
 		return a.x * b.x + a.y * b.y + a.z * b.z;
 	}
 
+	inline __host__ __device__  float dot(double3 a, double3 b) {
+		return a.x * b.x + a.y * b.y + a.z * b.z;
+	}
+
 	inline __host__ __device__  float dot(float4 a, float4 b) {
 		return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
 	}
@@ -83,6 +121,29 @@ namespace vector_ops {
 	}
 
 	inline __host__ __device__ float sq_norm(float3 a) {
+		return dot(a, a);
+	}
+
+	inline __host__ __device__ float sq_norm(double3 a) {
+		return dot(a, a);
+	}
+
+	/// <summary>
+	/// Performs the square norm operation but replaces nans in the argument with 0
+	/// </summary>
+	/// <param name="a">argument to find square norm on</param>
+	/// <returns>square_norm</returns>
+	inline __host__ __device__ float sq_norm_no_nan(double3 a) {
+		if (isnan(a.x)) {
+			a.x = 0;
+		}
+		if (isnan(a.y)) {
+			a.y = 0;
+		}
+		if (isnan(a.z)) {
+			a.z = 0;
+		}
+
 		return dot(a, a);
 	}
 

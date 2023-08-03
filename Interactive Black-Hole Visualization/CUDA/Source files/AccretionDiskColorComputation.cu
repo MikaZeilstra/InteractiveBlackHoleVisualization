@@ -462,10 +462,6 @@ __global__ void CreateDiskSummary(const int GM, const int GN, float2* disk_grid,
 
 		}
 
-		if (i == 5) {
-			i;
-		}
-
 		// We trace a ray outwards over the image to detect disk segments, this means the most inner segment is inside, however the most inner segment varies per angle since it might be ocluded by the disk or the black hole.
 		// We know that the outer segments can only oclude inner segments so if we store the segments inside-out it means that indexes ar guaranteed to correspond to the same disk-segment, if an inner segment is occluded it will be zero. 
 		//We need to switch everything untill half rounded down of the outer disk segment index.		
@@ -548,7 +544,6 @@ __global__ void CreateDiskSummary(const int GM, const int GN, float2* disk_grid,
 			float outer_edge_value = disk_summary[1 + ((n_samples + 2 * (1 + max_disk_segments)) * i)].y;
 			disk_summary[((n_samples + 2 * (1 + max_disk_segments)) * i)] = { outer_edge_value ,outer_edge_value };
 		}
-
 	}
 }
 

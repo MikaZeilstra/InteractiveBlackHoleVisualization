@@ -276,7 +276,14 @@ namespace CUDA {
 	/// <param name="dev_grid">GPU pointer to store generated grid</param>
 	/// <param name="dev_disk">GPU pointer to store generated disk grid</param>
 	/// <param name="dev_inc">GPU pointer to store generated disk incident angles</param>
-	void requestGrid(double3 cam_pos, double3 cam_speed_dir, float speed, BlackHole* bh, Parameters* param, float* dev_cam, float2* dev_grid, float2* dev_disk, float3* dev_inc);
+	/// <param name="dev_bh_border">GPU pointer to black hole borders</param>
+	/// <param name="dev_disk_sum">GPU pointer to disk summary</param>
+	/// <param name="dev_disk_sum_inc">GPU pointer to disk summary incident data</param>
+	void requestGrid(double3 cam_pos, double3 cam_speed_dir, float speed, GPUBlocks& gpuBlocks, BlackHole* bh, Parameters* param, float* dev_cam, float2* dev_grid, float2* dev_disk, float3* dev_inc,
+		float2* dev_bh_border, float2* dev_disk_sum, float3* dev_disk_sum_inc);
+
+
+	void manageGrids(Parameters& param, ViewCamera* viewer, GPUBlocks gpuBlocks, BlackHole* bh, int q);
 
 	void CreateTexture(Parameters& param, const Image& image, const StarVis& starvis, const Texture accretionDiskTexture, const CelestialSky& celestialsky, const GPUBlocks& gpublocks,
 		float camera_phi_offset, int q, bool should_interpolate_grids, float grid_alpha);

@@ -37,6 +37,8 @@ struct Parameters {
 	bool useRandomStars;
 	float randomStarSelectionChance;
 
+	float gridDistanceR, gridDistanceTheta;
+
 	int movementMode = -1;
 
 	float2 bh_center = {};
@@ -308,7 +310,7 @@ struct Parameters {
 			}
 			
 			//If we move allong a path lookup the ending locations
-			if (movementMode = 1) {
+			if (movementMode == 1) {
 				camSpeedChange = config.lookup("camSpeedChange");
 				if (camSpeedChange) {
 					camSpeedFromTo.y = config.lookup("camSpeedTo");
@@ -335,6 +337,13 @@ struct Parameters {
 			else {
 				nrOfFrames = 1;
 				gridNum = 1;
+			}
+
+			//If we do free movement lookup the distance required per grid
+			if (movementMode == 2) {
+				gridDistanceR = config.lookup("gridDistanceR");
+				gridDistanceTheta = config.lookup("gridDistanceTheta");
+				gridDistanceTheta *= PI;
 			}
 
 			

@@ -30,15 +30,31 @@ public:
     int screen_width = 0;
     int screen_height = 0;
 
+    bool theta_mirror = false;
+    double3 lower_grid;
+    double3 higher_grid = { 0,0,0 };
+
+    int3 grid_move_dir = { 0,0,0 };
+    int3 current_move = { 0,0,0 };
+
+    float3 grid_distance;
+
+
     bool mouse_pressed = false;
 
     Parameters* m_param = nullptr;
 
     /// <summary>
-    /// Returns the position of the camera
+    /// Returns the position of the camera for grid generation with phi always 0;
     /// </summary>
-    /// <param name="angle">The number of the grid we want the position for. Ignored if movementmode != 1</param>
+    /// <param name="grid_nr">The number of the grid we want the position for. Ignored if movementmode != 1</param>
     double3 getCameraPos(int grid_nr);
+
+    /// <summary>
+    /// Returns the phi coordinate of the camera.
+    /// </summary>
+    /// <param name="frame">The frame number.  Ignored if movementmode != 1.</param>
+    double getPhiOffset(int frame);
 
     void updateInput();
     void rotateYaw(float angle);
@@ -50,6 +66,17 @@ public:
     /// </summary>
     /// <param name="phiChange"></param>
     void movePhi(float phiChange);
+    /// <summary>
+    /// Updates camera Theta position does noting if movement mode != 2
+    /// </summary>
+    /// <param name="phiChange"></param>
+    void moveTheta(float thetaChange);
+    /// <summary>
+    /// Updates camera R position does noting if movement mode != 2
+    /// </summary>
+    /// <param name="phiChange"></param>
+    void moveR(float RChange);
+
 
     void set_window(GLFWwindow* window);
 

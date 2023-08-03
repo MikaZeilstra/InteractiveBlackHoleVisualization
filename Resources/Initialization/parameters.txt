@@ -26,7 +26,7 @@ useLensing = false
 useStars = false
 
 //AccretionDisk
-useAccretionDisk = false
+useAccretionDisk = true
 //Minimum and maximum accretion disk radius 6 is the minimum stable orbit around the black hole and lower values for the minimum will cause issues
 accretionDiskMinRadius = 6.
 accretionDiskMaxRadius = 40.
@@ -74,7 +74,7 @@ afactor = 0.982;
 // 0 = single frame
 // 1 = Move along path
 // 2 = Free movement
-movementMode = 1
+movementMode = 2
 
 // Camera (starting) location, speed, direction
 cameraFov = 70.
@@ -105,3 +105,6 @@ camInclinationTo = 0.45 //*PI
 camPhiChange = false
 camPhiTo = 0.5 //*PI
 
+//If movement mode 2 the distance before we generate a new grid
+gridDistanceTheta = 0.1 //*PI
+gridDistanceR = 5.0
