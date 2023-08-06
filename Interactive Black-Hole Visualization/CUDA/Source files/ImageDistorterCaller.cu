@@ -546,7 +546,10 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 
 		q++;
 
-		
+		//Reset current move
+		viewer->current_move = { 0,0 };
+		glfwPollEvents();
+
 		
 		std::cout << "frame_duration " <<
 			std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - frame_start_time).count() << "ms!" <<
@@ -756,7 +759,6 @@ void CUDA::projectTextureToWindow(Parameters& param, const Image& image, ViewCam
 	GL_CHECK(glDrawArrays(GL_TRIANGLE_STRIP, 0, 4));
 
 	glfwSwapBuffers(viewer->get_window());
-	glfwPollEvents();
 }
 
 void CUDA::manageGrids(Parameters& param, ViewCamera* viewer, GPUBlocks gpuBlocks, BlackHole* bh, int q) {
@@ -817,8 +819,17 @@ void CUDA::manageGrids(Parameters& param, ViewCamera* viewer, GPUBlocks gpuBlock
 		else if (abs(viewer->current_move.x) == abs(viewer->grid_move_dir.x) && abs(viewer->current_move.y) == abs(viewer->grid_move_dir.y)) {
 			
 			//Calculate alpha by subtracting lower grid from current position, correcting for possible backwards movement and taking euclidian norm to correct for diagonal movement
-			alpha = sqrt(vector_ops::sq_norm_no_nan((((viewer->lower_grid - viewer->getCameraPos(-1)) / viewer->grid_distance) * viewer->grid_move_dir)));
+			double3 alpha_per_coord = -1.0 * (((viewer->lower_grid - viewer->getCameraPos(-1)) / viewer->grid_distance) * viewer->grid_move_dir);
+
+			//Calculate alpha by euclidian noprm to acount for diagonal movement
+			alpha = sqrt(vector_ops::sq_norm_no_nan(alpha_per_coord));
 			
+			//Check if we had negative alpha meaning we need to swap grids
+			if (alpha_per_coord.x < 0 || alpha_per_coord.y < 0) {
+				alpha = -alpha;
+			}
+	
+
 			//Request new grids if we move out of range
 			if (alpha > 1) {
 				swap_grids();
@@ -854,7 +865,7 @@ void CUDA::manageGrids(Parameters& param, ViewCamera* viewer, GPUBlocks gpuBlock
 					dev_blackHoleBorder0, dev_disk_summary, dev_disk_incident_summary
 				);
 
-
+				alpha = alpha + 1;
 			}
 			should_interpolate_grids = true;
 

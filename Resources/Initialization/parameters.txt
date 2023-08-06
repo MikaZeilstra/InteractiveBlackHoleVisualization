@@ -6,8 +6,8 @@ windowWidth = 1920
 windowHeight = 1080
 
 //Intermediate texture size in pixels
-texWidth = 4096
-texHeight = 2160
+texWidth = 1920//4096
+texHeight = 1080//2160
 
 // Viewer settings
 viewAngle = 0.5 //*PI
@@ -38,9 +38,9 @@ useAccretionDiskTexture = false
 accretionDiskTexture = "AcretionTest.png"
 
 //AcretionDiskInterpolation
-n_disk_angles = 200;
+n_disk_angles = 100;
 n_disk_sample = 200;
-max_disk_segments = 4;
+max_disk_segments = 2;
 
 //Option to save the geodesics used to generate the image
 saveGeodesics = false
@@ -65,7 +65,7 @@ diffractionImg = "0s1.png"
 // Grid Settings
 gridStartLevel = 1
 gridMinLevel = 2
-gridMaxLevel = 11
+gridMaxLevel = 9
 
 // Blackhole angular velocity
 afactor = 0.982;

@@ -64,6 +64,11 @@ inline __host__ __device__  double3 operator* (double3 a, int3 b) {
 	return make_double3(a.x * b.x, a.y * b.y, a.z * b.z);
 }
 
+inline __host__ __device__ double3 operator*(float b, double3 a)
+{
+	return make_double3(b * (float)a.x, b * (float)a.y, b * (float)a.z);
+}
+
 inline __host__ __device__ float3 operator*(float b, float3 a)
 {
 	return make_float3(b * (float) a.x, b * (float) a.y, b * (float) a.z);

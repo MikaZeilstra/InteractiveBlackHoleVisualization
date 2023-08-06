@@ -452,8 +452,20 @@ __global__ void CreateDiskSummary(const int GM, const int GN, float2* disk_grid,
 			gridpt = { int(roundf(pt.x)), int(roundf(pt.y)) };
 			ray_length_A = vector_ops::sq_norm(disk_incident_grid[gridpt.x * GM + gridpt.y]);
 
-			//If either coord is oob break
+			//If either coord is oob break and finish segment if required
 			if (gridpt.x > GN|| gridpt.x < 0 || gridpt.y > GM || gridpt.y < 0) {
+				if (!between_disk) {
+					//Calculate distance and save it in the high distance spot for the disk
+					float dist = sqrtf(vector_ops::sq_norm(pt - bh_pt - mov_dir));
+					disk_summary[disk_found + ((n_samples + 2 * (1 + max_disk_segments)) * i)].y = dist;
+
+					//Now between disk
+					between_disk = true;
+
+					last_ray_length_disk = ray_length_B;
+					//Update total distance
+					total_distance += disk_summary[disk_found + ((n_samples + 2 * (1 + max_disk_segments)) * i)].y - disk_summary[disk_found + ((n_samples + 2 * (1 + max_disk_segments)) * i)].x;
+				}
 				break;
 			}
 
