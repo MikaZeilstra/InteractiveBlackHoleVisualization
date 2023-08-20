@@ -527,7 +527,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 
 	std::chrono::steady_clock::time_point frame_start_time;
 
-	while(!glfwWindowShouldClose(viewer->get_window())) {
+	while(!glfwWindowShouldClose(viewer->get_window()) && !(param.outputMode != 0 && q >= param.nrOfFrames )) {
  		frame_start_time = std::chrono::high_resolution_clock::now();
 
 
@@ -542,7 +542,12 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 		cudaStreamSynchronize(stream);
 		cudaGraphicsUnmapResources(1, &cuda_pbo_resource, 0);
 
-		projectTextureToWindow(param,image,viewer,gl_PBO,gl_Tex,shaderProgram);
+		if (param.outputMode == 0) {
+			projectTextureToWindow(param, image, viewer, gl_PBO, gl_Tex, shaderProgram);
+		}
+		else if (q < param.nrOfFrames){
+			saveImages(param, image, prev_grid_nr, q);
+		}
 
 		q++;
 
@@ -819,7 +824,7 @@ void CUDA::manageGrids(Parameters& param, ViewCamera* viewer, GPUBlocks gpuBlock
 		else if (abs(viewer->current_move.x) == abs(viewer->grid_move_dir.x) && abs(viewer->current_move.y) == abs(viewer->grid_move_dir.y)) {
 			
 			//Calculate alpha by subtracting lower grid from current position, correcting for possible backwards movement and taking euclidian norm to correct for diagonal movement
-			double3 alpha_per_coord = -1.0 * (((viewer->lower_grid - viewer->getCameraPos(-1)) / viewer->grid_distance) * viewer->grid_move_dir);
+			double3 alpha_per_coord = (((viewer->getCameraPos(-1)- viewer->lower_grid) / viewer->grid_distance) * viewer->grid_move_dir);
 
 			//Calculate alpha by euclidian noprm to acount for diagonal movement
 			alpha = sqrt(vector_ops::sq_norm_no_nan(alpha_per_coord));

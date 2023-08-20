@@ -39,7 +39,7 @@ struct Parameters {
 
 	float gridDistanceR, gridDistanceTheta;
 
-	int movementMode = -1;
+	int movementMode, outputMode = -1;
 
 	float2 bh_center = {};
 
@@ -261,6 +261,7 @@ struct Parameters {
 			randomStarSelectionChance = config.lookup("randomSelectionChance");
 
 			movementMode = config.lookup("movementMode");
+			outputMode = config.lookup("outputMode");
 
 			userSpeed = config.lookup("userSpeed");
 			br = config.lookup("br");
