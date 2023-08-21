@@ -24,7 +24,12 @@ public:
 		//+1 to complete the last pixel, because every pixel has 4 corners
 		viewMatrix = std::vector<cv::Point2f>((pixelheight + 1) * (pixelwidth + 1));
 		//makeEquaView();
-		if (param.sphereView) makeSphereView();
+		if (param.outputMode == 2) {
+			makeSphereViewVR();
+		}
+		else if (param.sphereView) {
+			makeSphereView();
+		}
 		else {
 			viewAngleWide = param.viewAngle;
 			viewAngleUp = 1.*param.texHeight * viewAngleWide / (1.*param.texWidth);
@@ -86,6 +91,16 @@ public:
 			}
 		}
 	}
+
+	void makeSphereViewVR() {
+		for (int i = 0; i < pixelheight + 1; i++) {
+			for (int j = 0; j < (pixelwidth + 1)/2; j++) {
+				viewMatrix[i * (pixelwidth + 1) + j] = { float(i * PI / (1.f * pixelheight)), float(j * PI2 / (1.f * (pixelwidth / 2))) };
+				viewMatrix[i * (pixelwidth + 1) + (j+ pixelwidth/2)] = { float(i * PI / (1.f * pixelheight)), float(j * PI2 / (1.f * (pixelwidth/2))) };
+			}
+		}
+	}
+
 
 	//void turnVer(double offsetVer) {
 	//	if (fabs(offsetVer) >(PI - viewAngle)*HALF) {

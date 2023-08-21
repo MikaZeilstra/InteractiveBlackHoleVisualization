@@ -74,13 +74,13 @@ afactor = 0.982;
 // 0 = single frame
 // 1 = Move along path
 // 2 = Free movement
-movementMode = 1
+movementMode = 0
 
 // Output mode
 // 0 = Viewer
 // 1 = 360 degree images
 // 2 = LR 360 degree VR images
-outputMode = 1
+outputMode = 2
 
 // Camera (starting) location, speed, direction
 cameraFov = 70.
