@@ -39,6 +39,9 @@ struct Parameters {
 
 	float gridDistanceR, gridDistanceTheta;
 
+	float pixelWidth, screenDistance, screenDepthPerR, interOcularDistance;
+	bool useIntegrationDistance;
+
 	int movementMode, outputMode = -1;
 
 	float2 bh_center = {};
@@ -263,6 +266,15 @@ struct Parameters {
 			movementMode = config.lookup("movementMode");
 			outputMode = config.lookup("outputMode");
 
+			if (outputMode == 2) {
+				pixelWidth = config.lookup("pixelWidth");
+				screenDepthPerR = config.lookup("screenDepthPerR");
+				screenDistance = config.lookup("screenDistance");
+				interOcularDistance = config.lookup("interOcularDistance");
+
+				useIntegrationDistance = config.lookup("useIntegrationDistance");
+			}
+
 			userSpeed = config.lookup("userSpeed");
 			br = config.lookup("br");
 			bphi = config.lookup("bphi");
@@ -350,7 +362,7 @@ struct Parameters {
 			
 		}
 		catch (libconfig::SettingNotFoundException& e) {
-			std::cerr << "Incorrect setting(s) in configuration file." << std::endl;
+			std::cerr << "Incorrect setting(s) in configuration file for setting " << e.getPath() << "." << std::endl;
 		}
 
 		if (sphereView) texHeight = (int)floor(texWidth / 2);

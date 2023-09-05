@@ -280,7 +280,7 @@ namespace CUDA {
 	/// <param name="dev_disk_sum">GPU pointer to disk summary</param>
 	/// <param name="dev_disk_sum_inc">GPU pointer to disk summary incident data</param>
 	void requestGrid(double3 cam_pos, double3 cam_speed_dir, float speed, GPUBlocks& gpuBlocks, BlackHole* bh, Parameters* param, float* dev_cam, float2* dev_grid, float2* dev_disk, float3* dev_inc,
-		float2* dev_bh_border, float2* dev_disk_sum, float3* dev_disk_sum_inc);
+		float2* dev_bh_border, float2* dev_disk_sum, float3* dev_disk_sum_inc, float2* dev_mapped_disk_vert);
 
 
 	void manageGrids(Parameters& param, ViewCamera* viewer, GPUBlocks gpuBlocks, BlackHole* bh, int q);

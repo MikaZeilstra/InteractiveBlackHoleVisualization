@@ -113,6 +113,10 @@ float2* dev_disk_summary_2 = 0;
 float3* dev_disk_incident_summary = 0;
 float3* dev_disk_incident_summary_2 = 0;
 
+float2* dev_mapped_disk_vert = 0;
+float2* dev_mapped_disk_vert_2 = 0;
+
+
 static float2* dev_interpolatedGrid = 0;
 
 static float2* dev_interpolatedDiskGrid = 0;
@@ -123,6 +127,8 @@ int* dev_gridGap = 0;
 
 float* dev_cameras = 0;
 float* dev_cameras_2 = 0;
+
+float* dev_interpolated_cameras = 0;
 
 float2* dev_viewer = 0;
 float4* dev_summedCelestialSky = 0;
@@ -171,6 +177,8 @@ cudaError_t CUDA::cleanup() {
 	cudaFree(dev_interpolatedGrid);
 	cudaFree(dev_interpolatedDiskGrid);
 	cudaFree(dev_interpolatedIncidentGrid);
+	cudaFree(dev_mapped_disk_vert);
+
 
 	cudaFree(dev_disk_summary);
 	cudaFree(dev_disk_incident_summary);
@@ -178,6 +186,7 @@ cudaError_t CUDA::cleanup() {
 	cudaFree(dev_gridGap);
 
 	cudaFree(dev_cameras);
+	cudaFree(dev_interpolated_cameras);
 
 	cudaFree(dev_viewer);
 	cudaFree(dev_summedCelestialSky);
@@ -356,12 +365,17 @@ void CUDA::memoryAllocationAndCopy(const Image& image, const CelestialSky& celes
 
 		allocate(temperatureLUT_device, param.accretionTemperatureLUTSize * sizeof(double), "temperature table");
 		allocate(dev_accretionDiskTexture, accretionTexture.width * accretionTexture.height * sizeof(float4), "AccretionTexture");
+
+		allocate(dev_mapped_disk_vert, 2 * (param.n_disk_angles * param.max_disk_segments * 4));
+		dev_mapped_disk_vert_2 = &dev_mapped_disk_vert[(param.n_disk_angles * param.max_disk_segments * 4)];
 	}
 
 	allocate(dev_gridGap, rastSize * sizeof(int), "gridGap");
 
 	allocate(dev_cameras, 10 * 2 * sizeof(float), "cameras");
 	dev_cameras_2 = &dev_cameras[10];
+
+	allocate(dev_interpolated_cameras, 10 * sizeof(float), "cameras")
 
 	allocate(dev_blackHoleMask, imageSize * sizeof(unsigned char), "blackHoleMask");
 	allocate(dev_diskMask, imageSize * sizeof(unsigned char), "blackHoleMask");
@@ -434,7 +448,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 			param.bphi
 		},
 		metric::calcSpeed(initial_pos.x, initial_pos.y),gpuBlocks, bh, &param, dev_cameras, dev_grid, dev_disk_grid, dev_incident_grid,
-		dev_blackHoleBorder0, dev_disk_summary, dev_disk_incident_summary
+		dev_blackHoleBorder0, dev_disk_summary, dev_disk_incident_summary,dev_mapped_disk_vert
 	);
 
 
@@ -806,7 +820,7 @@ void CUDA::manageGrids(Parameters& param, ViewCamera* viewer, GPUBlocks gpuBlock
 					param.bphi
 				},
 				metric::calcSpeed(next_grid_pos.x, next_grid_pos.y), gpuBlocks, bh, &param, dev_cameras_2, dev_grid_2, dev_disk_grid_2, dev_incident_grid_2,
-				dev_blackHoleBorder1, dev_disk_summary_2, dev_disk_incident_summary_2
+				dev_blackHoleBorder1, dev_disk_summary_2, dev_disk_incident_summary_2,dev_mapped_disk_vert
 			);
 		}
 
@@ -849,7 +863,7 @@ void CUDA::manageGrids(Parameters& param, ViewCamera* viewer, GPUBlocks gpuBlock
 						param.bphi
 					},
 					metric::calcSpeed(viewer->higher_grid.x, viewer->higher_grid.y), gpuBlocks, bh, &param, dev_cameras_2, dev_grid_2, dev_disk_grid_2, dev_incident_grid_2,
-					dev_blackHoleBorder1, dev_disk_summary_2, dev_disk_incident_summary_2
+					dev_blackHoleBorder1, dev_disk_summary_2, dev_disk_incident_summary_2,dev_mapped_disk_vert_2
 				);
 
 				alpha = alpha - 1;
@@ -867,7 +881,7 @@ void CUDA::manageGrids(Parameters& param, ViewCamera* viewer, GPUBlocks gpuBlock
 						param.bphi
 					},
 					metric::calcSpeed(viewer->lower_grid.x, viewer->lower_grid.y), gpuBlocks, bh, &param, dev_cameras, dev_grid, dev_disk_grid, dev_incident_grid,
-					dev_blackHoleBorder0, dev_disk_summary, dev_disk_incident_summary
+					dev_blackHoleBorder0, dev_disk_summary, dev_disk_incident_summary,dev_mapped_disk_vert
 				);
 
 				alpha = alpha + 1;
@@ -887,7 +901,7 @@ void CUDA::manageGrids(Parameters& param, ViewCamera* viewer, GPUBlocks gpuBlock
 					param.bphi
 				},
 				metric::calcSpeed(initial_pos.x, initial_pos.y), gpuBlocks, bh, &param, dev_cameras, dev_grid, dev_disk_grid, dev_incident_grid,
-				dev_blackHoleBorder0, dev_disk_summary, dev_disk_incident_summary
+				dev_blackHoleBorder0, dev_disk_summary, dev_disk_incident_summary, dev_mapped_disk_vert
 			);
 			viewer->lower_grid = initial_pos;
 
@@ -900,7 +914,7 @@ void CUDA::manageGrids(Parameters& param, ViewCamera* viewer, GPUBlocks gpuBlock
 					param.bphi
 				},
 				metric::calcSpeed(next_grid_pos.x, next_grid_pos.y), gpuBlocks, bh, &param, dev_cameras_2, dev_grid_2, dev_disk_grid_2, dev_incident_grid_2,
-				dev_blackHoleBorder1, dev_disk_summary_2, dev_disk_incident_summary_2
+				dev_blackHoleBorder1, dev_disk_summary_2, dev_disk_incident_summary_2, dev_mapped_disk_vert_2
 			);
 			viewer->higher_grid = next_grid_pos;
 			should_interpolate_grids = false;
@@ -911,7 +925,7 @@ void CUDA::manageGrids(Parameters& param, ViewCamera* viewer, GPUBlocks gpuBlock
 }
 
 void CUDA::requestGrid(double3 cam_pos, double3 cam_speed_dir, float speed, GPUBlocks& gpuBlocks, BlackHole* bh, Parameters* param, float* dev_cam, float2* dev_grid, float2* dev_disk, float3* dev_inc,
-		float2* dev_bh_border, float2* dev_disk_sum, float3* dev_disk_sum_inc){
+		float2* dev_bh_border, float2* dev_disk_sum, float3* dev_disk_sum_inc, float2* dev_mapped_disk_vert){
 
 	auto grid_time = std::chrono::high_resolution_clock::now();
 	
@@ -940,6 +954,11 @@ void CUDA::requestGrid(double3 cam_pos, double3 cam_speed_dir, float speed, GPUB
 	if (param->useAccretionDisk) {
 		callKernelAsync("disk_edges", CreateDiskSummary, gpuBlocks.numBlocks_disk_edges, gpuBlocks.threadsPerBlock_32, 0, param->grid_M, param->grid_N, dev_disk, dev_inc, dev_disk_sum, dev_disk_sum_inc,
 			param->bh_center, param->accretionDiskMaxRadius, param->n_disk_angles, param->n_disk_sample, param->max_disk_segments);
+
+		if (param->outputMode == 2) {
+			callKernelAsync("map disk vert VR", map_disk_vert, gpuBlocks.numBlocks_disk_edges, gpuBlocks.threadsPerBlock_32, 0, dev_disk_sum, dev_disk_sum_inc, dev_mapped_disk_vert, param->n_disk_angles, param->n_disk_sample, param->max_disk_segments, param->bh_center, param->grid_M, param->grid_N, param->texWidth, param->texHeight,
+				param->pixelWidth, param->screenDepthPerR, param->screenDistance, param->interOcularDistance, param->useIntegrationDistance, dev_cam);
+		}
 	}
 
 
@@ -956,19 +975,36 @@ void CUDA::requestGrid(double3 cam_pos, double3 cam_speed_dir, float speed, GPUB
 void CUDA::CreateTexture(Parameters& param, const Image& image, const StarVis&  starvis, const Texture accretionDiskTexture, const CelestialSky& celestialSky, const GPUBlocks& gpublocks,
 	float camera_phi_offset, int q, bool should_interpolate_grids, float grid_alpha) {
 
+	callKernelAsync("update cam", camUpdate, 1, gpublocks.threadsPerBlock_32, 0,
+		alpha, dev_cameras, dev_cameras_2, dev_interpolated_cameras);
+
 	callKernelAsync("Interpolated grid", pixInterpolation, gpublocks.numBlocks_N1_M1_5_25, gpublocks.threadsPerBlock5_25, 0,
 		dev_viewer, image.M, image.N, should_interpolate_grids, dev_interpolatedGrid, dev_grid, dev_grid_2, param.grid_M, param.grid_N,
 		dev_gridGap, param.gridMaxLevel, dev_blackHoleBorder0, dev_blackHoleBorder1, param.bh_center, param.n_black_hole_angles, grid_alpha);
-
+	
 	if (param.useAccretionDisk) {
-		callKernelAsync("Interpolated disk grid", disk_pixInterpolation, gpublocks.numBlocks_N1_M1_5_25, gpublocks.threadsPerBlock5_25, 0,
-			dev_viewer, image.M, image.N, should_interpolate_grids, dev_interpolatedDiskGrid, dev_interpolatedIncidentGrid, dev_disk_grid, dev_incident_grid,
-			dev_disk_summary, dev_disk_summary_2, dev_disk_incident_summary, dev_disk_incident_summary_2, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments,
-			param.grid_M, param.grid_N,
-			dev_gridGap, param.gridMaxLevel, param.bh_center, param.n_black_hole_angles, grid_alpha);
+		if (param.outputMode == 2) {
+			callKernelAsync("Interpolated disk grid_VR", disk_pixInterpolationVR, gpublocks.numBlocks_N1_M1_5_25, gpublocks.threadsPerBlock5_25, 0,
+				dev_viewer, image.M, image.N, should_interpolate_grids, dev_interpolatedDiskGrid, dev_interpolatedIncidentGrid, dev_disk_grid, dev_incident_grid,
+				dev_disk_summary, dev_disk_summary_2, dev_disk_incident_summary, dev_disk_incident_summary_2, dev_mapped_disk_vert, dev_mapped_disk_vert_2, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments,
+				param.grid_M, param.grid_N,
+				dev_gridGap, param.gridMaxLevel, param.bh_center, param.n_black_hole_angles, grid_alpha)
+		}
+		else {
+			callKernelAsync("Interpolated disk grid", disk_pixInterpolation, gpublocks.numBlocks_N1_M1_5_25, gpublocks.threadsPerBlock5_25, 0,
+				dev_viewer, image.M, image.N, should_interpolate_grids, dev_interpolatedDiskGrid, dev_interpolatedIncidentGrid, dev_disk_grid, dev_incident_grid,
+				dev_disk_summary, dev_disk_summary_2, dev_disk_incident_summary, dev_disk_incident_summary_2, param.n_disk_angles, param.n_disk_sample, param.max_disk_segments,
+				param.grid_M, param.grid_N,
+				dev_gridGap, param.gridMaxLevel, param.bh_center, param.n_black_hole_angles, grid_alpha)
+		}
+			
+
+	
 
 		callKernelAsync("Constructed disk mask", makeDiskCheck, gpublocks.numBlocks_N_M_5_25, gpublocks.threadsPerBlock5_25, 0,
 			dev_interpolatedDiskGrid, dev_diskMask, image.M, image.N);
+
+		
 	}
 
 
@@ -999,7 +1035,7 @@ void CUDA::CreateTexture(Parameters& param, const Image& image, const StarVis&  
 
 		callKernelAsync("Distorted star map", distortStarMap, gpublocks.numBlocks_N_M_4_4, gpublocks.threadsPerBlock4_4, 0,
 			dev_starLight0, dev_interpolatedGrid, dev_diskMask, dev_blackHoleMask, dev_starPositions, dev_starTree, starvis.starSize,
-			dev_cameras, dev_starMagnitudes, starvis.treeLevel,
+			dev_interpolated_cameras, dev_starMagnitudes, starvis.treeLevel,
 			image.M, image.N, starvis.gaussian, camera_phi_offset, dev_treeSearch, starvis.searchNr, dev_starCache, dev_nrOfImagesPerStar,
 			dev_starTrails, starvis.trailnum, dev_gradient, q, dev_viewer, param.useRedshift, param.useLensing, dev_solidAngles0);
 
@@ -1015,7 +1051,7 @@ void CUDA::CreateTexture(Parameters& param, const Image& image, const StarVis&  
 
 	callKernelAsync("Distorted celestial sky image", distortEnvironmentMap, gpublocks.numBlocks_N_M_4_4, gpublocks.threadsPerBlock4_4, 0,
 		dev_interpolatedGrid, dev_outputImage, dev_blackHoleMask, celestialSky.imsize, image.M, image.N, camera_phi_offset,
-		dev_summedCelestialSky, dev_cameras, dev_solidAngles0, dev_viewer, param.useRedshift, param.useLensing, dev_diskMask);
+		dev_summedCelestialSky, dev_interpolated_cameras, dev_solidAngles0, dev_viewer, param.useRedshift, param.useLensing, dev_diskMask);
 
 
 	if (param.useStars) {
@@ -1033,12 +1069,12 @@ void CUDA::CreateTexture(Parameters& param, const Image& image, const StarVis&  
 
 			callKernelAsync("Add accretion Disk", addAccretionDisk, gpublocks.numBlocks_N_M_4_4, gpublocks.threadsPerBlock4_4, 0,
 				dev_interpolatedDiskGrid, dev_interpolatedIncidentGrid, dev_outputImage, temperatureLUT_device, (param.accretionDiskMaxRadius / param.accretionTemperatureLUTSize), param.accretionTemperatureLUTSize,
-				dev_blackHoleMask, image.M, image.N, dev_cameras, dev_solidAngles0, dev_solidAngles0_disk, dev_viewer, param.accretionDiskMinRadius, param.accretionDiskMaxRadius, param.useLensing, dev_diskMask);
+				dev_blackHoleMask, image.M, image.N, dev_interpolated_cameras, dev_solidAngles0, dev_solidAngles0_disk, dev_viewer, param.accretionDiskMinRadius, param.accretionDiskMaxRadius, param.useLensing, dev_diskMask);
 		}
 		else {
 			callKernelAsync("Add accretion Disk Texture", addAccretionDiskTexture, gpublocks.numBlocks_N_M_4_4, gpublocks.threadsPerBlock4_4, 0,
 				dev_interpolatedDiskGrid, image.M, dev_blackHoleMask, dev_outputImage, dev_accretionDiskTexture, param.accretionDiskMinRadius, param.accretionDiskMaxRadius,
-				accretionDiskTexture.width, accretionDiskTexture.height, dev_cameras, dev_solidAngles0, dev_solidAngles0_disk, dev_viewer, param.useLensing, dev_diskMask
+				accretionDiskTexture.width, accretionDiskTexture.height, dev_interpolated_cameras, dev_solidAngles0, dev_solidAngles0_disk, dev_viewer, param.useLensing, dev_diskMask
 			)
 		}
 	}
@@ -1072,6 +1108,10 @@ void CUDA::swap_grids() {
 	float2* bh_border_tmp = dev_blackHoleBorder0;
 	dev_blackHoleBorder0 = dev_blackHoleBorder1;
 	dev_blackHoleBorder1 = bh_border_tmp;
+
+	float2* mapped_vert_tmp = dev_mapped_disk_vert;
+	dev_mapped_disk_vert = dev_mapped_disk_vert_2;
+	dev_mapped_disk_vert_2 = bh_border_tmp;
 }
 
 

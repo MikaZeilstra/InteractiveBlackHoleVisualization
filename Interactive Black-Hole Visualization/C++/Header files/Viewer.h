@@ -25,6 +25,7 @@ public:
 		viewMatrix = std::vector<cv::Point2f>((pixelheight + 1) * (pixelwidth + 1));
 		//makeEquaView();
 		if (param.outputMode == 2) {
+			//makeSphereViewVR();
 			makeSphereViewVR();
 		}
 		else if (param.sphereView) {

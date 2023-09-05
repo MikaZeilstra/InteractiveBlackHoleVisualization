@@ -6,6 +6,8 @@
 #include "../../C++/Header files/IntegrationDefines.h"
 #include "../Header files/Constants.cuh"
 
+#include "../Header files/ColorComputation.cuh"
+
 #include <stdio.h>
 
 #define MIN_DISK_FRACTION_FOR_CONTRIBUTION 0.2
@@ -41,9 +43,9 @@ template<>  __device__ float2 interpolate_vector_linearly<float2, true>(float2* 
 	return (1 - alpha) * values[0] + alpha * values[1];
 }
 
-__global__ void camUpdate(const float alpha, const int g, const float* camParam, float* cam) {
+__global__ void camUpdate(const float alpha, const float* camParam, float* camParam2, float* cam) {
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
-	if (i < 7) cam[i] = (1.f - alpha) * camParam[g * 7 + i] + alpha * camParam[(g + 1) * 7 + i];
+	if (i < 10) cam[i] = (1.f - alpha) * camParam[i] + alpha * camParam2[i];
 }
 
 
@@ -121,6 +123,211 @@ __global__ void pixInterpolation(const float2* viewthing, const int M, const int
 	}
 }
 
+
+
+__global__ void map_disk_vert(float2* disk_summary, float3* disk_incident_summary, float2* disk_mapped_vertexes, const int n_disk_angles, const int n_disk_sample, const int n_disk_segments,const float2 bh_center, const int GM, const int GN, const int M, const int N,
+	float pixelWidth, float screenDepthR, float screenDistance, float IOD, bool useIntegrationDistance, float* camera) {
+	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
+	
+	if (i < n_disk_angles) {
+		float angle = PI2 / (1.f * n_disk_angles) * 1.f * i;
+		float2 mov_dir = { -sinf(angle) , cosf(angle) };
+		float2 gridToImage = { (float)M / (float)GM, (float)N / (float)GN };
+		for (int seg = 0; seg < n_disk_segments; seg++) {
+			float2 grid_pos_lower = bh_center + disk_summary[seg + ((n_disk_sample + 2 * (1 + n_disk_segments)) * i)].x * mov_dir;
+			float2 grid_pos_upper = bh_center + disk_summary[seg + ((n_disk_sample + 2 * (1 + n_disk_segments)) * i)].y * mov_dir;
+
+			float2 image_pos_lower = grid_pos_lower * gridToImage;
+			float2 image_pos_upper = grid_pos_upper * gridToImage;
+			
+			//Correct for the half size
+			image_pos_lower.y = image_pos_lower.y / 2 + (M / 4);
+			image_pos_upper.y = image_pos_upper.y / 2 + (M / 4);
+
+			float2 map_lower = { 0, (M / 4) };
+			float2 map_upper = { 0, (M / 4) };
+
+			float2 index_edges = disk_summary[(1 + n_disk_segments) + seg + i * (n_disk_sample + 2 * (1 + n_disk_segments))];
+
+			float2 dist;
+
+			if (useIntegrationDistance) {
+				//Find coordinates of lower and higher point in world space
+				float3 grid_coord_lower = disk_incident_summary[(int)index_edges.x + i * n_disk_sample];
+				float3 grid_coord_higher = disk_incident_summary[(int)index_edges.y + i * n_disk_sample];
+
+				dist = {
+					sqrtf(vector_ops::sq_norm(grid_coord_lower)),
+					sqrtf(vector_ops::sq_norm(grid_coord_higher))
+				};
+
+			}
+			else {
+				//Find coordinates of lower and higher point in world space
+				float2 grid_coord_lower = disk_summary[(int)index_edges.x + 2 * (1 + n_disk_segments) + i * (n_disk_sample + 2 * (1 + n_disk_segments))];
+				float2 grid_coord_higher = disk_summary[(int)index_edges.y + 2 * (1 + n_disk_segments) + i * (n_disk_sample + 2 * (1 + n_disk_segments))];
+
+				//Convert all coordinates to cartesion
+				float3 cam_pos = getCartesianCoordinates({ camera[9],camera[7],camera[8] });
+				float3 lower_pos = getCartesianCoordinates({ grid_coord_lower.x, PI1_2, grid_coord_lower.y });
+				float3 higher_pos = getCartesianCoordinates({ grid_coord_higher.x, PI1_2, grid_coord_higher.y });
+
+				//Find distance
+				dist = {
+					sqrtf(vector_ops::sq_norm(lower_pos - cam_pos)),
+					sqrtf(vector_ops::sq_norm(higher_pos - cam_pos))
+				};
+
+				
+			}
+
+
+			//Center such that black hole is at center of screen
+			dist = -1 * (dist - camera[9]);
+
+			//Find the actual depth for the screen
+			dist = screenDepthR * dist;
+
+			//Find the pixel disparity according to lecture 4 of CSE4365 Applied Image processing
+			float2 offset = (IOD / pixelWidth) * (dist / (dist + screenDistance));
+
+			map_lower.y += offset.x;
+			map_upper.y += offset.y;
+
+		
+
+			float2 image_pos_lower_L = image_pos_lower - map_lower;
+			float2 image_pos_upper_L = image_pos_upper - map_upper;
+
+			float2 image_pos_lower_R = image_pos_lower + map_lower;
+			float2 image_pos_upper_R = image_pos_upper + map_upper;
+
+
+			//Left image mapped
+			disk_mapped_vertexes[0 + (seg * 4) +  (i * 4 * n_disk_segments)] = image_pos_lower_L;
+			disk_mapped_vertexes[1 + (seg * 4) +  (i * 4 * n_disk_segments)] = image_pos_upper_L;
+
+			//Right image mapped
+			disk_mapped_vertexes[2 + (seg * 4) + (i * 4 * n_disk_segments)] = image_pos_lower_R;
+			disk_mapped_vertexes[3 + (seg * 4) + (i * 4 * n_disk_segments)] = image_pos_upper_R;
+		}
+	}
+}
+
+
+__device__ float3 is_point_in_quad(const float2* vertices1,float2* vertices2, float2& point) {
+	float2 v01 = vertices1[1] - vertices1[0], v11 = vertices2[0] - vertices1[0], v21 = point - vertices1[0];
+	float d001 = vector_ops::dot(v01, v01);
+	float d011 = vector_ops::dot(v01, v11);
+	float d111 = vector_ops::dot(v11, v11);
+	float d201 = vector_ops::dot(v21, v01);
+	float d211 = vector_ops::dot(v21, v11);
+	float denom1 = d001 * d111 - d011 * d011;
+	float v1 = (d111 * d201 - d011 * d211) / denom1;
+	float w1 = (d001 * d211 - d011 * d201) / denom1;
+	float u1 = 1.0f - v1 - w1;
+
+	float2 v02 = vertices2[1] - vertices1[1], v12 = vertices2[0] - vertices1[1], v22 = point - vertices1[1];
+	float d002 = vector_ops::dot(v02, v02);
+	float d012 = vector_ops::dot(v02, v12);
+	float d112 = vector_ops::dot(v12, v12);
+	float d202 = vector_ops::dot(v22, v02);
+	float d212 = vector_ops::dot(v22, v12);
+	float denom2 = d002 * d112 - d012 * d012;
+	float v2 = (d112 * d202 - d012 * d212) / denom2;
+	float w2 = (d002 * d212 - d012 * d202) / denom2;
+	float u2 = 1.0f - v2 - w2;
+
+
+	float3 ret = { 0.5,0.5,0.5 }; 
+
+	if (v1 < 1 && v1 > 0 && w1 < 1 && w1 > 0 && u1 < 1 && u1 > 0) {
+		float2 tex_coord = v1 * make_float2(1,0) + w1 * make_float2(0, 1);
+
+		ret.x = tex_coord.x;
+		ret.y = tex_coord.x;
+		ret.z = tex_coord.y;
+	}
+	else if (v2 < 1 && v2 > 0 && w2 < 1 && w2 > 0 && u2 < 1 && u2 > 0) {
+		float2 tex_coord = w2 * make_float2(0,1) + u2 * make_float2(1, 0) + v2 * make_float2(1, 1);
+
+		ret.x = tex_coord.x;
+		ret.y = tex_coord.x;
+		ret.z = tex_coord.y;
+	}
+	else {
+		ret.x = -1;
+	}
+
+	return ret;
+}
+
+__global__ void disk_pixInterpolationVR(const float2* viewthing, const int M, const int N, const bool should_interpolate_grids, float2* disk_thphi, float3* disk_incident, const float2* disk_grid, const float3* disk_incident_grid,
+	float2* disk_summary, float2* disk_summary_2, float3* disk_incident_summary, float3* disk_incident_summary_2, float2* disk_mapped_vertexes, float2* disk_mapped_vertexes_2, const int n_disk_angles, const int n_disk_sample, const int n_disk_segments, const int GM, const int GN, int* gapsave, int gridlvl,
+	const float2 bh_center, const int angleNum, float alpha) {
+	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
+	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
+
+
+	float2 pix_pos = { i,j };
+	if (i < N1 && j < M1) {
+		disk_thphi[i * M1 + j] = { nanf(""),0 };
+
+
+		int mapped_vertex_LR_offset = (j > (M1 / 2)) * 2;
+
+		float theta = viewthing[i * M1 + j].x;
+		float phi = fmodf(viewthing[i * M1 + j].y + PI2, PI2);
+
+		float3 alphas = {  };
+		if (should_interpolate_grids) {
+			
+		}
+		else {
+			for (int angleSlot = 0; angleSlot < n_disk_angles; angleSlot++) {
+				for (int segment_slot = 1; segment_slot < n_disk_segments; segment_slot++) {
+					int angleSlot2 = (angleSlot + 1) % n_disk_angles;
+					alphas = is_point_in_quad(
+						&disk_mapped_vertexes[segment_slot * 4 + mapped_vertex_LR_offset + (angleSlot * 4 * n_disk_segments)],
+						&disk_mapped_vertexes[segment_slot * 4 + mapped_vertex_LR_offset + (angleSlot2 * 4 * n_disk_segments)],
+						pix_pos);
+					if (alphas.x > 0) {
+						
+
+						//Get index range for this segment on grid 1 and 2
+						float2 index_edges_G1_A1 = disk_summary[(1 + n_disk_segments) + segment_slot + angleSlot * (n_disk_sample + 2 * (1 + n_disk_segments))];
+						float2 index_edges_G1_A2 = disk_summary[(1 + n_disk_segments) + segment_slot + angleSlot2 * (n_disk_sample + 2 * (1 + n_disk_segments))];
+
+
+						//Calculate grid values
+
+						float2 summary_val = interpolate_summary<float2, true>(&disk_summary[2 * (1 + n_disk_segments) + angleSlot * (n_disk_sample + 2 * (1 + n_disk_segments))],
+							&disk_summary[2 * (1 + n_disk_segments) + angleSlot2 * (n_disk_sample + 2 * (1 + n_disk_segments))],
+							index_edges_G1_A1, index_edges_G1_A2, alphas.z, alphas.x, alphas.y);
+
+						//Interpolate grids to get final value
+						disk_thphi[i * M1 + j] = summary_val;
+
+
+						//Calulate the incident grid values
+						//Calculate grid values
+						float3 incident_val = interpolate_summary<float3, false>(&disk_incident_summary[angleSlot * n_disk_sample],
+							&disk_incident_summary[angleSlot2 * n_disk_sample],
+							index_edges_G1_A1, index_edges_G1_A2, alphas.z, alphas.x, alphas.y);
+
+						disk_incident[i * M1 + j] = incident_val;
+
+						return;
+					}
+				}
+			}
+		}
+
+
+	}
+
+};
+
 __global__ void disk_pixInterpolation(const float2* viewthing, const int M, const int N, const bool should_interpolate_grids, float2* disk_thphi, float3* disk_incident, const float2* disk_grid, const float3* disk_incident_grid,
 	float2* disk_summary, float2* disk_summary_2, float3* disk_incident_summary, float3* disk_incident_summary_2, const int n_disk_angles, const int n_disk_sample, const int n_disk_segments, const int GM, const int GN, int* gapsave, int gridlvl,
 	const float2 bh_center, const int angleNum, float alpha) {
@@ -186,10 +393,10 @@ __global__ void disk_pixInterpolation(const float2* viewthing, const int M, cons
 					float2 grid_values[] = {
 						interpolate_summary<float2, true>(&disk_summary[2 * (1 + n_disk_segments) + angleSlot * (n_disk_sample + 2 * (1 + n_disk_segments))],
 							&disk_summary[2 * (1 + n_disk_segments) + angleSlot2 * (n_disk_sample + 2 * (1 + n_disk_segments))],
-							index_edges_G1_A1, index_edges_G1_A2, angle_alpha, segment_frac),
+							index_edges_G1_A1, index_edges_G1_A2, angle_alpha, segment_frac, segment_frac),
 						interpolate_summary<float2, true>(&disk_summary_2[2 * (1 + n_disk_segments) + angleSlot * (n_disk_sample + 2 * (1 + n_disk_segments))],
 							&disk_summary_2[2 * (1 + n_disk_segments) + angleSlot2 * (n_disk_sample + 2 * (1 + n_disk_segments))],
-							index_edges_G2_A1,index_edges_G2_A2, angle_alpha, segment_frac)
+							index_edges_G2_A1,index_edges_G2_A2, angle_alpha, segment_frac,segment_frac)
 					};
 
 					piCheckTot<float2, true>(grid_values, PI_CHECK_FACTOR, 2);
@@ -204,10 +411,10 @@ __global__ void disk_pixInterpolation(const float2* viewthing, const int M, cons
 					float3 incident_grid_values[] = {
 						interpolate_summary<float3, false>(&disk_incident_summary[angleSlot * n_disk_sample],
 							&disk_incident_summary[angleSlot2 * n_disk_sample],
-							index_edges_G1_A1, index_edges_G1_A2, angle_alpha, segment_frac),
+							index_edges_G1_A1, index_edges_G1_A2, angle_alpha, segment_frac, segment_frac),
 						interpolate_summary<float3, false>(&disk_incident_summary_2[angleSlot * n_disk_sample],
 							&disk_incident_summary_2[angleSlot2 * n_disk_sample],
-							index_edges_G2_A1,index_edges_G2_A2, angle_alpha, segment_frac)
+							index_edges_G2_A1,index_edges_G2_A2, angle_alpha, segment_frac, segment_frac)
 					};
 
 					disk_incident[i * M1 + j] = interpolate_vector_linearly<float3, false>(incident_grid_values,alpha);
@@ -228,6 +435,9 @@ __global__ void disk_pixInterpolation(const float2* viewthing, const int M, cons
 
 	}
 }
+
+
+
 
 /// <summary>
 /// Interpolates the disk summary at a given angle
@@ -268,12 +478,12 @@ template <class T, bool CheckPi> __device__ T interpolate_summary_angle(T* disk_
 /// <param name="angle_alpha">Mixing factor for the angles</param>
 /// <param name="segment_frac">How far along the segment the point is [0,1]</param>
 /// <returns>interpolated value</returns>
-template <class T, bool CheckPi> __device__ T interpolate_summary(T* disk_summary_angle_1, T* disk_summary_angle_2, float2 index_edges_1, float2 index_edges_2, float angle_alpha, float segment_frac) {
+template <class T, bool CheckPi> __device__ T interpolate_summary(T* disk_summary_angle_1, T* disk_summary_angle_2, float2 index_edges_1, float2 index_edges_2, float angle_alpha, float segment_frac, float segment_frac_2) {
 
 	//Calculate the values according to both adjecent angles
 	T values[] = {
 		interpolate_summary_angle<T, CheckPi>(disk_summary_angle_1, segment_frac,index_edges_1),
-		interpolate_summary_angle<T, CheckPi>(disk_summary_angle_2, segment_frac,index_edges_2)
+		interpolate_summary_angle<T, CheckPi>(disk_summary_angle_2, segment_frac_2,index_edges_2)
 	};
 
 	//Fix 2 pi crossings

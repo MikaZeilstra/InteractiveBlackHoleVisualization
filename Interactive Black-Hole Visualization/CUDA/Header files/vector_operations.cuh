@@ -17,6 +17,10 @@ inline __host__ __device__  float2 operator- (int2 a, float2 b) {
 	return make_float2(a.x - b.x, a.y - b.y);
 }
 
+inline __host__ __device__  float2 operator* (float2 a, float2 b) {
+	return make_float2(a.x * b.x, a.y * b.y);
+}
+
 inline __host__ __device__ float2 operator*(float b, float2 a)
 {
 	return make_float2(b * (float)a.x, b * (float)a.y);
@@ -42,6 +46,10 @@ inline __host__ __device__  double3 operator- (double3 a, double3 b) {
 
 inline __host__ __device__  double3 operator- (double3 a, float3 b) {
 	return make_double3(a.x - b.x, a.y - b.y, a.z - b.z);
+}
+
+inline __host__ __device__  float2 operator/ (float2 a, float2 b) {
+	return make_float2(a.x / b.x, a.y / b.y);
 }
 
 inline __host__ __device__  double3 operator/ (double3 a, float3 b) {
@@ -82,6 +90,18 @@ inline __host__ __device__ float4 operator*(float b, uchar4 a)
 inline __host__ __device__ float3 operator*(float b, uchar3 a)
 {
 	return make_float3(b * (float) a.x, b * (float) a.y, b * (float) a.z);
+}
+
+inline __host__ __device__  float3 operator- (float3 a, float b) {
+	return make_float3(a.x - b, a.y - b, a.z - b);
+}
+
+inline __host__ __device__  float2 operator- (float2 a, float b) {
+	return make_float2(a.x - b, a.y - b);
+}
+
+inline __host__ __device__  float2 operator+ (float2 a, float b) {
+	return make_float2(a.x + b, a.y + b);
 }
 
 
@@ -154,5 +174,9 @@ namespace vector_ops {
 
 	inline __host__ __device__ float sq_norm(float2 a) {
 		return dot(a, a);
+	}
+
+	inline __host__ __device__ float cross_2d(float2 a,float2 b) {
+		return a.x * b.y - a.y * b.x;
 	}
 }

@@ -22,6 +22,14 @@ __device__ float getDeterminant(const float3& center,const float3& v1, const flo
 	return ((v1.x - center.x) * (v2.y - center.y)) - (v2.x - center.x) * (v1.y - center.y);
 }
 
+__device__ float3 getCartesianCoordinates(const float3& pos) {
+	return {
+		sqrtf(pos.x * pos.x + metric::asq_dev<INTEGRATION_PRECISION_MODE>) * sin(pos.y) * cos(pos.z) ,
+		sqrtf(pos.x * pos.x + metric::asq_dev<INTEGRATION_PRECISION_MODE>) * sin(pos.y) * sin(pos.z) ,
+		pos.x * cos(pos.y)
+	};
+	
+}
 
 /// <summary>
 /// Finds the solid angle of the celestial sky/accretion disk
@@ -79,7 +87,12 @@ __global__ void findArea(const float2* thphi, const float2* thphi_disk, const in
 			//		
 			//		(r-1)	1
 
-			float2 disk_vertices[4] = { thphi_disk[ind],thphi_disk[ind + 1],thphi_disk[ind + M1],thphi_disk[ind + M1 + 1] };
+			float3 disk_vertices[4] = { 
+				{thphi_disk[ind].x,PI1_2,thphi_disk[ind].y},
+				{thphi_disk[ind+1].x ,PI1_2, thphi_disk[ind + 1].y },
+				{thphi_disk[ind + M1].x,PI1_2 , thphi_disk[ind + M1].y },
+				{thphi_disk[ind + M1 + 1].x,PI1_2 , thphi_disk[ind + M1 + 1].y }
+			};
 
 			int accretion_vertices[4];
 			int celestial_vertices[3];
@@ -93,11 +106,7 @@ __global__ void findArea(const float2* thphi, const float2* thphi_disk, const in
 			float distance = 0;
 
 			for (int k = 0; k < 4; k++) {
-				cartesian_vertices[k] = {
-					sqrtf(disk_vertices[k].x * disk_vertices[k].x + metric::asq_dev<INTEGRATION_PRECISION_MODE>) * cos(disk_vertices[k].y),
-					sqrtf(disk_vertices[k].x * disk_vertices[k].x + metric::asq_dev<INTEGRATION_PRECISION_MODE>) * sin(disk_vertices[k].y),
-					0
-				};
+				cartesian_vertices[k] = getCartesianCoordinates(disk_vertices[k]);
 				distance += 0.25f * sqrt(vector_ops::sq_norm(disk_incidents[k]));
 			}
 
