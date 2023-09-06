@@ -1,8 +1,17 @@
 #version 330 core
 out vec4 FragColor;
 
+float near = 0.1; 
+float far  = 100.0; 
+
+float LinearizeDepth(float depth) 
+{
+    float z = depth * 2.0 - 1.0; // back to NDC 
+    return (2.0 * near * far) / (far + near - z * (far - near));	
+}
 
 void main()
 {
-    FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);
+    float depth = LinearizeDepth(gl_FragCoord.z) / far; // divide by far for demonstration
+    FragColor = vec4(depth , 0,1-depth, 1.0); 
 } 

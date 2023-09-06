@@ -30,6 +30,26 @@ glm::mat4 Camera::viewMatrix() const
     return glm::lookAt(m_position, m_position + m_forward, m_up);
 }
 
+glm::mat4 Camera::BHviewMatrix() const
+{
+    glm::mat4 vm = glm::lookAt(m_position, m_position + m_forward, m_up);
+
+    float scale = glm::sqrt((vm[0][0] * vm[0][0]) + (vm[0][1] * vm[0][1]) + (vm[0][2] * vm[0][2]));
+
+    vm[0][0] = scale;
+    vm[0][1] = 0;
+    vm[0][2] = 0;
+    vm[1][0] = 0;
+    vm[1][1] = scale;
+    vm[1][2] = 0;
+    vm[2][0] = 0;
+    vm[2][1] = 0;
+    vm[2][2] = scale;
+
+    return vm;
+
+}
+
 void Camera::rotateX(float angle)
 {
     const glm::vec3 horAxis = glm::cross(s_yAxis, m_forward);

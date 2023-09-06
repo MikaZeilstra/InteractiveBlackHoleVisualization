@@ -1,13 +1,14 @@
 #version 330 core
 out vec4 FragColor;
 
+smooth in vec2 texel;
 
 void main()
 {
-    vec2 circCoord = 2.0 * gl_PointCoord - 1.0;
-    if (dot(circCoord, circCoord) > 1.0) {
+    if(dot(texel.xy,texel.xy) > 1){
         discard;
     }
 
-    FragColor = vec4(0.0f, 0.0f, 0.0f, 1.0f);
-} 
+
+    FragColor = vec4(0,0, 0.0f, 1.0f);
+}

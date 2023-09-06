@@ -16,6 +16,7 @@ public:
 
     glm::vec3 cameraPos() const;
     glm::mat4 viewMatrix() const;
+    glm::mat4 BHviewMatrix() const;
 
     glm::vec3 m_position{ 10,0,0 };
     glm::vec3 m_forward{ -1, 0, 0};

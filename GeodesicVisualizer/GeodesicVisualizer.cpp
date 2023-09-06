@@ -22,6 +22,9 @@ std::vector<float> geodesics;
 GLuint VAO;
 GLuint VBO;
 
+GLuint BHVAO;
+GLuint BHVBO;
+
 std::vector<float> vertices;
 std::vector<int> vertex_counts;
 std::vector<int> vertex_starts;
@@ -83,6 +86,8 @@ int main()
 	glClearColor(0, 0, 0, 1);
 	glClear(GL_COLOR_BUFFER_BIT);
     glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_TRUE);
 	//Setup initial screen
 	glfwSwapBuffers(window);
 
@@ -133,19 +138,39 @@ int main()
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
-    //Create Blackhole as point
-    GLuint PointVAO;
-    glGenVertexArrays(1, &PointVAO);
-    glBindVertexArray(PointVAO);
+  
+    //Black hole quad
+   
 
-    GLuint PointVBO;
-    glGenBuffers(1, &PointVBO);
-    glBindBuffer(GL_ARRAY_BUFFER, PointVBO);
-    float point[] = { 0,0,0 };
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 3, point, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    std::vector<glm::vec3> vertices;
+
+    vertices.resize(6);
+    // first triangle
+    vertices[0] = glm::vec3(-1, -1, 0.0f);
+    vertices[1] = glm::vec3(1 ,-1, 0.0f); 
+    vertices[2] = glm::vec3(-1, 1, 0.0f); 
+    // second triangle
+    vertices[3] = glm::vec3(-1, 1, 0.0f);
+    vertices[4] = glm::vec3(1, 1, 0.0f); 
+    vertices[5] = glm::vec3(1,-1, 0.0f); 
+
+    GLuint bhvao;
+    GLuint bhvbo;
+
+    glGenVertexArrays(1, &bhvao);
+    glBindVertexArray(bhvao);
+
+    glGenBuffers(1, &bhvbo);
+    glBindBuffer(GL_ARRAY_BUFFER, bhvbo);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
     glEnableVertexAttribArray(0);
-    
+
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), vertices.data(), GL_STATIC_DRAW);
+
+    glBindVertexArray(0);
+
+
 
     //Compile vertexShader for geodesics
     std::string vertexShaderText = readFile("./VertexShader.vert");
@@ -200,15 +225,26 @@ int main()
 
 
         //Draw Black hole
-        glBindVertexArray(PointVAO);
-        glBindBuffer(GL_ARRAY_BUFFER, PointVBO);
+        glBindVertexArray(BHVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, BHVBO);
+
         glUseProgram(BHshaderProgram);
+
         uniProj = glGetUniformLocation(shaderProgram, "proj");
         glUniformMatrix4fv(uniProj, 1, GL_FALSE, glm::value_ptr(proj));
         uniView = glGetUniformLocation(shaderProgram, "view");
-        glUniformMatrix4fv(uniView, 1, GL_FALSE, glm::value_ptr(camera.viewMatrix()));
+        glUniformMatrix4fv(uniView, 1, GL_FALSE, glm::value_ptr(camera.BHviewMatrix()));
 
-        glDrawArrays(GL_POINTS, 0, 1);
+        glBindVertexArray(bhvao);
+
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        glBindVertexArray(0);
+
+ 
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 2);
 
         //Draw geodesics
         glBindVertexArray(VAO);
@@ -224,6 +260,9 @@ int main()
 
         glMultiDrawArrays(GL_LINE_STRIP, vertex_starts.data(), vertex_counts.data(), vertex_starts.size());
 
+        glUseProgram(BHshaderProgram);
+
+     
         
 
 
