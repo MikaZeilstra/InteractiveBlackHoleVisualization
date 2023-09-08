@@ -25,6 +25,7 @@ GLuint VBO;
 GLuint BHVAO;
 GLuint BHVBO;
 
+std::vector<int> vertex_id;
 std::vector<float> vertices;
 std::vector<int> vertex_counts;
 std::vector<int> vertex_starts;
@@ -120,11 +121,14 @@ int main()
             float phi = geodesics[geo_index * (MAXSTP / STEP_SAVE_INTERVAL) + step + 1];
             float r = geodesics[geo_index * (MAXSTP / STEP_SAVE_INTERVAL) + step + 2];
 
+            
 
             //Transform the coordinates to cartesian and save them
             vertices.push_back(r * sin(theta) * cos(phi));
             vertices.push_back(r * sin(theta) * sin(phi));
             vertices.push_back(r * cos(theta));
+
+            vertices.push_back(step);
 
             //Go to the next step
             step += 3;
@@ -135,8 +139,11 @@ int main()
     }
     //Upload buffer data and set VAO properties
     glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 3 * total_vertex_count, vertices.data(), GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(4 * sizeof(float)));
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+
 
   
     //Black hole quad
@@ -165,6 +172,7 @@ int main()
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
     glEnableVertexAttribArray(0);
+
 
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), vertices.data(), GL_STATIC_DRAW);
 

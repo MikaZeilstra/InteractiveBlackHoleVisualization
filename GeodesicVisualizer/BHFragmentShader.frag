@@ -1,7 +1,7 @@
 #version 330 core
 out vec4 FragColor;
 
-smooth in vec2 texel;
+in vec2 texel;
 
 void main()
 {
