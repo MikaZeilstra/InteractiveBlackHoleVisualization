@@ -5,6 +5,10 @@ inline __host__ __device__  float4 operator/ (uchar4 a, float b) {
 	return make_float4(a.x / b, a.y /b, a.z /b , a.w / b);
 }
 
+inline __host__ __device__  float2 operator/ (float a, float2 b) {
+	return make_float2(a / b.x, a / b.y);
+}
+
 inline __host__ __device__  float2 operator+ (float2 a, float2 b) {
 	return make_float2(a.x + b.x, a.y + b.y);
 }

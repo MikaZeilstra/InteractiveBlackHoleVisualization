@@ -55,7 +55,6 @@ __global__ void pixInterpolation(const float2* viewthing, const int M, const int
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 
-
 	if (i < N1 && j < M1) {
 		float theta = viewthing[i * M1 + j].x;
 		float phi = fmodf(viewthing[i * M1 + j].y + PI2, PI2);
@@ -189,7 +188,7 @@ __global__ void map_disk_vert(float2* disk_summary, float3* disk_incident_summar
 			dist = screenDepthR * dist;
 
 			//Find the pixel disparity according to lecture 4 of CSE4365 Applied Image processing
-			float2 offset = (IOD / pixelWidth) * (dist / (dist + screenDistance));
+			float2 offset = 0.5 * ((IOD / pixelWidth) * (dist / (dist + screenDistance)));
 
 			map_lower.y += offset.x;
 			map_upper.y += offset.y;

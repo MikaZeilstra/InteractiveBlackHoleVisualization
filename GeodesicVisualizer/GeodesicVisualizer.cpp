@@ -128,18 +128,25 @@ int main()
             vertices.push_back(r * sin(theta) * sin(phi));
             vertices.push_back(r * cos(theta));
 
+
             vertices.push_back(step);
 
             //Go to the next step
             step += 3;
             total_vertex_count++;
         }
+
+        for (int x = 3; x < step; x += 4) {
+            float temp = vertices[x] / (float)step;
+            vertices[x] = temp;
+        }
+
         //Save the amount of vertices in each geodesic
-        vertex_counts.push_back(step/3);
+        vertex_counts.push_back((step/3));
     }
     //Upload buffer data and set VAO properties
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 3 * total_vertex_count, vertices.data(), GL_STATIC_DRAW);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(4 * sizeof(float)));
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 4 * total_vertex_count, vertices.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(3 * sizeof(float)));
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);

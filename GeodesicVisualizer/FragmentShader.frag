@@ -19,4 +19,10 @@ void main()
     float depth = vert_id;
     
     FragColor = vec4(depth , 0,1-depth, 1.0); 
+
+    if(depth > 1.1){
+        FragColor = vec4(0,1,0,1);
+    }
+
+    
 } 

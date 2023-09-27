@@ -5,7 +5,7 @@
 
 __global__ void distortEnvironmentMap(const float2* thphi, uchar4* out, const unsigned char* bh, const int2 imsize,
 	const int M, const int N, float offset, float4* sumTable, const float* camParam,
-	const float* solidangle, float2* viewthing,bool redshiftOn, bool lensingOn, const unsigned char* disk_mask);
+	const float* solidangle, float2* viewthing,bool redshiftOn, bool lensingOn, const unsigned char* disk_mask, const float vr_offset);
 
 __global__ void makePix(float3* starLight, uchar4* out, int M, int N);
 

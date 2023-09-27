@@ -286,7 +286,7 @@ namespace CUDA {
 	void manageGrids(Parameters& param, ViewCamera* viewer, GPUBlocks gpuBlocks, BlackHole* bh, int q);
 
 	void CreateTexture(Parameters& param, const Image& image, const StarVis& starvis, const Texture accretionDiskTexture, const CelestialSky& celestialsky, const GPUBlocks& gpublocks,
-		float camera_phi_offset, int q, bool should_interpolate_grids, float grid_alpha);
+		float camera_phi_offset, int q, bool should_interpolate_grids, float grid_alpha, float vr_offset);
 
 	void projectTextureToWindow(Parameters& param, const Image& image, ViewCamera* viewer, GLuint gl_PBO, GLuint gl_Tex, GLuint shaderProgram);
 

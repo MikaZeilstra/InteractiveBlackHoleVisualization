@@ -436,8 +436,12 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 	const Stars& stars, const StarVis& starvis, const Texture& accretionDiskTexture, Parameters& param, ViewCamera* viewer) {
 	bool star = param.useStars;
 
-	GPUBlocks gpuBlocks(param, stars, image);
+	float vr_offset = 0;
+	if (param.outputMode == 2) {
+		vr_offset = (param.pixelWidth / param.interOcularDistance) * (PI2/ image.M);
+	}
 
+	GPUBlocks gpuBlocks(param, stars, image);
 
 	double3 initial_pos = viewer->getCameraPos(0);
 	CUDA::requestGrid(
@@ -538,10 +542,10 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 	size_t num_bytes;
 
 	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0); // << default texture object
+	float total_frame_time = 0;
 
 	std::chrono::steady_clock::time_point frame_start_time;
-
-	while(!glfwWindowShouldClose(viewer->get_window()) && !(param.outputMode != 0 && q >= param.nrOfFrames )) {
+	while(!glfwWindowShouldClose(viewer->get_window()) && !(param.outputMode == 2 && q >= param.nrOfFrames )) {
  		frame_start_time = std::chrono::high_resolution_clock::now();
 
 
@@ -551,7 +555,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 
 		manageGrids(param, viewer, gpuBlocks, bh, q);
 
-		CreateTexture(param, image, starvis, accretionDiskTexture, celestialSky, gpuBlocks, viewer->getPhiOffset(q), q, should_interpolate_grids, alpha);
+		CreateTexture(param, image, starvis, accretionDiskTexture, celestialSky, gpuBlocks, viewer->getPhiOffset(q), q, should_interpolate_grids, alpha, vr_offset);
 				
 		cudaStreamSynchronize(stream);
 		cudaGraphicsUnmapResources(1, &cuda_pbo_resource, 0);
@@ -569,9 +573,10 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 		viewer->current_move = { 0,0 };
 		glfwPollEvents();
 
-		
+		float frame_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - frame_start_time).count();
+		total_frame_time += frame_time_ms;
 		std::cout << "frame_duration " <<
-			std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - frame_start_time).count() << "ms!" <<
+			frame_time_ms << "ms!" <<
 			std::endl << std::endl;
 	}
 	 
@@ -579,6 +584,7 @@ void CUDA::runKernels(BlackHole* bh, const Image& image, const CelestialSky& cel
 	
 	std::cout << "total time spend generating grids " << total_time << " total ray count " << total_rays << std::endl;
 	std::cout << "total integration batches " << total_batches << " of which on the GPU " << gpu_batches << std::endl;
+	std::cout << "total frame time " << total_frame_time << "ms" << std::endl;
 
 	//Cleanup
 	CUDA::cleanup();
@@ -684,7 +690,7 @@ void CUDA::saveImages(Parameters& param, const Image& image, float grid_value, i
 			else {
 				disk_grid_image[i].x = 0;
 				disk_grid_image[i].y = 0;
-				disk_grid_image[i].z = 1;
+				disk_grid_image[i].z = 0;
 				disk_grid_image[i].w = 1;
 			}
 
@@ -973,7 +979,7 @@ void CUDA::requestGrid(double3 cam_pos, double3 cam_speed_dir, float speed, GPUB
 }
 
 void CUDA::CreateTexture(Parameters& param, const Image& image, const StarVis&  starvis, const Texture accretionDiskTexture, const CelestialSky& celestialSky, const GPUBlocks& gpublocks,
-	float camera_phi_offset, int q, bool should_interpolate_grids, float grid_alpha) {
+	float camera_phi_offset, int q, bool should_interpolate_grids, float grid_alpha, float vr_offset) {
 
 	callKernelAsync("update cam", camUpdate, 1, gpublocks.threadsPerBlock_32, 0,
 		alpha, dev_cameras, dev_cameras_2, dev_interpolated_cameras);
@@ -1048,10 +1054,9 @@ void CUDA::CreateTexture(Parameters& param, const Image& image, const StarVis&  
 			dev_starLight1, image.M, image.N, dev_diffraction, starvis.diffSize);
 	}
 
-
 	callKernelAsync("Distorted celestial sky image", distortEnvironmentMap, gpublocks.numBlocks_N_M_4_4, gpublocks.threadsPerBlock4_4, 0,
 		dev_interpolatedGrid, dev_outputImage, dev_blackHoleMask, celestialSky.imsize, image.M, image.N, camera_phi_offset,
-		dev_summedCelestialSky, dev_interpolated_cameras, dev_solidAngles0, dev_viewer, param.useRedshift, param.useLensing, dev_diskMask);
+		dev_summedCelestialSky, dev_interpolated_cameras, dev_solidAngles0, dev_viewer, param.useRedshift, param.useLensing, dev_diskMask, vr_offset);
 
 
 	if (param.useStars) {

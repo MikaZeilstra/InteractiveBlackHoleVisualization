@@ -6,8 +6,8 @@ windowWidth = 1920
 windowHeight = 1080
 
 //Intermediate texture size in pixels
-texWidth = 1920//4096
-texHeight = 1080//2160
+texWidth = 4096
+texHeight = 2160
 
 // Viewer settings
 viewAngle = 0.5 //*PI
@@ -15,8 +15,8 @@ offsetX = 0 // *PI
 offsetY = 0 // *PI
 
 //Frame settings if not movement mode 1 they are automatically overwritten to 1
-nrOfFrames = 3
-nrOfGrids = 2
+nrOfFrames = 1
+nrOfGrids = 1
 
 n_black_hole_angles = 50;
 
@@ -65,7 +65,7 @@ diffractionImg = "0s1.png"
 // Grid Settings
 gridStartLevel = 1
 gridMinLevel = 2
-gridMaxLevel = 9
+gridMaxLevel = 10
 
 // Blackhole angular velocity
 afactor = 0.982;
@@ -113,7 +113,7 @@ camRadiusChange = false
 camRadiusTo = 30.
 
 camInclinationChange = true
-camInclinationTo = 0.45 //*PI
+camInclinationTo = 0.485 //*PI
 
 camPhiChange = false
 camPhiTo = 0.5 //*PI

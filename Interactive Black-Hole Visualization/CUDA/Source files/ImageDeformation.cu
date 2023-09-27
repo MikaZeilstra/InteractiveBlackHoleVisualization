@@ -2,14 +2,26 @@
 
 __global__ void distortEnvironmentMap(const float2* thphi, uchar4* out, const unsigned char* bh, const int2 imsize,
 										const int M, const int N, float camera_phi_offset, float4* sumTable, const float* camParam,
-										const float* solidangle, float2* viewthing, bool redshiftOn, bool lensingOn, const unsigned char* dev_diskMask) {
+										const float* solidangle, float2* viewthing, bool redshiftOn, bool lensingOn, const unsigned char* dev_diskMask, const float vr_offset) {
 	
 	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int j = (blockIdx.y * blockDim.y) + threadIdx.y;
 	float4 color = { 0.f, 0.f, 0.f, 0.f };
 	int ind = i * M1 + j;
-	// Only compute if pixel is not black hole and i j is in image
 
+	//Copy phi_offset to potentially edit
+	float corrected_camera_phi_offset = camera_phi_offset;
+
+	if (vr_offset != 0) {
+		if (j < (M / 2)) {
+			corrected_camera_phi_offset = camera_phi_offset - vr_offset;
+		}
+		else {
+			corrected_camera_phi_offset = camera_phi_offset + vr_offset;
+		}
+	}
+
+	// Only compute if pixel is not black hole and i j is in image
 
 
 	if (i < N && j < M) {
@@ -20,7 +32,7 @@ __global__ void distortEnvironmentMap(const float2* thphi, uchar4* out, const un
 
 			volatile float t[4], p[4];
 			bool picheck = false;
-			retrievePixelCorners(thphi, const_cast<float*>(t), const_cast<float*>(p), ind, M, picheck, camera_phi_offset);
+			retrievePixelCorners(thphi, const_cast<float*>(t), const_cast<float*>(p), ind, M, picheck, corrected_camera_phi_offset);
 
 			if (ind > 0) {
 
