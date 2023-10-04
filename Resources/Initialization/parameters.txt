@@ -21,8 +21,8 @@ nrOfGrids = 1
 n_black_hole_angles = 50;
 
 //Effect settings
-useRedshift = false
-useLensing = false
+useRedshift = true
+useLensing = true
 useStars = false
 
 //AccretionDisk
@@ -80,7 +80,7 @@ movementMode = 0
 // 0 = Viewer
 // 1 = 360 degree images
 // 2 = LR 360 degree VR images
-outputMode = 2
+outputMode = 0
 
 //VR settings
 pixelWidth = 0.3 //mm

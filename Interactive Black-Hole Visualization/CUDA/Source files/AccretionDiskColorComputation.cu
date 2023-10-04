@@ -141,24 +141,11 @@ __global__ void addAccretionDisk(const float2* thphi, const float3* disk_inciden
 
 			float H, S, P;
 			RGBtoHSP(color.x, color.y , color.z , H, S, P);
-			float intensity_factor = fminf(color.w / max_intensity,1.f);
+			float intensity_factor = fminf(color.w / max_intensity, 1.f);
 			float redshft = 1;
-			float frac_disk = 1;
-			float frac_sky = 1;
-
-			if (lensingOn) {
-				float lensing_alpha = 0;
-
-				if (avg_thp.x > DISK_SOLIDANGLE_FADE * max_disk_r) {
-					//lensing_alpha = (avg_thp.x - DISK_SOLIDANGLE_FADE * max_disk_r) / (max_disk_r - DISK_SOLIDANGLE_FADE * max_disk_r);
-
-				}
-
-				findLensingRedshift(M, ind, camParam, viewthing, frac_disk, redshft, solidangle_disk[ijc]);
-				//findLensingRedshift(M, ind, camParam, viewthing, frac_sky, redshft, solidangle[ijc]);
-				
-				//P *= (1 - lensing_alpha) * frac_disk + lensing_alpha * frac_sky;
-			}
+			float frac = 1;
+			findLensingRedshift(M, ind, camParam, viewthing, frac, redshft, solidangle_disk[ijc]);
+			if (lensingOn) P *= frac;
 
  			P *= intensity_factor;
 
