@@ -15,13 +15,13 @@ offsetX = 0 // *PI
 offsetY = 0 // *PI
 
 //Frame settings if not movement mode 1 they are automatically overwritten to 1
-nrOfFrames = 1
-nrOfGrids = 1
+nrOfFrames = 3
+nrOfGrids = 2
 
 n_black_hole_angles = 50;
 
 //Effect settings
-useRedshift = true
+useRedshift =  true
 useLensing = true
 useStars = false
 
@@ -38,9 +38,9 @@ useAccretionDiskTexture = false
 accretionDiskTexture = "AcretionTest.png"
 
 //AcretionDiskInterpolation
-n_disk_angles = 101;
+n_disk_angles = 200;
 n_disk_sample = 200;
-max_disk_segments = 2;
+max_disk_segments = 4;
 
 //Option to save the geodesics used to generate the image
 saveGeodesics = false
@@ -74,7 +74,7 @@ afactor = 0.982;
 // 0 = single frame
 // 1 = Move along path
 // 2 = Free movement
-movementMode = 0
+movementMode = 2
 
 // Output mode
 // 0 = Viewer
@@ -113,10 +113,10 @@ camRadiusChange = false
 camRadiusTo = 30.
 
 camInclinationChange = true
-camInclinationTo = 0.485 //*PI
+camInclinationTo = 0.41 //*PI
 
 camPhiChange = false
-camPhiTo = 0.5 //*PI
+camPhiTo = 0.0 //*PI
 
 //If movement mode 2 the distance before we generate a new grid
 gridDistanceTheta = 0.1 //*PI

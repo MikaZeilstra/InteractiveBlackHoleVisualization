@@ -129,16 +129,11 @@ int main()
             vertices.push_back(r * cos(theta));
 
 
-            vertices.push_back(step);
+            vertices.push_back((float)step );
 
             //Go to the next step
             step += 3;
             total_vertex_count++;
-        }
-
-        for (int x = 3; x < step; x += 4) {
-            float temp = vertices[x] / (float)step;
-            vertices[x] = temp;
         }
 
         //Save the amount of vertices in each geodesic
